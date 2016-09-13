@@ -2,8 +2,8 @@
 using namespace xm;
 
 template<class type>
-void baseband(bluereader& input, bluewriter& output, ssize_t offset, ssize_t length) {
-
+int baseband(bluereader& input, bluewriter& output, ssize_t offset, ssize_t length) {
+    return 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -13,14 +13,14 @@ int main(int argc, char* argv[]) {
         "and decimates by two.  Similar to a Hilbert transform."
     );
     double bandwidth = args.getdouble("bandwidth", 0, "pass band to preserve, default is 80%");
-    timecode tstart  = args.gettimecode("tstart", timecode{0,0}, "starting timecode, default is the beginning");
+    timecode tstart  = args.gettimecode("tstart", (timecode){0,0}, "starting timecode, default is the beginning");
     double tspan     = args.getdouble("tspan", 0, "amount of time to keep, default is whole file");
-    string inpath    = args.getinput("input.tmp", "input real-valued data");
-    string outpath   = args.getoutput("output.tmp", "output complex float");
+    str    inpath    = args.getinput("input.tmp", "input real-valued data");
+    str    outpath   = args.getoutput("output.tmp", "output complex float");
     args.done();
 
     bluereader input(inpath);
-    check(input->format[0] == 'S', "requires real-valued input");
+    check(input->format.data()[0] == 'S', "requires real-valued input");
     check(input->type/1000 == 1, "requires Type 1000 input");
 
     bluewriter output(outpath);
@@ -34,8 +34,12 @@ int main(int argc, char* argv[]) {
     int64_t offset = 0;
     int64_t length = input->xcount;
     double dwidth = .5;
+    (void)bandwidth;
+    (void)tstart;
+    (void)tspan;
+    (void)dwidth;
 
-    switch (input->format[1]) {
+    switch (input->format.data()[1]) {
         case 'B': return baseband<int8_t>  (input, output, offset, length);
         case 'I': return baseband<int16_t> (input, output, offset, length);
         case 'L': return baseband<int32_t> (input, output, offset, length);

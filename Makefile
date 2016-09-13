@@ -19,6 +19,8 @@ PROGRAMS = \
     xmtone \
     xmnoise \
     xmspec \
+    xmbase \
+    xmlfsr \
 
 all: $(PROGRAMS)
 
