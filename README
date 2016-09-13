@@ -1,1 +1,38 @@
-A collection of utilities for doing things with X-Midas files.
+A collection of utilities for working with X-Midas files.
+
+To Do List:
+
+    delete stuff that should die
+    fix the check function/macro
+
+    xmbase.cc  - real to complex at half rate
+    xmhalf.cc  - complex to complex at half rate
+    xmtfd.cc   - tune, filter, decimate (Borgerding)
+    xmlist.cc  - dump data to round-trip text
+    xmcic.cc   - cascade integrate comb
+    xmbot.cc   - bank of tuners
+    xmchan.cc  - take a channel from xmbot output
+    xmfir.cc   - build fir filter
+    xmcorl.cc  - linear correlation
+    xmcaf.cc   - complex ambiguity function
+    xmpeak.cc  - pick a caf peak
+    xmdemod.cc - AM, PM, FM demod
+    xmspec.cc  - power spectra
+
+    xmdraw.h   - window, canvas, plot frames
+    xmplot.cc  - type 1000 plotter
+    xmrast.cc  - type 2000 plotter
+    xmworld.cc - world map plot (lines? ephemeris?)
+
+    introselect(type* ptr, int64 len, int64 pos);
+    mergesort(type* ptr, int64 len, compare lessthan);
+    svdecomp(...)
+    qrdecomp(...)
+    lqdecomp(...)
+    solve(...)
+    covarmin(...) CMA-ES
+    quasimin(...) Trust Region, Quasi-Newton
+
+    bluereader subscripts
+    bluereader grab pointers
+
