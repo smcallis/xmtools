@@ -5239,25 +5239,6 @@ namespace xm {
         ) ? val : def;
     }
 
-    /* XXX
-    matrix<double> cmdline::getmatrix(str name, matrix<double>& def, str doc) {
-        check(switches_done == false, "switches must be processed first");
-        name = "-" + name;
-        if (need_help) {
-            fprintf(
-                stderr, "    %s <matrix, default='...'>\n\t%s\n",
-                name.data(), doc.data()
-            );
-            return matrix<double>();
-        }
-
-        const char* val = find_argument(name);
-        if (!val) return def;
-
-        return parse_matrix(name, val);
-    }
-    */
-
     str cmdline::getstring(str name, str doc) {
         check(switches_done == false, "switches must be processed first");
         name = format("-%s", name.data()); //name = "-" + name;
@@ -5324,28 +5305,6 @@ namespace xm {
         scan_argument(name, true, "geodetic", doc, 1, " %lf , %lf , %lf ", &val.lat, &val.lon, &val.alt);
         return val;
     }
-
-    /* XXX
-    matrix<double> cmdline::getmatrix(str name, str doc) {
-        check(switches_done == false, "switches must be processed first");
-        name = format("-%s", name.data()); //name = "-" + name;
-        if (need_help) {
-            fprintf(
-                stderr, "    %s <matrix, required>\n\t%s\n",
-                name.data(), doc.data()
-            );
-            return matrix<double>();
-        }
-
-        const char* val = find_argument(name);
-        if (val == 0) {
-            fprintf(stderr, "Error: switch '%s' is required\n", name.data());
-            exit(-1);
-        }
-
-        return parse_matrix(name, val);
-    }
-    */
 
     bool cmdline::getswitch(str name, str doc) {
         check(switches_done == false, "switches must be processed first");
@@ -5535,70 +5494,6 @@ namespace xm {
 
         return true;
     }
-
-    /* XXX
-    matrix<double> cmdline::parse_matrix(str name, const char* val) {
-        ssize_t cols = 1;
-        for (const char* pp = val; *pp != ';' && *pp; pp++) {
-            if (*pp == ',') cols++;
-        }
-
-        ssize_t rows = 1;
-        for (const char* pp = val; *pp; pp++) {
-            if (*pp == ';') rows++;
-        }
-
-        matrix<double> result(rows, cols);
-
-        const char* pp = val;
-        for (ssize_t row = 0; row<rows; row++) {
-            for (ssize_t col = 0; col<cols; col++) {
-                while (isblank(*pp)) pp++;
-                char* end = 0;
-                result(row, col) = strtod(pp, &end);
-                if (end == pp) {
-                    fprintf(
-                        stderr, "Error: %s, couldn't parse double starting at '%s'\n",
-                        name.data(), pp
-                    );
-                    exit(-1);
-                }
-                pp = end;
-                while (isblank(*pp)) pp++;
-                if (col != cols - 1) {
-                    if (*pp != ',') {
-                        fprintf(
-                            stderr, "Error: %s, expected a comma at '%s'\n",
-                            name.data(), pp
-                        );
-                        exit(-1);
-                    }
-                    pp++;
-                }
-            }
-            while (isblank(*pp)) pp++;
-            if (row != rows - 1) {
-                if (*pp != ';') {
-                    fprintf(
-                        stderr, "Error: %s, expected a semicolon at '%s'\n",
-                        name.data(), pp
-                    );
-                    exit(-1);
-                }
-                pp++;
-            }
-        }
-        if (*pp != '\0') {
-            fprintf(
-                stderr, "Error: %s, expected end of expression at '%s'\n",
-                name.data(), pp
-            );
-            exit(-1);
-        }
-
-        return result;
-    }
-    */
 
     //}}}
     //{{{ rawfile
