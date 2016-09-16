@@ -2,7 +2,6 @@ A collection of utilities for working with X-Midas files.
 
 To Do List:
 
-    delete stuff that should die
     fix the check function/macro
 
     xmbase.cc  - real to complex at half rate
