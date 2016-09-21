@@ -7101,7 +7101,7 @@ namespace xm {
         using namespace internal;
 
         int fd = path == "-" ? dup(1) : open(
-            path.data(), O_WRONLY | O_TRUNC | O_CREAT, 0660
+            path.data(), O_WRONLY | O_TRUNC | O_CREAT, 0666
         );
         check(fd >= 0, "opening '%s' for writing", path.data());
         rawfile file(fd);
