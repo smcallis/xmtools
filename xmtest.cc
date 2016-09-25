@@ -76,6 +76,29 @@ static void test0003() {
 }
 
 
+void test0004() {
+    static const int correct[38] = {
+        // See ICD GPC 200, pages 8-9, First 10 C/A Chips in Octal
+            0, 01440, 01620, 01710, 01744, 01133, 01455, 01131, 01454, 01626,
+        01504, 01642, 01750, 01764, 01772, 01775, 01776, 01156, 01467, 01633,
+        01715, 01746, 01763, 01063, 01706, 01743, 01761, 01770, 01774, 01127,
+        01453, 01625, 01712, 01745, 01713, 01134, 01456, 01713
+    };
+
+    for (int prn = 1; prn<=37; prn++) {
+        xm::gpsgold gold(prn);
+        int test = 0;
+        for (int ii = 0; ii<10; ii++) {
+            test <<= 1;
+            test |= gold.bit();
+            gold.next();
+        }
+        //printf("%2d: %04o %04o\n", prn, test, correct[prn]);
+        xm::check(test == correct[prn], "matching prn %d", prn);
+    }
+
+}
+
 
 
 int main() {
@@ -83,6 +106,7 @@ int main() {
     test0001();
     test0002();
     test0003();
+    test0004();
 
     return 0;
 }

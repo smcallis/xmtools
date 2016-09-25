@@ -21,6 +21,7 @@ PROGRAMS = \
     xmspec \
     xmbase \
     xmlfsr \
+    xmgps \
 
 all: $(PROGRAMS)
 
