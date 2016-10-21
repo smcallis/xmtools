@@ -41,6 +41,16 @@ void cheby_win(double *out, int N, double atten){
 int main() {
     using namespace xm;
 
+    /*
+    typedef float f32x4 __attribute__ ((vector_size (16)));
+
+    const f32x4 aa = { 1, 2, 3, 4 };
+    const f32x4 bb = { 5, 6, 7, 8 };
+    f32x4 cc = aa+bb;
+    float dd = cc[0] + cc[1] + cc[2] + cc[3];
+    fprintf(stderr, "dd: %lf\n", dd);
+    */
+
     const int64 size = 8192;
     vec<cfloat> timedata(size);
     vec<cfloat> freqdata(size);
@@ -51,22 +61,26 @@ int main() {
     //const int64 window = 1, muls = 8;
     //const int64 taps = 4*muls + 3;
 
-    //const int64 taps = 49;
-    //double window[taps];
-    //cheby_win(window, taps, 62.5);
-
-    const int64 taps = 33;
+    // about 74dB down
+    const int64 taps = 49;
     double window[taps];
-    cheby_win(window, taps, 44);
+    cheby_win(window, taps, 62.5);
 
+    // about 55dB down
+    //const int64 taps = 33;
+    //double window[taps];
+    //cheby_win(window, taps, 44);
+
+    //const int64 taps = 49;
 
     for (int64 ii = 0; ii<taps; ii++) {
         //timedata[ii] = sinc(.5*(ii - taps/2)) * firwin(window, ii - taps/2, taps - 1);
         timedata[ii] = sinc(.5*(ii - taps/2)) * window[ii];
+        //timedata[ii] = sinc(.5*(ii - taps/2)) * pow(cos((ii - taps/2)*M_PI/(taps - 1)), 3.6);
         printf("%+3lld %+.12lf\n", ii - taps/2, timedata[ii].re);
     }
 
-    if (0) {
+    if (1) {
         FILE* timeplot = popen("gnuplot -persist", "w");
         fprintf(timeplot, "set grid\n");
         fprintf(timeplot, "plot '-' with lp\n");
