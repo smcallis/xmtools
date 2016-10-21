@@ -20,6 +20,7 @@ PROGRAMS = \
     xmnoise \
     xmspec \
     xmbase \
+    xmhalf \
     xmlfsr \
     xmgps \
 
