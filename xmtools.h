@@ -8959,7 +8959,7 @@ namespace xm {
 
         for (ii = 0; ii<len; ii++) {
             double mag2 = magsqr(ptr[ii]);
-            double db = 10.0*log10(mag2 + 1e-300);
+            double db = 10.0*::log10(mag2 + 1e-300);
             double bin = floor(8000.0 + 10.0*db);
             if (bin < 0) bin = 0;
             if (bin > 15999) bin = 15999;
@@ -8971,14 +8971,12 @@ namespace xm {
             count += histogram[ii];
             if (count >= len/2) {
                 double db = (ii + .5 - 8000)/10.0;
-                double median = pow(10.0, db/10);
+                double median = ::pow(10.0, db/10);
 
-                // returns linear power after converting the median to mean
-                // assuming the distribution of the power (mag squared) is Chi-
-                // squared with 2 DOF formed from standard normal distributions,
-                // i.e., mean ~= 0, variance ~= 1. The estimate is fairly
-                // accurate when the mean and variance are just close to "standard".
-                return median*2.0/::log(4.0);
+                // Returns linear power after converting the median to mean.
+                // Assumes the original data was complex normal, and so the
+                // the mag squared data is Chi-square with 2 degrees of freedom.
+                return median/::log(2.0);
             }
         }
 
