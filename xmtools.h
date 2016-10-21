@@ -7749,7 +7749,7 @@ namespace xm {
         using namespace internal;
         tc = normalize(tc);
         vehday md = (vehday){ veh, tc.whole/86400 };
-        if (cache.haskey(md)) {
+        if (!cache.haskey(md)) {
             if ((int64)cache.size() >= maxsize) {
                 // the oldest one will have the lowest count
                 vehday oldest = (vehday){-1,-1};
@@ -8064,7 +8064,7 @@ namespace xm {
         double fractlon = lon - wholelon;
         latlon ll = { wholelat, wholelon };
 
-        if (cache.haskey(ll)) {
+        if (!cache.haskey(ll)) {
             if ((int64)cache.size() >= maxsize) {
                 // the oldest will have the lowest count
                 latlon oldest = (latlon){ -1, -1 };
