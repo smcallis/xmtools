@@ -4107,7 +4107,7 @@ namespace xm {
         mat<double> L, int sign, vec<double> x
     ) {
         check(L.rows() == L.cols(), "must be a square matrix");
-        check(L.rows() == x.size(), "must be a square matrix");
+        check(L.rows() == x.size(), "must be a matching size");
         cholupdate(L.data(), sign, x.data(), x.size());
         return L;
     }
