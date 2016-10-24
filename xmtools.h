@@ -4096,6 +4096,24 @@ namespace xm {
         }
     }
 
+    // Scale L so the largest diagonal is 1.0
+    static inline void cholunitize(double* L, int64 dim) {
+        double biggest = 0;
+        for (int64 ii = 0; ii<dim; ii++) {
+            double norm = 0;
+            for (int64 jj = 0; jj<=ii; jj++) {
+                norm += sqr(L[ii*dim + jj]);
+            }
+            biggest = max(norm, biggest);
+        }
+        double scale = 1/sqrt(biggest);
+        for (int64 ii = 0; ii<dim; ii++) {
+            for (int64 jj = 0; jj<=ii; jj++) {
+                L[ii*dim + jj] *= scale;
+            }
+        }
+    }
+
     static inline mat<double> cholesky(const mat<double>& A) {
         check(A.rows() == A.cols(), "must be a square matrix");
         mat<double> L(A.rows(), A.cols());
@@ -4515,7 +4533,112 @@ namespace xm {
     }
     */
     //}}}
-    //{{{ firwin
+    //{{{ Rice PDF and CDF
+    namespace internal {
+        // XXX: verify this
+        static inline double chebyshev(double xx, const double* cc, int nn) {
+            check(nn > 0, "sanity");
+            double b0 = cc[0];
+            double b1 = 0;
+            double b2 = 0;
+            for (int ii = 1; ii < nn; ++ii) {
+                b2 = b1;
+                b1 = b0;
+                b0 = xx*b1 - b2 + cc[ii];
+            }
+            
+            return 0.5*(b0 - b2);
+        }
+
+        // XXX: verify this
+        static inline double besseli0(double xx) {
+            // Coefficients for fabs(xx) < 8.0
+            static const double aa[30] = {
+                -4.41534164647933937950e-18, +3.33079451882223809783e-17,
+                -2.43127984654795469359e-16, +1.71539128555513303061e-15,
+                -1.16853328779934516808e-14, +7.67618549860493561688e-14,
+                -4.85644678311192946090e-13, +2.95505266312963983461e-12,
+                -1.72682629144155570723e-11, +9.67580903537323691224e-11,
+                -5.18979560163526290666e-10, +2.65982372468238665035e-9,
+                -1.30002500998624804212e-8,  +6.04699502254191894932e-8,
+                -2.67079385394061173391e-7,  +1.11738753912010371815e-6,
+                -4.41673835845875056359e-6,  +1.64484480707288970893e-5,
+                -5.75419501008210370398e-5,  +1.88502885095841655729e-4,
+                -5.76375574538582365885e-4,  +1.63947561694133579842e-3,
+                -4.32430999505057594430e-3,  +1.05464603945949983183e-2,
+                -2.37374148058994688156e-2,  +4.93052842396707084878e-2,
+                -9.49010970480476444210e-2,  +1.71620901522208775349e-1,
+                -3.04682672343198398683e-1,  +6.76795274409476084995e-1
+            };
+
+            // Coefficients for fabs(xx) >= 8.0
+            static const double bb[25] = {
+                -7.23318048787475395456e-18, -4.83050448594418207126e-18,
+                +4.46562142029675999901e-17, +3.46122286769746109310e-17,
+                -2.82762398051658348494e-16, -3.42548561967721913462e-16,
+                +1.77256013305652638360e-15, +3.81168066935262242075e-15,
+                -9.55484669882830764870e-15, -4.15056934728722208663e-14,
+                +1.54008621752140982691e-14, +3.85277838274214270114e-13,
+                +7.18012445138366623367e-13, -1.79417853150680611778e-12,
+                -1.32158118404477131188e-11, -3.14991652796324136454e-11,
+                +1.18891471078464383424e-11, +4.94060238822496958910e-10,
+                +3.39623202570838634515e-9, +2.26666899049817806459e-8,
+                +2.04891858946906374183e-7, +2.89137052083475648297e-6,
+                +6.88975834691682398426e-5, +3.36911647825569408990e-3,
+                +8.04490411014108831608e-1
+            };
+
+            if (xx < 0) xx = -xx;
+
+            return (xx < 8 ?
+                chebyshev(.5*xx - 2, aa, 30)*exp(xx) :
+                chebyshev(32/xx - 2, bb, 25)*exp(xx)/sqrt(xx)
+            );
+        }
+    }
+
+    static inline double ricepdf(double vv, double ss, double xx) {
+        using namespace internal;
+        check(vv >= 0, "sanity");
+        check(ss > 0, "sanity");
+        if (xx < 0) return 0;
+        return (
+            xx*exp(-(xx*xx + vv*vv) / (2 * ss*ss)) *
+            besseli0(xx*vv/(ss*ss)) / (ss*ss)
+        );
+    }
+
+    static inline double ricecdf(double vv, double ss, double xx) {
+        check(vv >= 0, "sanity");
+        check(ss > 0, "sanity");
+        if (xx < 0) return 0;
+        // This is magic to evaluate the Marcum Q function
+        double aa = vv/ss;
+        double bb = xx/ss;
+        // aa and bb below should be real and non-negative
+        // Should we check for this?
+        aa = aa*aa/2;
+        bb = bb*bb/2;
+        double dd = exp(-aa);
+        double hh = dd;
+        double ff = bb*exp(-bb);
+        double delta = ff*hh;
+        double sum = delta;
+        double kk = 1;
+        const double eps = 1e-60;
+        while (delta > eps*sum) {
+            dd *= aa/kk;
+            hh += dd;
+            ff *= bb/(kk + 1);
+            delta = ff*hh;
+            sum += delta;
+            kk = kk + 1;
+        }
+        return sum;
+    }
+
+    //}}}
+    //{{{ fir windows
     static inline double sinc(double x) {
         if (x == 0.0) return 1;
         return sin(M_PI*x)/(M_PI*x);
@@ -4591,6 +4714,60 @@ namespace xm {
         check(false, "invalid window");
         return 0;
     }
+
+    // Kaiser-Bessel window, centered at zero. 
+    // These windows have discontinuities at the end points.
+    static inline double kaiswin(double alpha, double offset, double length) {
+        if (offset > +.5*length) return 0;
+        if (offset < -.5*length) return 0;
+        offset += .5*length;
+
+        return (
+            internal::besseli0(
+                M_PI*alpha*::sqrt(1 - sqr(2*offset/length - 1))
+            ) / internal::besseli0(M_PI*alpha)
+        );
+    }
+
+    namespace internal {
+
+        //
+        // Time domain Dolph-Chebyshev window.  It has a very flat stop band.
+        //
+        // The equation is from, but this is not that source code:
+        //
+        //       http://practicalcryptography.com/miscellaneous/ ...
+        //       ... machine-learning/implementing-dolph-chebyshev-window/
+        //
+        // Refers to: Antoniou, A., "Digital Filters", McGraw-Hill, 2000
+        //
+        static double chebwin(double atten, double offset, double length) {
+            if (offset > +.5*length) return 0;
+            if (offset < -.5*length) return 0;
+
+            double invr = ::pow(10, -atten/20);
+            double xnot = ::cosh(::acosh(invr)/length);
+            double sum = 0;
+            for (int64 ii = 1; ii<length/2; ii++) {
+                double arg = xnot*::cos(ii*M_PI/(length + 1));
+                double cheb = (
+                    ::fabs(arg) <= 1.0 ? 
+                    ::cos(length*acos(arg)) :
+                    ::cosh(length*acosh(arg))
+                );
+                sum += ::cos(2*offset*ii*M_PI/(length + 1))*cheb;
+            }
+            return (invr + 2*sum)/(length + 1);
+        }
+    }
+
+    // The atten parameter is negative dB, for instance atten=-60.0
+    // See notes above in the internal implementatation.
+    static inline double chebwin(double atten, double offset, double length) {
+        const double scale = internal::chebwin(atten, 0, length);
+        return internal::chebwin(atten, offset, length)/scale;
+    }
+
     //}}}
     //{{{ timecode
 
@@ -7240,111 +7417,6 @@ namespace xm {
         check(symlink(datapath.data(), detfile.data()) == 0, "symlink '%s'", detfile.data());
     }
     //}}}
-    //{{{ Rice PDF and CDF
-    namespace internal {
-        // XXX: verify this
-        static inline double chebyshev(double xx, const double* cc, int nn) {
-            check(nn > 0, "sanity");
-            double b0 = cc[0];
-            double b1 = 0;
-            double b2 = 0;
-            for (int ii = 1; ii < nn; ++ii) {
-                b2 = b1;
-                b1 = b0;
-                b0 = xx*b1 - b2 + cc[ii];
-            }
-            
-            return 0.5*(b0 - b2);
-        }
-
-        // XXX: verify this
-        static inline double besseli0(double xx) {
-            // Coefficients for fabs(xx) < 8.0
-            static const double aa[30] = {
-                -4.41534164647933937950e-18, +3.33079451882223809783e-17,
-                -2.43127984654795469359e-16, +1.71539128555513303061e-15,
-                -1.16853328779934516808e-14, +7.67618549860493561688e-14,
-                -4.85644678311192946090e-13, +2.95505266312963983461e-12,
-                -1.72682629144155570723e-11, +9.67580903537323691224e-11,
-                -5.18979560163526290666e-10, +2.65982372468238665035e-9,
-                -1.30002500998624804212e-8,  +6.04699502254191894932e-8,
-                -2.67079385394061173391e-7,  +1.11738753912010371815e-6,
-                -4.41673835845875056359e-6,  +1.64484480707288970893e-5,
-                -5.75419501008210370398e-5,  +1.88502885095841655729e-4,
-                -5.76375574538582365885e-4,  +1.63947561694133579842e-3,
-                -4.32430999505057594430e-3,  +1.05464603945949983183e-2,
-                -2.37374148058994688156e-2,  +4.93052842396707084878e-2,
-                -9.49010970480476444210e-2,  +1.71620901522208775349e-1,
-                -3.04682672343198398683e-1,  +6.76795274409476084995e-1
-            };
-
-            // Coefficients for fabs(xx) >= 8.0
-            static const double bb[25] = {
-                -7.23318048787475395456e-18, -4.83050448594418207126e-18,
-                +4.46562142029675999901e-17, +3.46122286769746109310e-17,
-                -2.82762398051658348494e-16, -3.42548561967721913462e-16,
-                +1.77256013305652638360e-15, +3.81168066935262242075e-15,
-                -9.55484669882830764870e-15, -4.15056934728722208663e-14,
-                +1.54008621752140982691e-14, +3.85277838274214270114e-13,
-                +7.18012445138366623367e-13, -1.79417853150680611778e-12,
-                -1.32158118404477131188e-11, -3.14991652796324136454e-11,
-                +1.18891471078464383424e-11, +4.94060238822496958910e-10,
-                +3.39623202570838634515e-9, +2.26666899049817806459e-8,
-                +2.04891858946906374183e-7, +2.89137052083475648297e-6,
-                +6.88975834691682398426e-5, +3.36911647825569408990e-3,
-                +8.04490411014108831608e-1
-            };
-
-            if (xx < 0) xx = -xx;
-
-            return (xx < 8 ?
-                chebyshev(.5*xx - 2, aa, 30)*exp(xx) :
-                chebyshev(32/xx - 2, bb, 25)*exp(xx)/sqrt(xx)
-            );
-        }
-    }
-
-    static inline double ricepdf(double vv, double ss, double xx) {
-        using namespace internal;
-        check(vv >= 0, "sanity");
-        check(ss > 0, "sanity");
-        if (xx < 0) return 0;
-        return (
-            xx*exp(-(xx*xx + vv*vv) / (2 * ss*ss)) *
-            besseli0(xx*vv/(ss*ss)) / (ss*ss)
-        );
-    }
-
-    static inline double ricecdf(double vv, double ss, double xx) {
-        check(vv >= 0, "sanity");
-        check(ss > 0, "sanity");
-        if (xx < 0) return 0;
-        // This is magic to evaluate the Marcum Q function
-        double aa = vv/ss;
-        double bb = xx/ss;
-        // aa and bb below should be real and non-negative
-        // Should we check for this?
-        aa = aa*aa/2;
-        bb = bb*bb/2;
-        double dd = exp(-aa);
-        double hh = dd;
-        double ff = bb*exp(-bb);
-        double delta = ff*hh;
-        double sum = delta;
-        double kk = 1;
-        const double eps = 1e-60;
-        while (delta > eps*sum) {
-            dd *= aa/kk;
-            hh += dd;
-            ff *= bb/(kk + 1);
-            delta = ff*hh;
-            sum += delta;
-            kk = kk + 1;
-        }
-        return sum;
-    }
-
-    //}}}
     //{{{ shift2d
     namespace internal {
 
@@ -9440,6 +9512,171 @@ namespace xm {
     // XXX:
     // template<class atype, class btype, class ctype>
     // mat<atype> outer(const vec<btype>& bb, const vec<ctype>& cc)
+
+
+    //}}}
+    //{{{ covarmin covarmax
+
+    namespace internal {
+        struct candidate {
+            double score, *data;
+        };
+
+        static inline bool operator <(
+            const candidate& aa, const candidate& bb
+        ) {
+            return aa.score < bb.score;
+        }
+
+        template<class cost, int sign>
+        double covaropt(
+            cost func, double* center, double* steps,
+            int64 dim, int64 its, uint64_t seed=0
+        ) {
+            prng rand(seed);
+
+            const int64 children = ::llrint(4 + 3*::log(dim));
+            const int64 parents = children/2;
+
+            internal::candidate pop[parents + children];
+            double storage[dim*(parents + children)];
+            for (int64 ii = 0; ii<parents + children; ii++) {
+                pop[ii].data = storage + ii*dim;
+            }
+            
+            double mean[dim], chol[dim*dim], scale=1;
+            for (int64 ii = 0; ii<dim; ii++) {
+                mean[ii] = pop[0].data[ii] = 0;
+                for (int64 jj = 0; jj<dim; jj++) {
+                    chol[ii*dim + jj] = (ii == jj);
+                }
+            }
+            pop[0].score = func(center);
+            if (isinf(pop[0].score) == -1 || isnan(pop[0].score)) {
+                return pop[0].score;
+            }
+
+            while (its > 0) {
+
+                // create new offspring, retaining our one best from before
+                int64 improved = 0;
+                const int64 offspring = parents + children - 1;
+                for (int64 pp = 0; pp<offspring; pp++) {
+                    double probe[dim], unit[dim], *data = pop[1 + pp].data;
+                    for (;;) {
+                        for (int64 ii = 0; ii<dim; ii++) {
+                            data[ii] = mean[ii];
+                            unit[ii] = rand.normal();
+                            for (int64 jj = 0; jj<=ii; jj++) {
+                                data[ii] += scale*chol[ii*dim + jj]*unit[jj];
+                            }
+                            probe[ii] = center[ii] + steps[ii]*data[ii];
+                        }
+                        double score = sign*func(probe);
+                        if (isinf(score) == +1) continue;
+                        if (isinf(score) == - 1 || isnan(score)) {
+                            for (int64 ii = 0; ii<dim; ii++) {
+                                center[ii] = probe[ii];
+                            }
+                            return score;
+                        }
+                        pop[1 + pp].score = score;
+                        break;
+                    }
+                    improved += pop[1 + pp].score < pop[0].score;
+                }
+
+                introsort(pop, parents + children);
+
+                // averaging our new covariance with the old
+                const double learnrate = .2;
+                const double oldweight = ::sqrt(1 - learnrate);
+                const double newweight = ::sqrt(learnrate)/scale;
+
+                // shrink the old covariance
+                for (int64 ii = 0; ii<dim; ii++) {
+                    for (int64 jj = 0; jj<=ii; jj++) {
+                        chol[ii*dim + jj] *= oldweight;
+                    }
+                }
+
+                // add in the new contributions
+                for (int64 pp = 0; pp<parents; pp++) {
+                    double vec[dim];
+                    for (int64 ii = 0; ii<dim; ii++) {
+                        vec[ii] = (pop[pp].data[ii] - mean[ii])*newweight;
+                    }
+                    cholupdate(chol, +1, vec, dim);
+                }
+                cholunitize(chol, dim);
+
+                if (improved == 0) {
+                    // average back towards a sphere
+                    const double aa = ::sqrt(.99);
+                    const double bb = ::sqrt(.01);
+                    for (int64 ii = 0; ii<dim; ii++) {
+                        for (int64 jj = 0; jj<=ii; jj++) {
+                            chol[ii*dim + jj] *= aa;
+                        }
+                        chol[ii*dim + ii] += bb;
+                    }
+                }
+
+                // trying to maintain the one-fifth rule
+                scale = min(1, scale*::exp((improved - .2*offspring)/3));
+                if (scale < 1e-50) scale = 1; // reset condition
+
+                // update the new mean
+                double meanscale = 1.0/parents;
+                for (int64 ii = 0; ii<dim; ii++) {
+                    mean[ii] = 0;
+                }
+                for (int64 pp = 0; pp<parents; pp++) {
+                    for (int64 ii = 0; ii<dim; ii++) {
+                        mean[ii] += meanscale*pop[pp].data[ii];
+                    }
+                }
+
+                its -= offspring;
+            }
+
+            // center[ii] = our best answer
+            for (int64 ii = 0; ii<dim; ii++) {
+                center[ii] += steps[ii]*pop[0].data[ii];
+            }
+            
+            // steps[ii] = bounding ellipsoid of the covariance
+            for (int64 ii = 0; ii<dim; ii++) {
+                double norm = 0;
+                for (int64 jj = 0; jj<=ii; jj++) {
+                    norm = ::hypot(norm, chol[ii*dim + jj]);
+                }
+                steps[ii] = scale*norm;
+            }
+
+            return pop[0].score;
+        }
+    }
+
+    template<class cost>
+    double covarmin(
+        cost func, double* center, double* steps,
+        int64 dim, int64 its, uint64_t seed=0
+    ) {
+        return internal::covaropt<cost, +1>(
+            func, center, steps, dim, its, seed
+        );
+    }
+
+    template<class cost>
+    double covarmax(
+        cost func, double* center, double* steps,
+        int64 dim, int64 its, uint64_t seed=0
+    ) {
+        return internal::covaropt<cost, -1>(
+            func, center, steps, dim, its, seed
+        );
+    }
 
 
     //}}}

@@ -23,6 +23,7 @@ PROGRAMS = \
     xmhalf \
     xmlfsr \
     xmgps \
+    covar \
 
 all: $(PROGRAMS)
 

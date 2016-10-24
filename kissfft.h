@@ -3,27 +3,6 @@
 
 namespace xm {
 
-    //{{{ spread
-    //
-    template<class type> type spread(double val);
-
-    template<> float spread<float>(double val) {
-        return (float)val;
-    }
-
-    template<> double spread<double>(double val) {
-        return val;
-    }
-
-    template<> f32x4 spread<f32x4>(double dd) {
-        float ff = (float)dd;
-        return (f32x4){ ff, ff, ff, ff };
-    }
-
-    template<> f64x2 spread<f64x2>(double dd) {
-        return (f64x2){ dd, dd };
-    }
-    //}}}
     //{{{ kissfft
 
     //{{{ License:
@@ -66,7 +45,6 @@ namespace xm {
     //    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     //
     //}}}
-
     template<class type>
     struct kissfft {
         kissfft(int64 samples, bool inverse=false);
@@ -91,6 +69,27 @@ namespace xm {
             mutable vec<cx<type> > scratch;
     };
 
+    namespace internal {
+        template<class type> type spread(double val);
+
+        template<> float spread<float>(double val) {
+            return (float)val;
+        }
+
+        template<> double spread<double>(double val) {
+            return val;
+        }
+
+        template<> f32x4 spread<f32x4>(double dd) {
+            float ff = (float)dd;
+            return (f32x4){ ff, ff, ff, ff };
+        }
+
+        template<> f64x2 spread<f64x2>(double dd) {
+            return (f64x2){ dd, dd };
+        }
+    }
+
     //{{{ constructor
     template<class type>
     kissfft<type>::kissfft(int64 nn, bool inv) : inverse(inv), twiddles(nn) {
@@ -98,8 +97,8 @@ namespace xm {
         for (int64 ii = 0; ii < nn; ii++) {
             double phase = -2 * M_PI * ii / nn;
             if (inv) phase *= -1;
-            twiddles[ii].re = spread<type>(cos(phase));
-            twiddles[ii].im = spread<type>(sin(phase));
+            twiddles[ii].re = internal::spread<type>(cos(phase));
+            twiddles[ii].im = internal::spread<type>(sin(phase));
         }
 
         int64 pp = 4;
@@ -204,8 +203,8 @@ namespace xm {
             tw1 += fstride;
             tw2 += fstride * 2;
 
-            dst[mm].re = dst->re - scratch[3].re*spread<type>(.5);
-            dst[mm].im = dst->im - scratch[3].im*spread<type>(.5);
+            dst[mm].re = dst->re - scratch[3].re*internal::spread<type>(.5);
+            dst[mm].im = dst->im - scratch[3].im*internal::spread<type>(.5);
 
             scratch[0].re *= epi3.im;
             scratch[0].im *= epi3.im;
@@ -383,7 +382,6 @@ namespace xm {
     }
     //}}}
     //}}}
-
     //{{{ kisssse
     
     struct kisssse {
@@ -464,6 +462,7 @@ namespace xm {
 
 
     //}}}
+
 }
 
 #endif
