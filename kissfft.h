@@ -97,12 +97,12 @@ namespace xm {
         for (int64 ii = 0; ii < nn; ii++) {
             double phase = -2 * M_PI * ii / nn;
             if (inv) phase *= -1;
-            twiddles[ii].re = internal::spread<type>(cos(phase));
-            twiddles[ii].im = internal::spread<type>(sin(phase));
+            twiddles[ii].re = internal::spread<type>(::cos(phase));
+            twiddles[ii].im = internal::spread<type>(::sin(phase));
         }
 
         int64 pp = 4;
-        double floor_sqrt = floor(sqrt((double) nn));
+        double floor_sqrt = ::floor(::sqrt((double) nn));
 
         do {
             while (nn % pp) {

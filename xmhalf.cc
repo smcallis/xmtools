@@ -137,21 +137,19 @@ static double tapcost(double* args) {
     const int64 size = 10000;
     const int64 taps = 4*muls + 1;
 
-    vec<cfloat> timedata(size);
+    vec<cfloat> timedata(size, 0);
     vec<cfloat> freqdata(size);
     kissfft<float> fft(size);
-    zero(timedata);
     
     timedata[taps/2] = 1.0;
     for (int64 ii = 0; ii<muls; ii++) {
         timedata[taps/2 + 1 + 2*ii] = args[ii];
         timedata[taps/2 - 1 - 2*ii] = args[ii];
     }
-
     fft.exec(freqdata.data(), timedata.data());
 
     static int64 hack;
-    if (1) if (hack%100 == 0) {
+    if (0) if (hack%100 == 0) {
         static FILE* timeplot;
         if (!timeplot) {
             timeplot = popen("gnuplot -persist", "w");
@@ -171,13 +169,13 @@ static double tapcost(double* args) {
         if (!freqplot) {
             freqplot = popen("gnuplot -persist", "w");
             fprintf(freqplot, "set grid\n");
-            fprintf(freqplot, "set yrange [-160:10]\n");
+            //fprintf(freqplot, "set yrange [-160:10]\n");
         }
 
         fprintf(freqplot, "plot '-' with l\n");
         for (int64 ii = 0; ii<size; ii++) {
-            double db = 10*log10(magsqr(freqdata[ii]/2) + 1e-20);
-            fprintf(freqplot, "%le %le\n", ii*(200.0/size), db);
+            double db = 10*::log10(magsqr(freqdata[ii]/2) + 1e-20);
+            fprintf(freqplot, "%.18le %.18le\n", ii*(200.0/size), db);
         }
         fprintf(freqplot, "e\n");
         fflush(freqplot);
@@ -200,7 +198,6 @@ static double tapcost(double* args) {
     return cost;
 }
 //}}}
-
 
 int main() {
     using namespace xm;
@@ -230,8 +227,9 @@ int main() {
         //center[ii] = sinc(.5*xx) * kaiswin(3.195, xx, taps - 1); // keep this, good for 12 muls
         //center[ii] = sinc(.5*xx) * kaiswin(6.8, xx, taps - 1); // good for 32 muls
 
+        //center[ii] = sinc(.5*xx) * chebwin(-125, xx, taps - 1);
         center[ii] = sinc(.5*xx) * chebwin(-125, xx, taps - 1);
-        steps[ii] = .000001;
+        steps[ii] = .001;
     }
 
     covarmin(tapcost<24>, center, steps, muls, 100000);
