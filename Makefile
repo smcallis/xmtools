@@ -2,7 +2,7 @@ INCDIRS = \
 
 LIBDIRS = \
 
-CC = g++ -std=c++98 -pthread -g -O3 -Wall $(INCDIRS) $(LIBDIRS)
+CC = g++ -std=c++98 -fwrapv -pthread -g -O3 -Wall $(INCDIRS) $(LIBDIRS)
 
 INCLUDES = \
     xmtools.h \
@@ -23,6 +23,7 @@ PROGRAMS = \
     xmhalf \
     xmlfsr \
     xmgps \
+    xmfirpm \
     covar \
 
 all: $(PROGRAMS)
