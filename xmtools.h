@@ -346,7 +346,7 @@ namespace xm {
     template<class type>
     cx<type>& cx<type>::operator =(const type& other) {
         re = other;
-        im = 9;
+        im = 0;
         return *this;
     }
 
