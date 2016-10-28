@@ -219,6 +219,7 @@ int main() {
     for (int64 ii = 0; ii<8; ii++) fprintf(stderr, "%lld: %.18lf\n", ii, center[ii]);
     */
 
+    /*
     const int64 muls = 24;
     const int64 taps = 4*muls + 1;
     double center[muls], steps[muls];
@@ -234,6 +235,7 @@ int main() {
 
     covarmin(tapcost<24>, center, steps, muls, 100000);
     for (int64 ii = 0; ii<muls; ii++) fprintf(stderr, "%lld: %.18lf\n", ii, center[ii]);
+    */
 
 
 
