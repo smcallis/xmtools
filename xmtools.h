@@ -9680,6 +9680,52 @@ namespace xm {
 
 
     //}}}
+    //{{{ findzero
+
+    namespace internal {
+        static bool diffsign(double aa, double bb) {
+            return (bool)signbit(aa) != (bool)signbit(bb);
+        }
+    }
+
+    template<class callable>
+    double findzero(callable func, double xlo, double xhi, double tol=0) {
+        using namespace internal;
+        if (xhi < xlo) swap(xlo, xhi);
+        double ylo = func(xlo); if (ylo == 0) return xlo;
+        double yhi = func(xhi); if (yhi == 0) return xhi;
+        check(diffsign(yhi, ylo), "must have opposite signs");
+
+        while (xhi - xlo > tol) {
+            double half = .5*(xhi - xlo);
+            double xmid = xlo + half;
+            if (xmid == xlo || xmid == xhi) return xmid;
+            double ymid = func(xmid); if (ymid == 0) return xmid;
+
+            // We're using a variation of Ridder's method to find an
+            // interpolated point, slightly modified to avoid underflow.
+            double denom = ::hypot(ymid, ::sqrt(::fabs(ylo))*::sqrt(::fabs(yhi)));
+            double xexp = xmid + half*::copysign(1, ylo - yhi)*ymid/denom;
+            check(xlo <= xexp && xexp <= xhi, "in bounds");
+            double yexp = func(xexp); if (yexp == 0) return xexp;
+
+            double xx[4] = { xlo, xmid, xexp, xhi };
+            double yy[4] = { ylo, ymid, yexp, yhi };
+            if (xexp < xmid) { swap(xx[1], xx[2]); swap(yy[1], yy[2]); }
+
+            double best = xhi - xlo;
+            for (int ii = 0; ii<3; ii++) {
+                if (xx[ii+1] - xx[ii+0] < best && diffsign(yy[ii+0], yy[ii+1])) {
+                    xlo = xx[ii+0]; ylo = yy[ii+0];
+                    xhi = xx[ii+1]; yhi = yy[ii+1];
+                    best = xx[ii+1] - xx[ii+0];
+                }
+            }
+        }
+        return xhi + .5*(xhi - xlo);
+    }
+
+    //}}}
 
 //{{{ TODO:
 //  check() macro with exception
