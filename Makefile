@@ -22,6 +22,7 @@ PROGRAMS = \
     xmgps \
     xmfirpm \
     covar \
+    house \
 
 all: $(PROGRAMS)
 
