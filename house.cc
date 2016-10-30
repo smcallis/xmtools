@@ -537,11 +537,11 @@ namespace xm {
     //}}}
 
     //
-    // Solve: A X = B, Given: A[rows, cols], X[cols, size], B[rows, size]
+    // Solve: A X = B, Given: A[rows, cols], B[max(rows, cols), size]
     // 
     // This function finds the least-squares or least-norm solution to the
-    // system of linear equations.  Each of A, X, and B will be modified with
-    // the final result in X.
+    // system of linear equations.  Both A and B will be modified with the
+    // final result in the top of B.
     //
     // If provided, P is used as scratch space and should be P[rows] large.
     // If not provided, the routine will allocate and free temporary space.
@@ -549,12 +549,19 @@ namespace xm {
     template<class type>
     int64 gensolve(
         type* A, int64 rows, int64 cols, 
-        type* X, type* B, int64 size=1,
-        double tol=1e-12, int64* P=0
+        type* B, int64 size, double tol=1e-12,
+        int64* P=0
     ) {
         using namespace internal;
         int64 rank = min(rows, cols);
         int64* perm = P ? P : alloc<int64>(rank*sizeof(int64));
+
+        // zero out the extra part of B, only if rows < cols
+        for (int64 ii = rows; ii<cols; ii++) {
+            for (int64 jj = 0; jj<size; jj++) {
+                B[ii*size + jj] = 0;
+            }
+        }
 
         // do a rank-revealing QR decomposition
         for (int64 ij = 0; ij<rank; ij++) {
@@ -600,8 +607,8 @@ namespace xm {
 
         // do a bi-diagonal decomposition (diagonal and sub-diagonal)
         for (int64 ij = 0; ij<rank - 1; ij++) {
-            double diag = householder_row(A, rows, cols, ij, ij);
-            double offd = householder_col(A, rows, cols, ij+1, ij);
+            double diag = householder_row(A, rank, cols, ij, ij);
+            double offd = householder_col(A, rank, cols, ij+1, ij);
             householder_col(A, rank, cols, B, rank, size, ij+1, ij);
             // forward ellimation with the diagonal and sub-diagonal
             for (int64 jj = 0; jj<size; jj++) {
@@ -615,28 +622,16 @@ namespace xm {
             B[(rank - 1)*size + jj] /= diag;
         }
 
-        // copy from B into X, and zero extend if needed
-        for (int64 ii = 0; ii<rank; ii++) {
-            for (int64 jj = 0; jj<size; jj++) {
-                X[ii*size + jj] = B[ii*size + jj];
-            }
-        }
-        for (int64 ii = rank; ii<cols; ii++) {
-            for (int64 jj = 0; jj<size; jj++) {
-                X[ii*size + jj] = 0;
-            }
-        }
-
         // apply our householder rows to X
         for (int64 ij = rank - 1; ij>=0; ij--) {
-            inverse_row_col(A, rows, cols, X, cols, size, ij, ij);
+            inverse_row_col(A, rank, cols, B, cols, size, ij, ij);
         }
 
         // apply our permutations to X
         for (int64 ii = rank - 1; ii>=0; ii--) {
             if (perm[ii] != ii) {
                 for (int64 jj = 0; jj<size; jj++) {
-                    swap(X[ii*size + jj], X[perm[ii]*size + jj]);
+                    swap(B[ii*size + jj], B[perm[ii]*size + jj]);
                 }
             }
         }
@@ -648,7 +643,7 @@ namespace xm {
 
 }
 
-static void dump(const char* name, const xm::mat<xm::cdouble>& matrix) {
+static inline void dump(const char* name, const xm::mat<xm::cdouble>& matrix) {
     fprintf(stderr, "%s:\n", name);
     for (int64 ii = 0; ii<matrix.rows(); ii++) {
         for (int64 jj = 0; jj<matrix.cols(); jj++) {
@@ -658,12 +653,23 @@ static void dump(const char* name, const xm::mat<xm::cdouble>& matrix) {
     }
 }
 
-static inline xm::mat<xm::cdouble> matmul(
-    xm::mat<xm::cdouble> aa, xm::mat<xm::cdouble> bb
+static inline void dump(const char* name, const xm::mat<double>& matrix) {
+    fprintf(stderr, "%s:\n", name);
+    for (int64 ii = 0; ii<matrix.rows(); ii++) {
+        for (int64 jj = 0; jj<matrix.cols(); jj++) {
+            printf("\t%+.3lf", matrix(ii, jj));
+        }
+        printf("\n");
+    }
+}
+
+template<class type>
+static inline xm::mat<type> matmul(
+    xm::mat<type> aa, xm::mat<type> bb
 ) {
     xm::check(aa.cols() == bb.rows(), "compatible sizes");
     int64 size = aa.cols();
-    xm::mat<xm::cdouble> cc(aa.rows(), bb.cols());
+    xm::mat<type> cc(aa.rows(), bb.cols());
     for (int64 ii = 0; ii<cc.rows(); ii++) {
         for (int64 jj = 0; jj<cc.cols(); jj++) {
             cc(ii, jj) = 0;
@@ -684,40 +690,60 @@ int main() {
 
     prng random(0);
 
-    const int64 rows = 16;
-    const int64 cols = 16;
-    const int64 size = 16;
+    const int64 rows = 4;
+    const int64 cols = 8;
+    const int64 size = 3;
     mat<cdouble> A(rows, cols);
-    mat<cdouble> X(cols, size);
     mat<cdouble> B(rows, size);
 
     for (int64 ii = 0; ii<rows; ii++) {
         for (int64 jj = 0; jj<cols; jj++) {
             A(ii, jj).re = int64(random.uint64()%18) - 9;
             A(ii, jj).im = int64(random.uint64()%18) - 9;
+            //A(ii, jj) = int64(random.uint64()%18) - 9;
         }
     }
     for (int64 ii = 0; ii<rows; ii++) {
         for (int64 jj = 0; jj<size; jj++) {
             B(ii, jj).re = int64(random.uint64()%18) - 9;
             B(ii, jj).im = int64(random.uint64()%18) - 9;
+            //B(ii, jj) = int64(random.uint64()%18) - 9;
         }
     }
 
-    mat<cdouble> acopy = A;
-    mat<cdouble> bcopy = B;
+    {
+        mat<cdouble> T = A;
+        mat<cdouble> X(max(rows, cols), size);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<size; jj++) {
+                X(ii, jj) = B(ii, jj);
+            }
+        }
 
-    //int64 P[rows];
-    gensolve(
-        acopy.data(), rows, cols,
-        X.data(), bcopy.data(), size
-    );
+        int64 rank = gensolve(T.data(), rows, cols, X.data(), size);
+        fprintf(stderr, "rank: %lld\n", rank);
 
-    dump("A", A);
-    dump("X", X);
-    dump("B", B);
-    dump("A*X", matmul(A, X));
-    dump("B - A*X", B - matmul(A, X));
+        mat<cdouble> x(cols, size);
+        for (int64 ii = 0; ii<cols; ii++) {
+            for (int64 jj = 0; jj<size; jj++) {
+                x(ii, jj) = X(ii, jj);
+            }
+        }
+
+        dump("A", A);
+        dump("B", B);
+        dump("A*X", matmul(A, x));
+        dump("X", x);
+        //dump("B - A*X", B - matmul(A, X));
+    }
+
+    /*
+    if (0) {
+        qrsolve(A.data(), rows, cols, B.data(), size);
+        dump("X from qr:", B);
+    }
+    */
+
 
     return 0;
 }
