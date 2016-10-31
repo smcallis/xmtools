@@ -2274,6 +2274,7 @@ namespace xm {
                 storage->bucket[ii].~type();
             }
         } else {
+            // XXX: If size == 0, consider leaving as a null ptr
             clear(); // create new unconstructed memory
             storage = alloc<implementation>((size - 1)*sizeof(type));
         }
@@ -3310,6 +3311,617 @@ namespace xm {
 
     //}}}
     //}}}
+    //{{{ gensolve
+
+    namespace internal {
+
+        //
+        // "The Complex Householder Transform", Kuo-Liang Chung and Wen-Ming Yan
+        // IEEE Transactions on Sig Proc, Vol. 45, No. 9, September 1997
+        // 
+        // There are two pairs of Householder functions here.  One pair works
+        // on columns from the left of the matrix, and the other works on rows
+        // form the right.  The first function of each pair builds the
+        // Householder vector and modifies the original matrix.  The second
+        // function can be used to apply that Householder vector to other
+        // matrices.  The second function also has an optional last argument
+        // which is used to determine whether you're trying to apply the actual
+        // Householder transform, or if you're trying to recover the matrix for
+        // a decomposition.  Note that for decompositions, the transforms must
+        // be applied in reverse order to recover the combined Householder
+        // matrix (Q below).
+        //
+        // For a least squares problems:
+        // 
+        //     Assume we start with:              A X = B
+        //     householder_col(A, ...) implements:     (H A)
+        //     householder_col(A, ,,, B, ...) gives:   (H B)
+        //     allowing us to make progress on:  H A X = H B
+        //
+        // For matrix decompositions:
+        //
+        //     Assume we start with:     A and I
+        //     householder_col(A, ...) implements:     R = (H A)
+        //     householder_col(A, ..., Q, ..., true):   Q = (H I)
+        //
+        // See gensolve(), qrdecomp(), and lqdecomp() for examples.
+        //
+
+        // Apply a Householder col from A to cols of B starting at low
+        template<class type>
+        void householder_col(
+            const type* A, int64 arows, int64 acols,
+                  type* B, int64 brows, int64 bcols,
+            int64 row, int64 col, int64 low=0, bool recover=false
+        ) {
+            check(arows == brows, "matching rows");
+            type pivot = A[row*acols + col];
+            if (pivot == 0) return;
+            if (recover) pivot = conj(pivot);
+            type scale = 1.0/pivot;
+            for (int64 jj = low; jj<bcols; jj++) {
+                type sum = 0;
+                for (int64 ii = row; ii<arows; ii++) {
+                    sum += B[ii*bcols + jj] * conj(A[ii*acols + col]);
+                }
+                sum *= scale;
+                for (int64 ii = row; ii<arows; ii++) {
+                    B[ii*bcols + jj] += sum * A[ii*acols + col];
+                }
+            }
+        }
+
+        template<class type>
+        double householder_col(
+            type* H, int64 rows, int64 cols,
+            int64 row, int64 col
+        ) {
+            // calculate the vector magnitude
+            double magr = 0;
+            for (int64 ii = row; ii<rows; ii++) {
+                magr = hypot(magr, H[ii*cols + col]);
+            }
+            if (magr == 0) return 0; // it's a zero col
+            if (real(H[row*cols + col]) > 0) magr = -magr;
+            double invr = 1/magr;
+            for (int64 ii = row; ii<rows; ii++) {
+                H[ii*cols + col] *= invr;
+            }
+            H[row*cols + col] -= 1;
+            householder_col(H, rows, cols, H, rows, cols, row, col, col + 1);
+            return magr;
+        }
+
+        // Apply a Household row from H to rows of A starting at low
+        template<class type>
+        void householder_row(
+            const type* A, int64 arows, int64 acols,
+                  type* B, int64 brows, int64 bcols,
+            int64 row, int64 col, int64 low=0, bool recover=false
+        ) {
+            (void)arows; // not needed, but it looks nicer
+            check(acols == bcols, "matching cols");
+            type pivot = A[row*acols + col];
+            if (pivot == 0) return;
+            if (recover) pivot = conj(pivot);
+            type scale = 1.0/pivot;
+            for (int64 ii = low; ii<brows; ii++) {
+                type sum = 0;
+                for (int64 jj = col; jj<acols; jj++) {
+                    sum += B[ii*bcols + jj] * conj(A[row*acols + jj]);
+                }
+                sum *= scale;
+                for (int64 jj = col; jj<acols; jj++) {
+                    B[ii*bcols + jj] += sum * A[row*acols + jj];
+                }
+            }
+        }
+
+        template<class type>
+        double householder_row(
+            type* H, int64 rows, int64 cols,
+            int64 row, int64 col
+        ) {
+            // calculate the vector magnitude
+            double magr = 0;
+            for (int64 jj = col; jj<cols; jj++) {
+                magr = hypot(magr, H[row*cols + jj]);
+            }
+            if (magr == 0) return 0; // it's a zero row
+            if (real(H[row*cols + col]) > 0) magr = -magr;
+            double invr = 1/magr;
+            for (int64 jj = col; jj<cols; jj++) {
+                H[row*cols + jj] *= invr;
+            }
+            H[row*cols + col] -= 1;
+            householder_row(H, rows, cols, H, rows, cols, row, col, row + 1);
+            return magr;
+        }
+
+        // Apply the inverse of Householder row from A to R
+        template<class type>
+        void inverse_row_col(
+            const type* A, int64 arows, int64 acols,
+                  type* R, int64 rrows, int64 rcols,
+            int64 row, int64 col, int64 low=0
+        ) {
+            (void)arows; // not needed, but it looks nicer
+            check(acols == rrows, "matching sizes");
+            type pivot = A[row*acols + col];
+            if (pivot == 0) return;
+            type scale = 1.0/pivot;
+            for (int64 jj = low; jj<rcols; jj++) {
+                type sum = 0;
+                for (int64 kk = col; kk<acols; kk++) {
+                    sum += R[kk*rcols + jj] * A[row*acols + kk];
+                }
+                sum *= scale;
+                for (int64 kk = col; kk<acols; kk++) {
+                    R[kk*rcols + jj] += sum * conj(A[row*acols + kk]);
+                }
+            }
+        }
+
+        /*
+        // Apply the inverse of Householder col from A to L
+        template<class type>
+        void inverse_col_row(
+            const type* A, int64 arows, int64 acols,
+                  type* L, int64 lrows, int64 lcols,
+            int64 row, int64 col, int64 low=0
+        ) {
+            check(arows == lcols, "matching sizes");
+            type pivot = A[row*acols + col];
+            if (pivot == 0) return;
+            type scale = 1.0/pivot;
+            for (int64 ii = low; ii<lrows; ii++) {
+                type sum = 0;
+                for (int64 kk = row; kk<arows; kk++) {
+                    sum += L[ii*lcols + kk] * A[kk*acols + col];
+                }
+                sum *= scale;
+                for (int64 kk = row; kk<arows; kk++) {
+                    L[ii*lcols + kk] += sum * conj(A[kk*acols + col]);
+                }
+            }
+        }
+        */
+    }
+
+    //
+    // Solve: A X = B, Given: A[rows, cols], B[max(rows, cols), size]
+    // 
+    // This function finds the least-squares or least-norm solution to the
+    // system of linear equations.  Both A and B will be modified with the
+    // final result in the top of B.
+    //
+    // If provided, P is used as scratch and must be P[min(rows, cols)] large.
+    // If not provided, the routine will allocate and free temporary space.
+    //
+    template<class type>
+    int64 gensolve(
+        type* A, int64 rows, int64 cols, 
+        type* B, int64 size, double tol=1e-12,
+        int64* P=0
+    ) {
+        using namespace internal;
+        int64 rank = min(rows, cols);
+        vec<int64> temp;
+        int64* perm = P ? P : (temp.resize(rank), temp.data());
+
+        // zero out the extra part of B, only if rows < cols
+        for (int64 ii = rows; ii<cols; ii++) {
+            for (int64 jj = 0; jj<size; jj++) {
+                B[ii*size + jj] = 0;
+            }
+        }
+
+        // do a rank-revealing QR decomposition
+        for (int64 ij = 0; ij<rank; ij++) {
+            // find largest col for pivoting
+            perm[ij] = -1;
+            double maxsum = -1;
+            for (int64 jj = ij; jj<cols; jj++) {
+                double sum = 0;
+                for (int64 ii = ij; ii<rows; ii++) {
+                    sum = hypot(sum, A[ii*cols + jj]);
+                }
+                if (sum > maxsum) {
+                    perm[ij] = jj;
+                    maxsum = sum;
+                }
+            }
+
+            if (ij != perm[ij]) {
+                // do the column pivot
+                for (int64 ii = 0; ii<rows; ii++) {
+                    swap(A[ii*cols + ij], A[ii*cols + perm[ij]]);
+                }
+            }
+
+            // do the Householder transform to A and B
+            double diag = householder_col(A, rows, cols, ij, ij);
+            householder_col(A, rows, cols, B, rows, size, ij, ij);
+
+            // remove the Householder vector we dumped into A
+            A[ij*cols + ij] = diag;
+            for (int64 jj = 0; jj<ij; jj++) {
+                A[ij*cols + jj] = 0;
+            }
+
+            // Compare to our tolerance to find the rank.  Note: On the first
+            // pass, his can only be true if the diagonal is actually zero, in
+            // which case our rank really is zero.
+            if (::fabs(diag) <= tol*::fabs(real(A[0]))) {
+                rank = ij;
+                break;
+            }
+        }
+
+        // do a bi-diagonal decomposition (diagonal and sub-diagonal)
+        for (int64 ij = 0; ij<rank - 1; ij++) {
+            double diag = householder_row(A, rank, cols, ij, ij);
+            double offd = householder_col(A, rank, cols, ij+1, ij);
+            householder_col(A, rank, cols, B, rank, size, ij+1, ij);
+            // forward ellimation with the diagonal and sub-diagonal
+            double scale = 1.0/diag;
+            for (int64 jj = 0; jj<size; jj++) {
+                B[ij*size + jj] *= scale;
+                B[(ij + 1)*size + jj] -= offd*B[ij*size + jj];
+            }
+        }
+        // do the final division for the last diagonal
+        double diag = householder_row(A, rows, cols, rank - 1, rank - 1);
+        double scale = 1.0/diag;
+        for (int64 jj = 0; jj<size; jj++) {
+            B[(rank - 1)*size + jj] *= scale;
+        }
+
+        // apply our householder rows to X
+        for (int64 ij = rank - 1; ij>=0; ij--) {
+            inverse_row_col(A, rank, cols, B, cols, size, ij, ij);
+        }
+
+        // apply our permutations to X
+        for (int64 ii = rank - 1; ii>=0; ii--) {
+            if (perm[ii] != ii) {
+                for (int64 jj = 0; jj<size; jj++) {
+                    swap(B[ii*size + jj], B[perm[ii]*size + jj]);
+                }
+            }
+        }
+
+        return rank;
+    }
+
+
+
+    //}}}
+    //{{{ qrsolve
+    //
+    // Solve A*X = B for X using QR decomposition
+    //
+    //    double A[rows * cols]
+    //    double B[rows * count]
+    //
+    // Returns false is A is singular
+    //
+    // A will be modified during the decomposition
+    //
+    // If successful, the result will be placed into the top
+    // 'cols' rows of B.  B will also be modified on failure
+    //
+    static inline bool qrsolve (
+        double* A, int64 rows, int64 cols,
+        double* B, int64 count
+    ) {
+        check(rows >= cols, "rows %lld must be >= cols %lld", rows, cols);
+
+        for (int64 jj = 0; jj<cols; jj++) {
+            double rr = 0;
+            for (int64 ii = jj; ii<rows; ii++) {
+                rr = hypot(rr, A[ii*cols + jj]);
+            }
+            // check if A is singular
+            if (rr == 0) return false;
+
+            // for numerical stability
+            if (A[jj*cols + jj] > 0) rr = -rr;
+
+            // normalize the Householder vector
+            double invrr = 1.0/rr;
+            for (int64 ii = jj; ii<rows; ii++) {
+                A[ii*cols + jj] *= invrr;
+            }
+            double pp = A[jj*cols + jj] -= 1;
+            double invpp = 1.0/pp;
+
+            // apply the Householder to the rest of A
+            for (int64 kk = jj + 1; kk<cols; kk++) {
+                double sum = 0;
+                for (int64 ii = jj; ii<rows; ii++) {
+                    sum += A[ii*cols + jj]*A[ii*cols + kk];
+                }
+                sum *= invpp;
+                for (int64 ii = jj; ii<rows; ii++) {
+                    A[ii*cols + kk] += sum*A[ii*cols + jj];
+                }
+            }
+
+            // apply the Householder to all of B
+            for (int64 kk = 0; kk<count; kk++) {
+                double sum = 0;
+                for (int64 ii = jj; ii<rows; ii++) {
+                    sum += A[ii*cols + jj]*B[ii*count + kk];
+                }
+                sum *= invpp;
+                for (int64 ii = jj; ii<rows; ii++) {
+                    B[ii*count + kk] += sum*A[ii*cols + jj];
+                }
+            }
+
+            A[jj*cols + jj] = rr;
+        }
+
+        // back substitute R into B
+        for (int64 jj = cols - 1; jj >= 0; jj--) {
+            // divide by diagonal element
+            double dd = A[jj*cols + jj];
+            double invdd = 1.0/dd;
+            for (int64 kk = 0; kk<count; kk++) {
+                B[jj*count + kk] *= invdd;
+            }
+
+            // subtract from other rows
+            for (int64 ii = jj - 1; ii >= 0; ii--) {
+                double ss = A[ii*cols + jj];
+                for (int64 kk = 0; kk<count; kk++) {
+                    B[ii*count + kk] -= ss*B[jj*count + kk];
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // Note for the next several wrappers: we intentionally take A and B by value
+    // so that copies will be made.  The worker routines will modify these copies.
+    static inline mat<double> qrsolve(mat<double> A, mat<double> B) {
+        check(A.rows() >= A.cols(), "can't be underdetermined");
+        check(A.rows() == B.rows(), "need compatible sizes");
+        check(
+            qrsolve(A.data(), A.rows(), A.cols(), B.data(), B.cols()),
+            "matrix must not be singular"
+        );
+        mat<double> X(A.cols(), B.cols());
+        for (int64 ii = 0; ii<X.rows(); ii++) {
+            for (int64 jj = 0; jj<X.cols(); jj++) {
+                X(ii, jj) = B(ii, jj);
+            }
+        }
+        return X;
+    }
+
+    static inline vec<double> qrsolve(mat<double> A, vec<double> b) {
+        check(A.rows() >= A.cols(), "can't be underdetermined");
+        check(A.rows() == b.size(), "need compatible sizes");
+        check(
+            qrsolve(A.data(), A.rows(), A.cols(), b.data(), 1),
+            "matrix must not be singular"
+        );
+        vec<double> x(A.cols());
+        for (int64 ii = 0; ii<x.size(); ii++) {
+            x[ii] = b[ii];
+        }
+        return x;
+    }
+    //}}}
+    //{{{ ldsolve
+    //
+    // Factor A using LDL^t decomposition.
+    //
+    // The matrix must be symmetric, but this is not checked.  The decomp is
+    // placed in the lower half of the A matrix.  This decomp is similar to a
+    // Cholesky decomp, but it does not require the matrix to be positive
+    // definite, only symmetric.  This function always succeeds, but the decomp
+    // is only unique when the matrix is non-singular.
+    //
+    static inline void ldfactor(double* A, int64 size) {
+        for (int64 jj = 0; jj < size; jj++) {
+            // Solve for Diagonal
+            double ajj = A[jj*size + jj];
+            for (int64 kk = 0; kk < jj; kk++) {
+                double dkk = A[kk*size + kk];
+                double ljk = A[jj*size + kk];
+                ajj -= ljk*(ljk)*dkk;
+            }
+            A[jj*size + jj] = ajj;
+            if (ajj == 0) ajj = 1;
+
+            // Solve for Lowers
+            for (int64 ii = jj + 1; ii < size; ii++) {
+                double aij = A[ii*size + jj];
+                for (int64 kk = 0; kk < jj; kk++) {
+                    double lik = A[ii*size + kk];
+                    double ljk = A[jj*size + kk];
+                    double dkk = A[kk*size + kk];
+                    aij -= lik*(ljk)*dkk;
+                }
+                A[ii*size + jj] = aij/ajj;
+            }
+        }
+    }
+
+    //
+    // Check if the LD decomposition is positive definite.
+    //
+    static inline bool ldposdef(const double* LD, int64 size) {
+        for (int64 ii = 0; ii<size; ii++) {
+            if (LD[ii*size + ii] <= 0) return false;
+        }
+        return true;
+    }
+
+    //
+    // Use the LDL^t decomposition in A to solve A*X = B.  X = A\B.
+    //
+    //     double LD[size * size]
+    //     double B[size * count]
+    //
+    // This function fails when the decomposition is singular (zero on diagonal)
+    //
+    static inline bool lddivide(const double* LD, int64 size, double* B, int64 count) {
+        for (int64 ii = 0; ii<size; ii++) {
+            if (LD[ii*size + ii] == 0) return false;
+        }
+        // Invert the Lower
+        for (int64 jj = 0; jj < size - 1; jj++) {
+            for (int64 ii = jj + 1; ii < size; ii++) {
+                for (int64 kk = 0; kk<count; kk++) {
+                    B[ii*count + kk] -= LD[ii*size + jj]*B[jj*count + kk];
+                }
+            }
+        }
+        // Invert the Diagonal
+        for (int64 ii = 0; ii < size; ii++) {
+            for (int64 kk = 0; kk<count; kk++) {
+                B[ii*count + kk] /= LD[ii*size + ii];
+            }
+        }
+        // Invert the Lower Transpose
+        for (int64 ii = size - 1; ii > 0; ii--) {
+            for (int64 jj = 0; jj < ii; jj++) {
+                for (int64 kk = 0; kk<count; kk++) {
+                    B[jj*count + kk] -= LD[ii*size + jj]*B[ii*count + kk];
+                }
+            }
+        }
+        return true;
+    }
+
+    //
+    // Solve A*X = B for X using LDL^t decomposition
+    //
+    //     double A[size * size]
+    //     double B[size * count]
+    //
+    // Modifies A, places the result in B.  Returns false if A is singular.
+    //
+    static inline bool ldsolve (double* A, int64 size, double* B, int64 count) {
+        ldfactor(A, size);
+        return lddivide(A, size, B, count);
+    }
+
+    static inline mat<double> ldsolve(mat<double> A, mat<double> B) {
+        check(A.rows() == A.cols(), "must be a square matrix");
+        check(A.rows() == B.rows(), "need compatible sizes");
+        check(
+            ldsolve(A.data(), A.rows(), B.data(), B.cols()),
+            "matrix must not be singular"
+        );
+        mat<double> X(A.cols(), B.cols());
+        for (int64 ii = 0; ii<X.rows(); ii++) {
+            for (int64 jj = 0; jj<X.cols(); jj++) {
+                X(ii, jj) = B(ii, jj);
+            }
+        }
+        return X;
+    }
+
+    static inline vec<double> ldsolve(mat<double> A, vec<double> b) {
+        check(A.rows() == A.cols(), "must be a square matrix");
+        check(A.rows() == b.size(), "need compatible sizes");
+        check(
+            ldsolve(A.data(), A.rows(), b.data(), 1),
+            "matrix must not be singular"
+        );
+        vec<double> x(A.cols());
+        for (int64 ii = 0; ii<x.size(); ii++) {
+            x[ii] = b[ii];
+        }
+        return x;
+    }
+
+    //}}}
+    //{{{ cholesky
+    //
+    // Decompose A = L * L^t with the Cholesky algorithm
+    //
+    static inline void cholesky(double* L, const double* A, int64 dim) {
+        memset(L, 0, dim*dim*sizeof(double));
+        for (int64 ii = 0; ii<dim; ii++) {
+            for (int64 jj = 0; jj<=ii; jj++) {
+                double sum = 0;
+                for (int64 kk = 0; kk<jj; kk++) {
+                    sum += L[ii*dim + kk]*L[jj*dim + kk];
+                }
+                double inv = 1/L[jj*dim +jj];
+                L[ii*dim + jj] = (
+                    (ii == jj) ? sqrt(A[ii*dim + ii] - sum) :
+                    (A[ii*dim + jj] - sum) * inv
+                );
+            }
+        }
+    }
+
+    // Modify a cholesky composition.  It's either "update" or "downdate",
+    // depending on the sign.  (+1 = update, -1 = downdate).  Both arguments
+    // are modified.
+    static inline void cholupdate(
+        double* L, int sign, double* x, int64 len
+    ) {
+        check(sign == +1 || sign == -1, "sanity");
+        for (int64 jj = 0; jj<len; jj++) {
+            double rr = sqrt(
+                sqr(L[jj*len + jj]) + sign*sqr(x[jj])
+            );
+            double cc = rr/L[jj*len + jj];
+            double ss = x[jj]/L[jj*len + jj];
+            L[jj*len + jj] = rr;
+            for (int64 ii = jj+1; ii<len; ii++) {
+                L[ii*len + jj] = (L[ii*len + jj] + sign*ss*x[ii])/cc;
+            }
+            for (int64 ii = jj+1; ii<len; ii++) {
+                x[ii] = cc*x[ii] - ss*L[ii*len + jj];
+            }
+        }
+    }
+
+    // Scale L so the largest diagonal is 1.0
+    static inline void cholunitize(double* L, int64 dim) {
+        double biggest = 0;
+        for (int64 ii = 0; ii<dim; ii++) {
+            double norm = 0;
+            for (int64 jj = 0; jj<=ii; jj++) {
+                norm += sqr(L[ii*dim + jj]);
+            }
+            biggest = max(norm, biggest);
+        }
+        double scale = 1/sqrt(biggest);
+        for (int64 ii = 0; ii<dim; ii++) {
+            for (int64 jj = 0; jj<=ii; jj++) {
+                L[ii*dim + jj] *= scale;
+            }
+        }
+    }
+
+    static inline mat<double> cholesky(const mat<double>& A) {
+        check(A.rows() == A.cols(), "must be a square matrix");
+        mat<double> L(A.rows(), A.cols());
+        cholesky(L.data(), A.data(), A.rows());
+        return L;
+    }
+
+    static inline mat<double> cholupdate(
+        mat<double> L, int sign, vec<double> x
+    ) {
+        check(L.rows() == L.cols(), "must be a square matrix");
+        check(L.rows() == x.size(), "must be a matching size");
+        cholupdate(L.data(), sign, x.data(), x.size());
+        return L;
+    }
+
+    //}}}
     //{{{ tuple
     //{{{ tuple 8
     template<
@@ -3971,331 +4583,6 @@ namespace xm {
     }
 
     //}}}
-    //}}}
-    //{{{ qrsolve
-    //
-    // Solve A*X = B for X using QR decomposition
-    //
-    //    double A[rows * cols]
-    //    double B[rows * count]
-    //
-    // Returns false is A is singular
-    //
-    // A will be modified during the decomposition
-    //
-    // If successful, the result will be placed into the top
-    // 'cols' rows of B.  B will also be modified on failure
-    //
-    static inline bool qrsolve (
-        double* A, int64 rows, int64 cols,
-        double* B, int64 count
-    ) {
-        check(rows >= cols, "rows %lld must be >= cols %lld", rows, cols);
-
-        for (int64 jj = 0; jj<cols; jj++) {
-            double rr = 0;
-            for (int64 ii = jj; ii<rows; ii++) {
-                rr = hypot(rr, A[ii*cols + jj]);
-            }
-            // check if A is singular
-            if (rr == 0) return false;
-
-            // for numerical stability
-            if (A[jj*cols + jj] > 0) rr = -rr;
-
-            // normalize the Householder vector
-            double invrr = 1.0/rr;
-            for (int64 ii = jj; ii<rows; ii++) {
-                A[ii*cols + jj] *= invrr;
-            }
-            double pp = A[jj*cols + jj] -= 1;
-            double invpp = 1.0/pp;
-
-            // apply the Householder to the rest of A
-            for (int64 kk = jj + 1; kk<cols; kk++) {
-                double sum = 0;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    sum += A[ii*cols + jj]*A[ii*cols + kk];
-                }
-                sum *= invpp;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    A[ii*cols + kk] += sum*A[ii*cols + jj];
-                }
-            }
-
-            // apply the Householder to all of B
-            for (int64 kk = 0; kk<count; kk++) {
-                double sum = 0;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    sum += A[ii*cols + jj]*B[ii*count + kk];
-                }
-                sum *= invpp;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    B[ii*count + kk] += sum*A[ii*cols + jj];
-                }
-            }
-
-            A[jj*cols + jj] = rr;
-        }
-
-        // back substitute R into B
-        for (int64 jj = cols - 1; jj >= 0; jj--) {
-            // divide by diagonal element
-            double dd = A[jj*cols + jj];
-            double invdd = 1.0/dd;
-            for (int64 kk = 0; kk<count; kk++) {
-                B[jj*count + kk] *= invdd;
-            }
-
-            // subtract from other rows
-            for (int64 ii = jj - 1; ii >= 0; ii--) {
-                double ss = A[ii*cols + jj];
-                for (int64 kk = 0; kk<count; kk++) {
-                    B[ii*count + kk] -= ss*B[jj*count + kk];
-                }
-            }
-        }
-
-        return true;
-    }
-
-    // Note for the next several wrappers: we intentionally take A and B by value
-    // so that copies will be made.  The worker routines will modify these copies.
-    static inline mat<double> qrsolve(mat<double> A, mat<double> B) {
-        check(A.rows() >= A.cols(), "can't be underdetermined");
-        check(A.rows() == B.rows(), "need compatible sizes");
-        check(
-            qrsolve(A.data(), A.rows(), A.cols(), B.data(), B.cols()),
-            "matrix must not be singular"
-        );
-        mat<double> X(A.cols(), B.cols());
-        for (int64 ii = 0; ii<X.rows(); ii++) {
-            for (int64 jj = 0; jj<X.cols(); jj++) {
-                X(ii, jj) = B(ii, jj);
-            }
-        }
-        return X;
-    }
-
-    static inline vec<double> qrsolve(mat<double> A, vec<double> b) {
-        check(A.rows() >= A.cols(), "can't be underdetermined");
-        check(A.rows() == b.size(), "need compatible sizes");
-        check(
-            qrsolve(A.data(), A.rows(), A.cols(), b.data(), 1),
-            "matrix must not be singular"
-        );
-        vec<double> x(A.cols());
-        for (int64 ii = 0; ii<x.size(); ii++) {
-            x[ii] = b[ii];
-        }
-        return x;
-    }
-    //}}}
-    //{{{ ldsolve
-    //
-    // Factor A using LDL^t decomposition.
-    //
-    // The matrix must be symmetric, but this is not checked.  The decomp is
-    // placed in the lower half of the A matrix.  This decomp is similar to a
-    // Cholesky decomp, but it does not require the matrix to be positive
-    // definite, only symmetric.  This function always succeeds, but the decomp
-    // is only unique when the matrix is non-singular.
-    //
-    static inline void ldfactor(double* A, int64 size) {
-        for (int64 jj = 0; jj < size; jj++) {
-            // Solve for Diagonal
-            double ajj = A[jj*size + jj];
-            for (int64 kk = 0; kk < jj; kk++) {
-                double dkk = A[kk*size + kk];
-                double ljk = A[jj*size + kk];
-                ajj -= ljk*(ljk)*dkk;
-            }
-            A[jj*size + jj] = ajj;
-            if (ajj == 0) ajj = 1;
-
-            // Solve for Lowers
-            for (int64 ii = jj + 1; ii < size; ii++) {
-                double aij = A[ii*size + jj];
-                for (int64 kk = 0; kk < jj; kk++) {
-                    double lik = A[ii*size + kk];
-                    double ljk = A[jj*size + kk];
-                    double dkk = A[kk*size + kk];
-                    aij -= lik*(ljk)*dkk;
-                }
-                A[ii*size + jj] = aij/ajj;
-            }
-        }
-    }
-
-    //
-    // Check if the LD decomposition is positive definite.
-    //
-    static inline bool ldposdef(const double* LD, int64 size) {
-        for (int64 ii = 0; ii<size; ii++) {
-            if (LD[ii*size + ii] <= 0) return false;
-        }
-        return true;
-    }
-
-    //
-    // Use the LDL^t decomposition in A to solve A*X = B.  X = A\B.
-    //
-    //     double LD[size * size]
-    //     double B[size * count]
-    //
-    // This function fails when the decomposition is singular (zero on diagonal)
-    //
-    static inline bool lddivide(const double* LD, int64 size, double* B, int64 count) {
-        for (int64 ii = 0; ii<size; ii++) {
-            if (LD[ii*size + ii] == 0) return false;
-        }
-        // Invert the Lower
-        for (int64 jj = 0; jj < size - 1; jj++) {
-            for (int64 ii = jj + 1; ii < size; ii++) {
-                for (int64 kk = 0; kk<count; kk++) {
-                    B[ii*count + kk] -= LD[ii*size + jj]*B[jj*count + kk];
-                }
-            }
-        }
-        // Invert the Diagonal
-        for (int64 ii = 0; ii < size; ii++) {
-            for (int64 kk = 0; kk<count; kk++) {
-                B[ii*count + kk] /= LD[ii*size + ii];
-            }
-        }
-        // Invert the Lower Transpose
-        for (int64 ii = size - 1; ii > 0; ii--) {
-            for (int64 jj = 0; jj < ii; jj++) {
-                for (int64 kk = 0; kk<count; kk++) {
-                    B[jj*count + kk] -= LD[ii*size + jj]*B[ii*count + kk];
-                }
-            }
-        }
-        return true;
-    }
-
-    //
-    // Solve A*X = B for X using LDL^t decomposition
-    //
-    //     double A[size * size]
-    //     double B[size * count]
-    //
-    // Modifies A, places the result in B.  Returns false if A is singular.
-    //
-    static inline bool ldsolve (double* A, int64 size, double* B, int64 count) {
-        ldfactor(A, size);
-        return lddivide(A, size, B, count);
-    }
-
-    static inline mat<double> ldsolve(mat<double> A, mat<double> B) {
-        check(A.rows() == A.cols(), "must be a square matrix");
-        check(A.rows() == B.rows(), "need compatible sizes");
-        check(
-            ldsolve(A.data(), A.rows(), B.data(), B.cols()),
-            "matrix must not be singular"
-        );
-        mat<double> X(A.cols(), B.cols());
-        for (int64 ii = 0; ii<X.rows(); ii++) {
-            for (int64 jj = 0; jj<X.cols(); jj++) {
-                X(ii, jj) = B(ii, jj);
-            }
-        }
-        return X;
-    }
-
-    static inline vec<double> ldsolve(mat<double> A, vec<double> b) {
-        check(A.rows() == A.cols(), "must be a square matrix");
-        check(A.rows() == b.size(), "need compatible sizes");
-        check(
-            ldsolve(A.data(), A.rows(), b.data(), 1),
-            "matrix must not be singular"
-        );
-        vec<double> x(A.cols());
-        for (int64 ii = 0; ii<x.size(); ii++) {
-            x[ii] = b[ii];
-        }
-        return x;
-    }
-
-    //}}}
-    //{{{ cholesky
-    //
-    // Decompose A = L * L^t with the Cholesky algorithm
-    //
-    static inline void cholesky(double* L, const double* A, int64 dim) {
-        memset(L, 0, dim*dim*sizeof(double));
-        for (int64 ii = 0; ii<dim; ii++) {
-            for (int64 jj = 0; jj<=ii; jj++) {
-                double sum = 0;
-                for (int64 kk = 0; kk<jj; kk++) {
-                    sum += L[ii*dim + kk]*L[jj*dim + kk];
-                }
-                double inv = 1/L[jj*dim +jj];
-                L[ii*dim + jj] = (
-                    (ii == jj) ? sqrt(A[ii*dim + ii] - sum) :
-                    (A[ii*dim + jj] - sum) * inv
-                );
-            }
-        }
-    }
-
-    // Modify a cholesky composition.  It's either "update" or "downdate",
-    // depending on the sign.  (+1 = update, -1 = downdate).  Both arguments
-    // are modified.
-    static inline void cholupdate(
-        double* L, int sign, double* x, int64 len
-    ) {
-        check(sign == +1 || sign == -1, "sanity");
-        for (int64 jj = 0; jj<len; jj++) {
-            double rr = sqrt(
-                sqr(L[jj*len + jj]) + sign*sqr(x[jj])
-            );
-            double cc = rr/L[jj*len + jj];
-            double ss = x[jj]/L[jj*len + jj];
-            L[jj*len + jj] = rr;
-            for (int64 ii = jj+1; ii<len; ii++) {
-                L[ii*len + jj] = (L[ii*len + jj] + sign*ss*x[ii])/cc;
-            }
-            for (int64 ii = jj+1; ii<len; ii++) {
-                x[ii] = cc*x[ii] - ss*L[ii*len + jj];
-            }
-        }
-    }
-
-    // Scale L so the largest diagonal is 1.0
-    static inline void cholunitize(double* L, int64 dim) {
-        double biggest = 0;
-        for (int64 ii = 0; ii<dim; ii++) {
-            double norm = 0;
-            for (int64 jj = 0; jj<=ii; jj++) {
-                norm += sqr(L[ii*dim + jj]);
-            }
-            biggest = max(norm, biggest);
-        }
-        double scale = 1/sqrt(biggest);
-        for (int64 ii = 0; ii<dim; ii++) {
-            for (int64 jj = 0; jj<=ii; jj++) {
-                L[ii*dim + jj] *= scale;
-            }
-        }
-    }
-
-    static inline mat<double> cholesky(const mat<double>& A) {
-        check(A.rows() == A.cols(), "must be a square matrix");
-        mat<double> L(A.rows(), A.cols());
-        cholesky(L.data(), A.data(), A.rows());
-        return L;
-    }
-
-    static inline mat<double> cholupdate(
-        mat<double> L, int sign, vec<double> x
-    ) {
-        check(L.rows() == L.cols(), "must be a square matrix");
-        check(L.rows() == x.size(), "must be a matching size");
-        cholupdate(L.data(), sign, x.data(), x.size());
-        return L;
-    }
-
     //}}}
     //{{{ queue
     template<class type>

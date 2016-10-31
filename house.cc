@@ -5,179 +5,6 @@ namespace xm {
     //{{{ linear algebra (work in progress)
     namespace internal {
 
-        //
-        // "The Complex Householder Transform", Kuo-Liang Chung and Wen-Ming Yan
-        // IEEE Transactions on Sig Proc, Vol. 45, No. 9, September 1997
-        // 
-        // There are two pairs of Householder functions here.  One pair works
-        // on columns from the left of the matrix, and the other works on rows
-        // form the right.  The first function of each pair builds the
-        // Householder vector and modifies the original matrix.  The second
-        // function can be used to apply that Householder vector to other
-        // matrices.  The second function also has an optional last argument
-        // which is used to determine whether you're trying to apply the actual
-        // Householder transform, or if you're trying to recover the matrix for
-        // a decomposition.  Note that for decompositions, the transforms must
-        // be applied in reverse order to recover the combined Householder
-        // matrix (Q below).
-        //
-        // For a least squares problems:
-        // 
-        //     Assume we start with:              A X = B
-        //     householder_col(A, ...) implements:     (H A)
-        //     householder_col(A, ,,, B, ...) gives:   (H B)
-        //     allowing us to make progress on:  H A X = H B
-        //
-        // For matrix decompositions:
-        //
-        //     Assume we start with:     A and I
-        //     householder_col(A, ...) implements:     R = (H A)
-        //     householder_col(A, ..., Q, ..., true):   Q = (H I)
-        //
-        // See gensolve(), qrdecomp(), and lqdecomp() for examples.
-        //
-
-        // Apply a Householder col from A to cols of B starting at low
-        template<class atype, class btype>
-        void householder_col(
-            const atype* A, int64 arows, int64 acols,
-                  btype* B, int64 brows, int64 bcols,
-            int64 row, int64 col, int64 low=0, bool recover=false
-        ) {
-            check(arows == brows, "matching rows");
-            atype pivot = A[row*acols + col];
-            if (pivot == 0) return;
-            if (recover) pivot = conj(pivot);
-            atype scale = 1.0/pivot;
-            for (int64 jj = low; jj<bcols; jj++) {
-                typename promotion<atype, btype>::type sum = 0;
-                for (int64 ii = row; ii<arows; ii++) {
-                    sum += B[ii*bcols + jj] * conj(A[ii*acols + col]);
-                }
-                sum *= scale;
-                for (int64 ii = row; ii<arows; ii++) {
-                    B[ii*bcols + jj] += sum * A[ii*acols + col];
-                }
-            }
-        }
-
-        template<class type>
-        double householder_col(
-            type* H, int64 rows, int64 cols,
-            int64 row, int64 col
-        ) {
-            // calculate the vector magnitude
-            double magr = 0;
-            for (int64 ii = row; ii<rows; ii++) {
-                magr = hypot(magr, H[ii*cols + col]);
-            }
-            if (magr == 0) return 0; // it's a zero col
-            if (real(H[row*cols + col]) > 0) magr = -magr;
-            double invr = 1/magr;
-            for (int64 ii = row; ii<rows; ii++) {
-                H[ii*cols + col] *= invr;
-            }
-            H[row*cols + col] -= 1;
-            householder_col(H, rows, cols, H, rows, cols, row, col, col + 1);
-            return magr;
-        }
-
-        // Apply a Household row from H to rows of A starting at low
-        template<class atype, class btype>
-        void householder_row(
-            const atype* A, int64 arows, int64 acols,
-                  btype* B, int64 brows, int64 bcols,
-            int64 row, int64 col, int64 low=0, bool recover=false
-        ) {
-            (void)arows; // not needed, but it looks nicer
-            check(acols == bcols, "matching cols");
-            atype pivot = A[row*acols + col];
-            if (pivot == 0) return;
-            if (recover) pivot = conj(pivot);
-            atype scale = 1.0/pivot;
-            for (int64 ii = low; ii<brows; ii++) {
-                typename promotion<atype, btype>::type sum = 0;
-                for (int64 jj = col; jj<acols; jj++) {
-                    sum += B[ii*bcols + jj] * conj(A[row*acols + jj]);
-                }
-                sum *= scale;
-                for (int64 jj = col; jj<acols; jj++) {
-                    B[ii*bcols + jj] += sum * A[row*acols + jj];
-                }
-            }
-        }
-
-        template<class type>
-        double householder_row(
-            type* H, int64 rows, int64 cols,
-            int64 row, int64 col
-        ) {
-            // calculate the vector magnitude
-            double magr = 0;
-            for (int64 jj = col; jj<cols; jj++) {
-                magr = hypot(magr, H[row*cols + jj]);
-            }
-            if (magr == 0) return 0; // it's a zero row
-            if (real(H[row*cols + col]) > 0) magr = -magr;
-            double invr = 1/magr;
-            for (int64 jj = col; jj<cols; jj++) {
-                H[row*cols + jj] *= invr;
-            }
-            H[row*cols + col] -= 1;
-            householder_row(H, rows, cols, H, rows, cols, row, col, row + 1);
-            return magr;
-        }
-
-        // Apply the inverse of Householder row from A to R
-        template<class atype, class rtype>
-        void inverse_row_col(
-            const atype* A, int64 arows, int64 acols,
-                  rtype* R, int64 rrows, int64 rcols,
-            int64 row, int64 col, int64 low=0
-        ) {
-            (void)arows; // not needed, but it looks nicer
-            check(acols == rrows, "matching sizes");
-            atype pivot = A[row*acols + col];
-            if (pivot == 0) return;
-            atype scale = 1.0/pivot;
-            for (int64 jj = low; jj<rcols; jj++) {
-                typename promotion<atype, rtype>::type sum = 0;
-                for (int64 kk = col; kk<acols; kk++) {
-                    sum += R[kk*rcols + jj] * A[row*acols + kk];
-                }
-                sum *= scale;
-                for (int64 kk = col; kk<acols; kk++) {
-                    R[kk*rcols + jj] += sum * conj(A[row*acols + kk]);
-                }
-            }
-        }
-
-        /*
-        // Apply the inverse of Householder col from A to L
-        template<class atype, class ltype>
-        void inverse_col_row(
-            const atype* A, int64 arows, int64 acols,
-                  ltype* L, int64 lrows, int64 lcols,
-            int64 row, int64 col, int64 low=0
-        ) {
-            check(arows == lcols, "matching sizes");
-            atype pivot = A[row*acols + col];
-            if (pivot == 0) return;
-            atype scale = 1.0/conj(pivot);
-            for (int64 ii = low; ii<lrows; ii++) {
-                typename promotion<atype, atype>::type sum = 0;
-                for (int64 kk = row; kk<arows; kk++) {
-                    sum += L[ii*lcols + kk] * A[kk*acols + col];
-                }
-                sum *= scale;
-                for (int64 kk = row; kk<arows; kk++) {
-                    L[ii*lcols + kk] += sum * conj(A[kk*acols + col]);
-                }
-            }
-        }
-        */
-
-
         struct givens_rotation {
             double rr, cc, ss;
             givens_rotation(double r0, double c0, double s0) :
@@ -536,130 +363,27 @@ namespace xm {
 
     //}}}
 
-    //
-    // Solve: A X = B, Given: A[rows, cols], B[max(rows, cols), size]
-    // 
-    // This function finds the least-squares or least-norm solution to the
-    // system of linear equations.  Both A and B will be modified with the
-    // final result in the top of B.
-    //
-    // If provided, P is used as scratch space and should be P[rows] large.
-    // If not provided, the routine will allocate and free temporary space.
-    //
-    template<class type>
-    int64 gensolve(
-        type* A, int64 rows, int64 cols, 
-        type* B, int64 size, double tol=1e-12,
-        int64* P=0
-    ) {
-        using namespace internal;
-        int64 rank = min(rows, cols);
-        int64* perm = P ? P : alloc<int64>(rank*sizeof(int64));
-
-        // zero out the extra part of B, only if rows < cols
-        for (int64 ii = rows; ii<cols; ii++) {
-            for (int64 jj = 0; jj<size; jj++) {
-                B[ii*size + jj] = 0;
-            }
-        }
-
-        // do a rank-revealing QR decomposition
-        for (int64 ij = 0; ij<rank; ij++) {
-            // find largest col for pivoting
-            perm[ij] = -1;
-            double maxsum = -1;
-            for (int64 jj = ij; jj<cols; jj++) {
-                double sum = 0;
-                for (int64 ii = ij; ii<rows; ii++) {
-                    sum = hypot(sum, A[ii*cols + jj]);
-                }
-                if (sum > maxsum) {
-                    perm[ij] = jj;
-                    maxsum = sum;
-                }
-            }
-
-            if (ij != perm[ij]) {
-                // do the column pivot
-                for (int64 ii = 0; ii<rows; ii++) {
-                    swap(A[ii*cols + ij], A[ii*cols + perm[ij]]);
-                }
-            }
-
-            // do the Householder transform to A and B
-            double diag = householder_col(A, rows, cols, ij, ij);
-            householder_col(A, rows, cols, B, rows, size, ij, ij);
-
-            // remove the Householder vector we dumped into A
-            A[ij*cols + ij] = diag;
-            for (int64 jj = 0; jj<ij; jj++) {
-                A[ij*cols + jj] = 0;
-            }
-
-            // Compare to our tolerance to find the rank.  Note: On the first
-            // pass, his can only be true if the diagonal is actually zero, in
-            // which case our rank really is zero.
-            if (::fabs(diag) <= tol*::fabs(real(A[0]))) {
-                rank = ij;
-                break;
-            }
-        }
-
-        // do a bi-diagonal decomposition (diagonal and sub-diagonal)
-        for (int64 ij = 0; ij<rank - 1; ij++) {
-            double diag = householder_row(A, rank, cols, ij, ij);
-            double offd = householder_col(A, rank, cols, ij+1, ij);
-            householder_col(A, rank, cols, B, rank, size, ij+1, ij);
-            // forward ellimation with the diagonal and sub-diagonal
-            for (int64 jj = 0; jj<size; jj++) {
-                B[ij*size + jj] /= diag;
-                B[(ij + 1)*size + jj] -= offd*B[ij*size + jj];
-            }
-        }
-        // do the final division for the last diagonal
-        double diag = householder_row(A, rows, cols, rank - 1, rank - 1);
-        for (int64 jj = 0; jj<size; jj++) {
-            B[(rank - 1)*size + jj] /= diag;
-        }
-
-        // apply our householder rows to X
-        for (int64 ij = rank - 1; ij>=0; ij--) {
-            inverse_row_col(A, rank, cols, B, cols, size, ij, ij);
-        }
-
-        // apply our permutations to X
-        for (int64 ii = rank - 1; ii>=0; ii--) {
-            if (perm[ii] != ii) {
-                for (int64 jj = 0; jj<size; jj++) {
-                    swap(B[ii*size + jj], B[perm[ii]*size + jj]);
-                }
-            }
-        }
-
-        if (!P) ::free(perm);
-
-        return rank;
-    }
-
 }
 
 static inline void dump(const char* name, const xm::mat<xm::cdouble>& matrix) {
     fprintf(stderr, "%s:\n", name);
     for (int64 ii = 0; ii<matrix.rows(); ii++) {
+        printf("\t[");
         for (int64 jj = 0; jj<matrix.cols(); jj++) {
-            printf("\t%+.3lf%+.3lf", matrix(ii, jj).re, matrix(ii, jj).im);
+            printf("\t%+.3lf%+.3lfj,", matrix(ii, jj).re, matrix(ii, jj).im);
         }
-        printf("\n");
+        printf("],\n");
     }
 }
 
 static inline void dump(const char* name, const xm::mat<double>& matrix) {
     fprintf(stderr, "%s:\n", name);
     for (int64 ii = 0; ii<matrix.rows(); ii++) {
+        printf("\t[");
         for (int64 jj = 0; jj<matrix.cols(); jj++) {
-            printf("\t%+.3lf", matrix(ii, jj));
+            printf("\t%+.3lf,", matrix(ii, jj));
         }
-        printf("\n");
+        printf("],\n");
     }
 }
 
@@ -690,11 +414,12 @@ int main() {
 
     prng random(0);
 
-    const int64 rows = 4;
+    typedef cdouble type;
+    const int64 rows = 5;
     const int64 cols = 8;
-    const int64 size = 3;
-    mat<cdouble> A(rows, cols);
-    mat<cdouble> B(rows, size);
+    const int64 size = 8;
+    mat<type> A(rows, cols);
+    mat<type> B(rows, size);
 
     for (int64 ii = 0; ii<rows; ii++) {
         for (int64 jj = 0; jj<cols; jj++) {
@@ -712,8 +437,8 @@ int main() {
     }
 
     {
-        mat<cdouble> T = A;
-        mat<cdouble> X(max(rows, cols), size);
+        mat<type> T = A;
+        mat<type> X(max(rows, cols), size);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<size; jj++) {
                 X(ii, jj) = B(ii, jj);
@@ -723,7 +448,7 @@ int main() {
         int64 rank = gensolve(T.data(), rows, cols, X.data(), size);
         fprintf(stderr, "rank: %lld\n", rank);
 
-        mat<cdouble> x(cols, size);
+        mat<type> x(cols, size);
         for (int64 ii = 0; ii<cols; ii++) {
             for (int64 jj = 0; jj<size; jj++) {
                 x(ii, jj) = X(ii, jj);
@@ -733,8 +458,8 @@ int main() {
         dump("A", A);
         dump("B", B);
         dump("A*X", matmul(A, x));
-        dump("X", x);
-        //dump("B - A*X", B - matmul(A, X));
+        //dump("X", x);
+        dump("B - A*X", B - matmul(A, X));
     }
 
     /*
