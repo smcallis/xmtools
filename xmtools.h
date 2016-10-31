@@ -31,6 +31,25 @@ typedef long long int64;
 
 //}}}
 
+// TODO:
+//
+//  check() with line numbers
+//  svdecomp()
+//  symeigens()
+//  adaptmin()
+//  quasimin()
+//  covarmin()
+//  quickselect()
+//  prng.sample()
+//  prng.shuffle()
+//  upper(str), lower(str)
+//  struct heap<>
+//  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
+//  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
+//  struct autodiff<>
+//  xmtest.cc for unit tests
+//
+
 namespace xm {
     //{{{ promotions 
     // Template type promotions (like common_type<...> in C++11)
@@ -10015,26 +10034,9 @@ namespace xm {
 
     //}}}
 
-//{{{ TODO:
-//  check() macro with exception
-//  quasimin()
-//  cmaesmin()
-//  quickselect()
-//  prng.sample()
-//  prng.shuffle()
-//  upper(str), lower(str)
-//  struct heap<>
-//  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
-//  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
-//  fourier transforms:
-//      fft      ifft
-//      fft2d    ifft2d
-//      hfft     hifft
-//      vfft     vifft
-//      rfft     rifft
-//  struct autodiff<> ?
-//  xmtest.cc for unit tests
-//}}}
+}
+    
+#if 0
     //{{{ old mul operators
 #if 0
     template<class atype, class btype> // matrix multiply A*b
@@ -10160,7 +10162,6 @@ namespace xm {
     }
 #endif
     //}}}
-
 //{{{ Miscellaneous Stuff
     /* These are more elegant Householder functions, but they don't work for complex...
         template<class htype, class atype>
@@ -10363,9 +10364,6 @@ namespace xm {
         //  +--+--+--+--+--+--+
         //
     //}}}
-}
-    
-#if 0
 //{{{ uncaught exception handler
 namespace stack_trace_on_uncaught_exceptions {
     // There is no reason to use anything in here directly.  This block of code
