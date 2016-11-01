@@ -61,19 +61,16 @@ namespace xm {
 
         // Golub and Van Loan, "Matrix Computations", 4th edition, Section 8.3.4
         static givens_rotation wilkinson_shift(
-            double* dd, double* ff, int64 lo, int64 hi, double* pp
+            double* dd, double* ff, int64 lo, int64 hi
         ) {
-            if (pp) {
-                double uu = pp[hi - 1]*pp[hi - 1];
-                return givens_rotation(dd[lo]*dd[lo] - uu, dd[lo]*ff[lo]);
-            }
             double aa = dd[hi - 2]*dd[hi - 2];
             double bb = dd[hi - 2]*ff[hi - 2];
             double cc = ff[hi - 2]*ff[hi - 2] + dd[hi - 1]*dd[hi - 1];
             double ee = 0.5*(aa - cc);
             double uu = cc + ee - copysign(1, ee)*hypot(ee, bb);
-            return givens_rotation(dd[lo]*dd[lo] - uu, dd[lo]*ff[lo]);
-            //return givens_rotation(dd[lo] - uu/dd[lo], ff[lo]);
+            check(dd[lo] != 0, "no divides by zero");
+            return givens_rotation(dd[lo] - uu/dd[lo], ff[lo]);
+            //return givens_rotation(dd[lo]*dd[lo] - uu, dd[lo]*ff[lo]);
         }
 
         //
@@ -101,7 +98,7 @@ namespace xm {
         //
         static inline void golub_kahan(
             double* dd, double* ff, int64 lo, int64 hi,
-            double* ll, double* rr, int64 size, double* pp
+            double* ll, double* rr, int64 size
         ) {
             if (3*fabs(dd[lo]) < fabs(dd[hi - 1])) {
                 reverse_submatrix(dd, ff, lo, hi, ll, rr, size);
@@ -109,7 +106,7 @@ namespace xm {
 
             // sweep top
             double bb = 0;
-            givens_rotation gt = wilkinson_shift(dd, ff, lo, hi, pp);
+            givens_rotation gt = wilkinson_shift(dd, ff, lo, hi);
             gt.rotate(dd[lo], ff[lo]);
             gt.rotate(bb, dd[lo + 1]);
             gt.rotate(rr, lo, size);
@@ -247,24 +244,31 @@ namespace xm {
 
         static inline void block_diag_svd(
             double* dd, double* ff, int64 lo, int64 hi,
-            double* ll, double* rr, int64 size, double* pp
+            double* ll, double* rr, int64 size
         ) {
-            int its = 0;
             while (hi - lo > 2) {
+                static int64 iteration;
+                fprintf(stderr, "iter: %lld\n", ++iteration);
+                fprintf(stderr, "     ff: ");
+                for (int64 ii = 0; ii<size - 1; ii++) fprintf(stderr, "\t%lf", ff[ii]);
+                fprintf(stderr, "\ndd: ");
+                for (int64 ii = 0; ii<size; ii++) fprintf(stderr, "\t%lf", dd[ii]);
+                fprintf(stderr, "\n");
+                getchar();
+
                 const double eps = 1e-20;
 
                 // look for opportunities to recurse from the off diagonal
                 for (int64 ii = lo; ii<hi - 1; ii++) {
                     if (fabs(ff[ii]) < eps*(fabs(dd[ii]) + fabs(dd[ii + 1]))) {
                         if ((ii - lo) < (hi - lo)/2) {
-                            block_diag_svd(dd, ff, lo, ii + 1, ll, rr, size, pp);
+                            block_diag_svd(dd, ff, lo, ii + 1, ll, rr, size);
                             lo = ii + 1;
                         } else {
-                            block_diag_svd(dd, ff, ii + 1, hi, ll, rr, size, pp);
+                            block_diag_svd(dd, ff, ii + 1, hi, ll, rr, size);
                             hi = ii + 1;
                             break;
                         }
-                        its = 0;
                     }
                 }
 
@@ -275,25 +279,20 @@ namespace xm {
                     if (fabs(dd[ii]) < eps*(f0 + f1)) {
                         split_diagonal(dd, ff, lo, hi, ll, rr, size);
                         if ((ii - lo) < (hi - lo)/2) {
-                            block_diag_svd(dd, ff, lo, ii, ll, rr, size, pp);
+                            block_diag_svd(dd, ff, lo, ii, ll, rr, size);
                             lo = ii; hi = hi - 1;
                         } else {
-                            block_diag_svd(dd, ff, ii, hi - 1, ll, rr, size, pp);
+                            block_diag_svd(dd, ff, ii, hi - 1, ll, rr, size);
                             hi = ii;
                             break;
                         }
-                        its = 0;
                     }
                 }
 
-                if (hi - lo > 2) {
-                    golub_kahan(dd, ff, lo, hi, ll, rr, size, ++its > 3 ? 0 : pp);
-                }
+                if (hi - lo > 2) golub_kahan(dd, ff, lo, hi, ll, rr, size);
             }
             
-            if (hi - lo == 2) {
-                upper_2x2_svd(dd, ff, lo, ll, rr, size);
-            }
+            if (hi - lo == 2) upper_2x2_svd(dd, ff, lo, ll, rr, size);
         }
 
         struct compare_singular_vals {
@@ -306,7 +305,7 @@ namespace xm {
 
         static inline void bidiagonal_svd(
             int64* tt, double* dd, double* ff,
-            double* ll, double* rr, int64 size, double* pp
+            double* ll, double* rr, int64 size
         ) {
             // For numerical precision, we scale the array to near unity
             double frob = 0;
@@ -318,7 +317,7 @@ namespace xm {
             for (int64 ii = 0; ii<size; ii++)   dd[ii] *= inv;
             for (int64 ii = 0; ii<size-1; ii++) ff[ii] *= inv;
 
-            block_diag_svd(dd, ff, 0, size, ll, rr, size, pp);
+            block_diag_svd(dd, ff, 0, size, ll, rr, size);
             
             // negate any negative elements
             for (int64 ii = 0; ii<size; ii++) if (dd[ii] < 0) {
@@ -414,143 +413,36 @@ int main() {
 
     prng random(0);
 
-    typedef cdouble type;
-    const int64 rows = 5;
-    const int64 cols = 8;
-    const int64 size = 8;
-    mat<type> A(rows, cols);
-    mat<type> B(rows, size);
+    const int64 size = 9;
 
-    for (int64 ii = 0; ii<rows; ii++) {
-        for (int64 jj = 0; jj<cols; jj++) {
-            A(ii, jj).re = int64(random.uint64()%18) - 9;
-            A(ii, jj).im = int64(random.uint64()%18) - 9;
-            //A(ii, jj) = int64(random.uint64()%18) - 9;
-        }
+    mat<double> L = ident<double>(size, size);
+    mat<double> C(size, size);
+    mat<double> S(size, size);
+    mat<double> R = ident<double>(size, size);
+
+    vec<double> d(size);
+    vec<double> f(size - 1);
+    vec<int64> t(size);
+    for (int64 ii = 0; ii<size; ii++) {
+        C(ii, ii) = d[ii] = (int64)(random.uint64()%1800) - 900;
     }
-    for (int64 ii = 0; ii<rows; ii++) {
-        for (int64 jj = 0; jj<size; jj++) {
-            B(ii, jj).re = int64(random.uint64()%18) - 9;
-            B(ii, jj).im = int64(random.uint64()%18) - 9;
-            //B(ii, jj) = int64(random.uint64()%18) - 9;
-        }
+    for (int64 ii = 0; ii<size - 1; ii++) {
+        C(ii, ii+1) = f[ii] = (int64)(random.uint64()%1800) - 900;
     }
 
-    {
-        mat<type> T = A;
-        mat<type> X(max(rows, cols), size);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<size; jj++) {
-                X(ii, jj) = B(ii, jj);
-            }
-        }
+    dump("C", C);
 
-        int64 rank = gensolve(T.data(), rows, cols, X.data(), size);
-        fprintf(stderr, "rank: %lld\n", rank);
+    bidiagonal_svd(t.data(), d.data(), f.data(), L.data(), R.data(), size);
 
-        mat<type> x(cols, size);
-        for (int64 ii = 0; ii<cols; ii++) {
-            for (int64 jj = 0; jj<size; jj++) {
-                x(ii, jj) = X(ii, jj);
-            }
-        }
-
-        dump("A", A);
-        dump("B", B);
-        dump("A*X", matmul(A, x));
-        //dump("X", x);
-        dump("B - A*X", B - matmul(A, X));
+    for (int64 ii = 0; ii<size; ii++) {
+        S(ii, ii) = d[ii];
     }
 
-    /*
-    if (0) {
-        qrsolve(A.data(), rows, cols, B.data(), size);
-        dump("X from qr:", B);
-    }
-    */
-
+    dump("L", L);
+    dump("R", R);
+    dump("L*S*R", matmul(herm(L), matmul(S, R)));
+    dump("L*S*R - C", matmul(herm(L), matmul(S, R)) - C);
 
     return 0;
 }
-
-    /*
-    const int64 rows = 9;
-    const int64 cols = 5;
-    mat<cdouble> A(rows, cols);
-    mat<cdouble> lilQ = ident<cdouble>(rows, cols);
-    mat<cdouble> bigQ = ident<cdouble>(rows, rows);
-    for (int64 ii = 0; ii<rows; ii++) {
-        for (int64 jj = 0; jj<cols; jj++) {
-            A(ii, jj).re = int64(random.uint64()%18) - 9;
-            A(ii, jj).im = int64(random.uint64()%18) - 9;
-        }
-    }
-    dump("A", A);
-    //getchar();
-
-    mat<cdouble> lilR(cols, cols, 0);
-    mat<cdouble> bigR(rows, cols, 0);
-    const int64 size = min(rows, cols);
-    for (int64 ij = 0; ij<size; ij++) {
-        lilR(ij, ij) = bigR(ij, ij) = householder_col(
-            A.data(), A.rows(), A.cols(),
-            ij, ij
-        );
-    }
-    for (int64 ij = size - 1; ij>=0; ij--) {
-        householder_col(
-            A.data(), A.rows(), A.cols(),
-            lilQ.data(), lilQ.rows(), lilQ.cols(),
-            ij, ij, 0, true
-        );
-        householder_col(
-            A.data(), A.rows(), A.cols(),
-            bigQ.data(), bigQ.rows(), bigQ.cols(),
-            ij, ij, 0, true
-        );
-    }
-
-    for (int64 ii = 0; ii<cols; ii++) {
-        for (int64 jj = ii + 1; jj<cols; jj++) {
-            lilR(ii, jj) = bigR(ii, jj) = A(ii, jj);
-        }
-    }
-    dump("big R", bigR);
-    dump("big Q*R", matmul(bigQ, bigR));
-    dump("lil R", lilR);
-    dump("lil Q*R", matmul(lilQ, lilR));
-    */
-        /*
-        householder_row(A.data(), A.rows(), A.cols(), ij, ij + 1);
-        reflect_row_row(
-            A.data(), A.rows(), A.cols(),
-            C.data(), C.rows(), C.cols(),
-            ij, ij + 1, ij
-        );
-        inverse_row_col(
-            A.data(), A.rows(), A.cols(),
-            R.data(), R.rows(), R.cols(),
-            ij, ij + 1
-        );
-
-        //dump("A", A);
-        dump("C", C);
-        dump("L*L'", matmul(L, herm(L)));
-        dump("R*R'", matmul(R, herm(R)));
-        dump("L*C*R", matmul(matmul(L, C), R));
-        getchar();
-        */
-
-        /*
-        householder_row(A.data(), A.rows(), A.cols(), ij, ij + 1);
-        reflect_row_row(
-            A.data(), A.rows(), A.cols(),
-            C.data(), C.rows(), C.cols(),
-            ij, ij + 1, ij
-        );
-        dump("A", A);
-        dump("C", C);
-        getchar();
-        */
-
 

@@ -22,7 +22,7 @@ PROGRAMS = \
     xmgps \
     xmfirpm \
     covar \
-    house \
+    svdecomp \
 
 all: $(PROGRAMS)
 
