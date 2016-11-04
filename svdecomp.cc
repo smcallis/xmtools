@@ -405,6 +405,109 @@ static inline xm::mat<type> matmul(
 }
 
 namespace xm {
+
+    //{{{
+    template<class type>
+    void svdecomp(
+        const mat<type>& A, mat<type>* L,
+        vec<double>* S, mat<type>* R
+    ) {
+        using namespace internal;
+        int64 size = min(A.rows(), A.cols());
+        check(size != 0, "can't be zero size"); // XXX: should allow this...
+
+        mat<type> C = A;
+        mat<double> U, V;
+        double* u = L ? (U = ident<double>(size, size), U.data()) : 0;
+        double* v = R ? (V = ident<double>(size, size), V.data()) : 0;
+        vec<double> d(size), f(size);
+        vec<int64> t(size);
+
+        if (C.rows() >= C.cols()) {
+            // build it upper diagonal
+            for (int64 ij = 0; ij<size; ij++) {
+                d[ij] = householder_col(C.data(), C.rows(), C.cols(), ij, ij);
+                f[ij] = householder_row(C.data(), C.rows(), C.cols(), ij, ij + 1);
+            }
+        } else {
+            // build it lower diagonal
+            for (int64 ij = 0; ij<size; ij++) {
+                d[ij] = householder_row(C.data(), C.rows(), C.cols(), ij, ij);
+                f[ij] = householder_col(C.data(), C.rows(), C.cols(), ij + 1, ij);
+            }
+            // givens rotate to upper diagonal
+            for (int64 ij = 0; ij<size - 1; ij++) {
+                givens_rotation gg(d[ij], f[ij]);
+                d[ij] = gg.rr; f[ij] = 0;
+                gg.rotate(f[ij], d[ij+1]);
+                gg.rotate(u, ij, size);
+            }
+        }
+        bidiagonal_svd(t.data(), d.data(), f.data(), u, v, size);
+
+        if (S) {
+            vec<double>& T = *S;
+            T.resize(size);
+            for (int64 ii = 0; ii<size; ii++) T[ii] = d[ii];
+        }
+
+        if (L) {
+            mat<type>& T = *L;
+            T.resize(C.rows(), size, 0);
+            for (int64 ii = 0; ii<size; ii++) {
+                for (int64 jj = 0; jj<size; jj++) {
+                    T(ii, jj) = U(jj, ii);
+                }
+            }
+            if (C.rows() >= C.cols()) {
+                for (int64 ij = size-1; ij>=0; ij--) {
+                    householder_col(
+                        C.data(), C.rows(), C.cols(),
+                        T.data(), T.rows(), T.cols(),
+                        ij, ij, 0, true
+                    );
+                }
+            } else {
+                for (int64 ij = size-1; ij>=0; ij--) {
+                    householder_col(
+                        C.data(), C.rows(), C.cols(),
+                        T.data(), T.rows(), T.cols(),
+                        ij + 1, ij, 0, true
+                    );
+                }
+            }
+
+        }
+
+        if (R) {
+            mat<type>& T = *R;
+            T.resize(size, C.cols(), 0);
+            for (int64 ii = 0; ii<size; ii++) {
+                for (int64 jj = 0; jj<size; jj++) {
+                    T(ii, jj) = V(ii, jj);
+                }
+            }
+            if (C.rows() >= C.cols()) {
+                for (int64 ij = size-1; ij>=0; ij--) {
+                    householder_row(
+                        C.data(), C.rows(), C.cols(),
+                        T.data(), T.rows(), T.cols(),
+                        ij, ij + 1, 0, true
+                    );
+                }
+            } else {
+                for (int64 ij = size-1; ij>=0; ij--) {
+                    householder_row(
+                        C.data(), C.rows(), C.cols(),
+                        T.data(), T.rows(), T.cols(),
+                        ij, ij, 0, true
+                    );
+                }
+            }
+        }
+    }
+    //}}}
+
 }
 
 int main() {
@@ -412,7 +515,39 @@ int main() {
     using namespace xm::internal;
 
     prng random(0);
+    const int64 rows = 7;
+    const int64 cols = 8;
+    const int64 size = min(rows, cols);
 
+    mat<cdouble> A(rows, cols), L, R;
+    vec<double> S(size);
+
+    for (int64 ii = 0; ii<rows; ii++) {
+        for (int64 jj = 0; jj<cols; jj++) {
+            A(ii, jj).re = (int64)(random.uint64()%18) - 9;
+            A(ii, jj).im = (int64)(random.uint64()%18) - 9;
+        }
+    }
+
+    svdecomp(A, &L, &S, &R);
+    mat<cdouble> C(size, size);
+    for (int64 ii = 0; ii<size; ii++) {
+        for (int64 jj = 0;jj<size; jj++) {
+            C(ii, jj) = (ii == jj) ? S[ii] : 0;
+        }
+    }
+
+    dump("A", A);
+    dump("L", L);
+    dump("C", C);
+    dump("R", R);
+    dump("L*C*R", matmul(L, matmul(C, R)));
+    dump("L*S*R - A", matmul(L, matmul(C, R)) - A);
+
+    return 0;
+}
+
+    /*
     const int64 size = 9;
 
     mat<double> L = ident<double>(size, size);
@@ -442,7 +577,4 @@ int main() {
     dump("R", R);
     dump("L*S*R", matmul(herm(L), matmul(S, R)));
     dump("L*S*R - C", matmul(herm(L), matmul(S, R)) - C);
-
-    return 0;
-}
-
+    */

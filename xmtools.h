@@ -3268,6 +3268,11 @@ namespace xm {
     }
 
     template<class type> // build a (maybe rectangular) identity mat
+    mat<type> zeros(int64 rows, int64 cols) {
+        return mat<type>(rows, cols, 0);
+    }
+
+    template<class type> // build a (maybe rectangular) identity mat
     mat<type> ident(int64 rows, int64 cols) {
         mat<type> result(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
@@ -3508,7 +3513,7 @@ namespace xm {
     }
 
     //
-    // Solve: A X = B, Given: A[rows, cols], B[max(rows, cols), size]
+    // Solve: A X = B, Given: A[rows*cols], B[max(rows, cols)*size]
     // 
     // This function finds the least-squares or least-norm solution to the
     // system of linear equations.  Both A and B will be modified with the
