@@ -22,7 +22,7 @@ PROGRAMS = \
     xmgps \
     xmfirpm \
     covar \
-    svdecomp \
+    arith \
 
 all: $(PROGRAMS)
 

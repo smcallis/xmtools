@@ -5288,13 +5288,13 @@ namespace xm {
     //{{{ queue
     template<class type>
     struct queue {
-        inline queue();
-        inline ~queue();
+        queue();
+        ~queue();
 
-        inline void give(type& item);
-        inline void push(const type& item);
-        inline type pull();
-        inline bool pull(type& item, double seconds);
+        void give(type& item);
+        void push(const type& item);
+        type pull();
+        bool pull(type& item, double seconds);
 
         private:
             queue(const queue&); // deleted
