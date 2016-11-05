@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
         "May optionally print all of the extended header keywords too."
     );
 
-    bool   kwds   = args.getswitch("kwds", "include the keywords");
-    str inpath = args.getinput("input.tmp", "input BLUE file");
+    bool kwds     = args.getswitch("kwds", "include the keywords");
+    string inpath = args.getinput("input.tmp", "input BLUE file");
     args.done();
 
     bluereader input(inpath);

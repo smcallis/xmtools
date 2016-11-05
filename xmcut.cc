@@ -6,8 +6,8 @@ int main(int argc, char* argv[]) {
     timecode tstart = args.gettimecode("tstart", (timecode){-1,-1}, "starting timecode, default is the beginning");
     double tspan    = args.getdouble("tspan", -1, "amount of time to keep, default is whole file");
     bool copykwds   = args.getswitch("copykwds", "copy the input keywords to the output file");
-    str inpath      = args.getinput("input.tmp", "input file");
-    str outpath     = args.getoutput("output.tmp", "output file");
+    string inpath   = args.getinput("input.tmp", "input file");
+    string outpath  = args.getoutput("output.tmp", "output file");
     args.done();
 
     bluereader input(inpath);

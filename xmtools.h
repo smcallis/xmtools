@@ -2522,18 +2522,18 @@ namespace xm {
     //}}}
     //}}}
     //{{{ Unicode Strings (UTF-8):       string 
-    struct str;
-    static inline void swap(str& flip, str& flop);
-    static inline str substr(const str& ss, int64 off, int64 len);
-    static inline str join(const list<str>& ll);
+    struct string;
+    static inline void swap(string& flip, string& flop);
+    static inline string substr(const string& ss, int64 off, int64 len);
+    static inline string join(const list<string>& ll);
 
-    struct str {
-        inline ~str();
-        inline str();
-        inline str(const str& other);
-        inline str(const char* ptr);
-        inline str& operator =(const str& other);
-        inline str& operator =(const char* ptr);
+    struct string {
+        inline ~string();
+        inline string();
+        inline string(const string& other);
+        inline string(const char* ptr);
+        inline string& operator =(const string& other);
+        inline string& operator =(const char* ptr);
 
         inline int64 size() const;
         inline int64 codes() const;
@@ -2541,13 +2541,13 @@ namespace xm {
 
         private:
             // only friend functions can see these two
-            inline str(int64 len);
+            inline string(int64 len);
             inline char* ptr();
 
-            friend str substr(const str& ss, int64 off, int64 len);
-            friend str join(const list<str>& ll);
+            friend string substr(const string& ss, int64 off, int64 len);
+            friend string join(const list<string>& ll);
 
-            friend void swap(str& flip, str& flop);
+            friend void swap(string& flip, string& flop);
             char* storage;
     };
 
@@ -2685,12 +2685,12 @@ namespace xm {
         }
     }
     //}}}
-    //{{{ str implementation
-    str::~str() { if (storage) free(storage); }
+    //{{{ string implementation
+    string::~string() { if (storage) free(storage); }
 
-    str::str() : storage(0) {}
+    string::string() : storage(0) {}
 
-    str::str(const str& other) : storage(0) {
+    string::string(const string& other) : storage(0) {
         if (other.storage) {
             int64 len = ::strlen(other.storage);
             storage = alloc<char>(len*sizeof(char));
@@ -2698,7 +2698,7 @@ namespace xm {
         }
     }
 
-    str::str(const char* ptr) : storage(0) {
+    string::string(const char* ptr) : storage(0) {
         using namespace internal;
         if (*ptr) {
             int64 len = utf8sanitize(0, ptr);
@@ -2707,11 +2707,11 @@ namespace xm {
         }
     }
 
-    str::str(int64 len) : storage(alloc<char>(len*sizeof(char))) {
+    string::string(int64 len) : storage(alloc<char>(len*sizeof(char))) {
         storage[len] = 0;
     }
 
-    str& str::operator =(const str& other) {
+    string& string::operator =(const string& other) {
         if (&other == this) return *this;
         if (storage) free(storage);
         if (other.storage) {
@@ -2724,7 +2724,7 @@ namespace xm {
         return *this;
     }
 
-    str& str::operator =(const char* ptr) {
+    string& string::operator =(const char* ptr) {
         using namespace internal;
         if (storage) free(storage);
         if (*ptr) {
@@ -2737,11 +2737,11 @@ namespace xm {
         return *this;
     }
 
-    int64 str::size() const {
+    int64 string::size() const {
         return storage ? ::strlen(storage) : 0;
     }
 
-    int64 str::codes() const {
+    int64 string::codes() const {
         using namespace internal;
         if (!storage) return 0;
         const char* ptr = storage;
@@ -2754,43 +2754,43 @@ namespace xm {
         return len;
     }
 
-    const char* str::data() const {
+    const char* string::data() const {
         return storage ? storage : "";
     }
 
-    char* str::ptr() {
+    char* string::ptr() {
         return storage;
     }
     //}}}
-    //{{{ str operators
-    static inline str operator +(const str& aa, const str& bb) {
-        list<str> ll;
+    //{{{ string operators
+    static inline string operator +(const string& aa, const string& bb) {
+        list<string> ll;
         ll.append(aa);
         ll.append(bb);
         return join(ll);
     }
 
-    static inline bool operator <(const str& aa, const str& bb) {
+    static inline bool operator <(const string& aa, const string& bb) {
         return ::strcmp(aa.data(), bb.data()) < 0;
     }
 
-    static inline bool operator <=(const str& aa, const str& bb) {
+    static inline bool operator <=(const string& aa, const string& bb) {
         return ::strcmp(aa.data(), bb.data()) <= 0;
     }
 
-    static inline bool operator >=(const str& aa, const str& bb) {
+    static inline bool operator >=(const string& aa, const string& bb) {
         return ::strcmp(aa.data(), bb.data()) >= 0;
     }
 
-    static inline bool operator >(const str& aa, const str& bb) {
+    static inline bool operator >(const string& aa, const string& bb) {
         return ::strcmp(aa.data(), bb.data()) > 0;
     }
 
-    static inline bool operator ==(const str& aa, const str& bb) {
+    static inline bool operator ==(const string& aa, const string& bb) {
         return ::strcmp(aa.data(), bb.data()) == 0;
     }
 
-    static inline bool operator !=(const str& aa, const str& bb) {
+    static inline bool operator !=(const string& aa, const string& bb) {
         return ::strcmp(aa.data(), bb.data()) != 0;
     }
     //}}}
@@ -2799,14 +2799,14 @@ namespace xm {
     //{{{ String Functions               format, substr, strip, split, join, rfind 
     //{{{ str functions
     __attribute__ ((format (printf, 1, 2))) 
-    static inline str format(const char* fmt, ...) {
+    static inline string format(const char* fmt, ...) {
         char buffer[64];
         va_list args;
         va_start(args, fmt);
         int64 bytes;
         if ((bytes = vsnprintf(buffer, 64, fmt, args)) < 64) {
             va_end(args);
-            return str(buffer);
+            return string(buffer);
         }
         va_end(args);
 
@@ -2815,18 +2815,18 @@ namespace xm {
         char* scratch = alloc<char>(bytes*sizeof(char));
         vsnprintf(scratch, bytes + 1, fmt, again);
         va_end(again);
-        str result(scratch);
+        string result(scratch);
         free(scratch);
         return result;
     }
 
-    static inline str substr(const str& ss, int64 off, int64 len) {
-        str result(len);
+    static inline string substr(const string& ss, int64 off, int64 len) {
+        string result(len);
         memcpy(result.ptr(), ss.data() + off, len);
         return result;
     }
 
-    static inline str strip(const str& text) {
+    static inline string strip(const string& text) {
         // XXX: Is this correct for UTF-8 codes?
         const char* ptr = text.data();
         int64 off = 0;
@@ -2838,14 +2838,14 @@ namespace xm {
         return substr(text, off, len);
     }
 
-    static inline list<str> split(const str& text) {
+    static inline list<string> split(const string& text) {
         int64 off = 0;
         int64 len = text.size();
         const char* ptr = text.data();
 
         while (len > 0 && isspace(ptr[off])) { off++; len--; }
 
-        list<str> result;
+        list<string> result;
 
         while (len > 0) {
             int64 cut = 0;
@@ -2859,9 +2859,9 @@ namespace xm {
         return result;
     }
 
-    /* XXX: finish this
-    static inline list<str> split(const str& text, const str& regex, int64 max = -1) {
-        list<str> result;
+    /* XXX: finish this?
+    static inline list<string> split(const string& text, const string& regex, int64 max = -1) {
+        list<string> result;
         int64 off = 0;
 
         regex_t pattern;
@@ -2886,22 +2886,22 @@ namespace xm {
     }
     */
 
-    static inline str join(const list<str>& ll) {
+    static inline string join(const list<string>& ll) {
         int64 max = 0;
         for (int64 ii = 0; ii<ll.size(); ii++) {
             max += ll[ii].size();
         }
-        str result(max);
+        string result(max);
         char* ptr = result.ptr();
         for (int64 ii = 0; ii<ll.size(); ii++) {
             int64 len = ll[ii].size();
-            memcpy(ptr, ll[ii].data(), len);
+            ::memcpy(ptr, ll[ii].data(), len);
             ptr += len;
         }
         return result;
     }
 
-    static inline int64 rfind(const str& haystack, const str& needle) {
+    static inline int64 rfind(const string& haystack, const string& needle) {
         int64 hlen = haystack.size();
         int64 nlen = needle.size();
         int64 off = hlen - nlen;
@@ -2914,11 +2914,11 @@ namespace xm {
         return -1;
     }
 
-    static inline void swap(str& flip, str& flop) {
+    static inline void swap(string& flip, string& flop) {
         swap(flip.storage, flop.storage);
     }
 
-    static inline size_t hash(const str& ss) {
+    static inline size_t hash(const string& ss) {
         return hash(ss.data(), ss.size(), 0);
     }
     //}}}
@@ -2929,9 +2929,9 @@ namespace xm {
     //}}}
     //{{{ Arithmetic Operators:          operator + - * / % etc 
     //}}}
-    //{{{ Basic Complex Functions:       real, imag, conj, abs, magsqr 
+    //{{{ Basic Complex Functions:       real, imag, conj, mag, mag2 
     //}}}
-    //{{{ Complex Trancendentals:        hypot, cos, sin, expj
+    //{{{ Complex Trancendentals:        hypot, cos, sin, exp, expj
     //}}}
     //{{{ Matrix Decompositions:         qrdecomp, lqdecomp, lddecomp, cholesky 
     //}}}
@@ -2997,7 +2997,7 @@ namespace xm {
 //  quickselect()
 //  prng.sample()
 //  prng.shuffle()
-//  upper(str), lower(str)
+//  upper(string), lower(string)
 //  struct heap<>
 //  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
 //  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
@@ -6124,7 +6124,7 @@ namespace xm {
         int64 whole;
         double fract;
 
-        static inline timecode parse(const str& ss);
+        static inline timecode parse(const string& ss);
     };
 
     // returns "seconds since midnight" before the timecode
@@ -6252,7 +6252,7 @@ namespace xm {
         return (aa - bb) >= 0;
     }
 
-    timecode timecode::parse(const str& ss) {
+    timecode timecode::parse(const string& ss) {
         datetime dt;
         int res = sscanf(
             // XXX: This will silently ignore any timezone at the end.
@@ -6266,7 +6266,7 @@ namespace xm {
         return gettime(dt);
     }
 
-    static inline str format(timecode tc, int32_t places=12) {
+    static inline string format(timecode tc, int32_t places=12) {
         datetime dt = getdate(tc, places);
         if (places <= 0) {
             return xm::format(
@@ -6639,29 +6639,29 @@ namespace xm {
 
     struct cmdline {
         inline ~cmdline();
-        inline cmdline(int argc, char const * const * const argv, str doc);
+        inline cmdline(int argc, char const * const * const argv, string doc);
 
-        inline str            getstring(    str name, str             def, str doc);
-        inline double         getdouble(    str name, double          def, str doc);
-        inline int64          getint64(     str name, int64           def, str doc);
-        inline timecode       gettimecode(  str name, timecode        def, str doc);
-        inline cartesian      getcartesian( str name, cartesian       def, str doc);
-        inline geodetic       getgeodetic(  str name, geodetic        def, str doc);
-        //inline matrix<double> getmatrix(    str name, matrix<double>& def, str doc); XXX
+        inline string         getstring(    string name, string             def, string doc);
+        inline double         getdouble(    string name, double          def, string doc);
+        inline int64          getint64(     string name, int64           def, string doc);
+        inline timecode       gettimecode(  string name, timecode        def, string doc);
+        inline cartesian      getcartesian( string name, cartesian       def, string doc);
+        inline geodetic       getgeodetic(  string name, geodetic        def, string doc);
+        //inline matrix<double> getmatrix(    string name, matrix<double>& def, string doc); XXX
 
-        inline str            getstring(    str name, str doc);
-        inline double         getdouble(    str name, str doc);
-        inline int64          getint64(     str name, str doc);
-        inline timecode       gettimecode(  str name, str doc);
-        inline cartesian      getcartesian( str name, str doc);
-        inline geodetic       getgeodetic(  str name, str doc);
+        inline string            getstring(    string name, string doc);
+        inline double         getdouble(    string name, string doc);
+        inline int64          getint64(     string name, string doc);
+        inline timecode       gettimecode(  string name, string doc);
+        inline cartesian      getcartesian( string name, string doc);
+        inline geodetic       getgeodetic(  string name, string doc);
         //inline matrix<double> getmatrix(    str name, str doc); XXX
 
-        inline bool           getswitch(    str name, str doc);
+        inline bool           getswitch(    string name, string doc);
 
-        inline str            getinput(     str name, str doc);
-        inline str            getoutput(    str name, str doc);
-        inline list<str>      getinputs(    str name, str doc);
+        inline string            getinput(     string name, string doc);
+        inline string            getoutput(    string name, string doc);
+        inline list<string>      getinputs(    string name, string doc);
 
         inline void done();
 
@@ -6670,12 +6670,12 @@ namespace xm {
             cmdline(const cmdline&);// = delete;
             void operator =(const cmdline&);// = delete;
 
-            inline const char* find_argument(const str& name);
+            inline const char* find_argument(const string& name);
 
             __attribute__ ((format (scanf, 7, 8)))
             inline bool scan_argument(
-                str name, bool required, const char* type,
-                const str& doc, int count, const char* format, ...
+                string name, bool required, const char* type,
+                const string& doc, int count, const char* format, ...
             );
 
             //inline matrix<double> parse_matrix(str name, const char* val); XXX
@@ -6688,12 +6688,12 @@ namespace xm {
 
     cmdline::~cmdline() { check(done_called, "must call cmdline .done()"); }
 
-    cmdline::cmdline(int argc, char const * const * const argv, str doc)
+    cmdline::cmdline(int argc, char const * const * const argv, string doc)
         : switches_done(false), need_help(false), done_called(false)
     {
         for (int ii = 1; ii<argc; ii++) {
             args.append(argv[ii]);
-            if (strcmp(argv[ii], "-h") == 0 || strcmp(argv[ii], "-help") == 0) {
+            if (::strcmp(argv[ii], "-h") == 0 || ::strcmp(argv[ii], "-help") == 0) {
                 need_help = true;
             }
         }
@@ -6705,7 +6705,7 @@ namespace xm {
         }
     }
 
-    str cmdline::getstring(str name, str def, str doc) {
+    string cmdline::getstring(string name, string def, string doc) {
         check(switches_done == false, "switches must be processed first");
         name = format("-%s", name.data()); //name = "-" + name;
         if (need_help) {
@@ -6720,23 +6720,23 @@ namespace xm {
         return val ? val : def;
     }
 
-    double cmdline::getdouble(str name, double def, str doc) {
+    double cmdline::getdouble(string name, double def, string doc) {
         double val = 0;
         doc = format("<double, default=%lg>\n\t%s", def, doc.data());
         return scan_argument(name, false, "double", doc, 1, " %lf ", &val) ? val : def;
     }
 
-    int64 cmdline::getint64(str name, int64 def, str doc) {
+    int64 cmdline::getint64(string name, int64 def, string doc) {
         int64 val = 0;
         doc = format("<int64, default=%lld>\n\t%s", def, doc.data());
         return scan_argument(name, false, "int64", doc, 1, " %lld ", &val) ? val : def;
     }
 
-    timecode cmdline::gettimecode(str name, timecode def, str doc) {
+    timecode cmdline::gettimecode(string name, timecode def, string doc) {
         check(switches_done == false, "switches must be processed first");
         name = format("-%s", name.data()); //name = "-" + name;
         if (need_help) {
-            str ts = format(def, 12);
+            string ts = format(def, 12);
             fprintf(
                 stderr, "    %s <timecode, default=%s>\n\t%s\n",
                 name.data(), ts.data(), doc.data()
@@ -6748,7 +6748,7 @@ namespace xm {
         return val ? timecode::parse(val) : def;
     }
 
-    cartesian cmdline::getcartesian(str name, cartesian def, str doc) {
+    cartesian cmdline::getcartesian(string name, cartesian def, string doc) {
         cartesian val = cartesian();
         doc = format("<cartesian, default=%lg,%lg,%lg>\n\t%s", def.x, def.y, def.z, doc.data());
         return scan_argument(
@@ -6756,7 +6756,7 @@ namespace xm {
         ) ? val : def;
     }
 
-    geodetic cmdline::getgeodetic(str name, geodetic def, str doc) {
+    geodetic cmdline::getgeodetic(string name, geodetic def, string doc) {
         geodetic val = geodetic();
         doc = format("<geodetic, default=%lg,%lg,%lg>\n\t%s", def.lat, def.lon, def.alt, doc.data());
         return scan_argument(
@@ -6764,7 +6764,7 @@ namespace xm {
         ) ? val : def;
     }
 
-    str cmdline::getstring(str name, str doc) {
+    string cmdline::getstring(string name, string doc) {
         check(switches_done == false, "switches must be processed first");
         name = format("-%s", name.data()); //name = "-" + name;
         if (need_help) {
@@ -6784,21 +6784,21 @@ namespace xm {
 
     }
 
-    double cmdline::getdouble(str name, str doc) {
+    double cmdline::getdouble(string name, string doc) {
         double val = 0;
         doc = format("<double, required>\n\t%s", doc.data());
         scan_argument(name, true, "double", doc, 1, " %lf ", &val);
         return val;
     }
 
-    int64 cmdline::getint64(str name, str doc) {
+    int64 cmdline::getint64(string name, string doc) {
         int64 val = 0;
         doc = format("<int64, required>\n\t%s", doc.data());
         scan_argument(name, true, "int64", doc, 1, " %lld ", &val);
         return val;
     }
 
-    timecode cmdline::gettimecode(str name, str doc) {
+    timecode cmdline::gettimecode(string name, string doc) {
         check(switches_done == false, "switches must be processed first");
         name = format("-%s", name.data()); //name = "-" + name;
         if (need_help) {
@@ -6817,21 +6817,21 @@ namespace xm {
         return timecode::parse(val);
     }
 
-    cartesian cmdline::getcartesian(str name, str doc) {
+    cartesian cmdline::getcartesian(string name, string doc) {
         cartesian val = cartesian();
         doc = format("<cartesian, required>\n\t%s", doc.data());
         scan_argument(name, true, "cartesian", doc, 1, " %lf , %lf , %lf ", &val.x, &val.y, &val.z);
         return val;
     }
 
-    geodetic cmdline::getgeodetic(str name, str doc) {
+    geodetic cmdline::getgeodetic(string name, string doc) {
         geodetic val = geodetic();
         doc = format("<geodetic, required>\n\t%s", doc.data());
         scan_argument(name, true, "geodetic", doc, 1, " %lf , %lf , %lf ", &val.lat, &val.lon, &val.alt);
         return val;
     }
 
-    bool cmdline::getswitch(str name, str doc) {
+    bool cmdline::getswitch(string name, string doc) {
         check(switches_done == false, "switches must be processed first");
         name = format("-%s", name.data()); //name = "-" + name;
         if (need_help) {
@@ -6850,7 +6850,7 @@ namespace xm {
         return false;
     }
 
-    str cmdline::getinput(str name, str doc) {
+    string cmdline::getinput(string name, string doc) {
         switches_done = true;
         if (need_help) {
             fprintf(
@@ -6864,13 +6864,13 @@ namespace xm {
         //        if (*ii[0] == '-' && strcmp(*ii, "-") != 0) {
         for (int64 ii = 0; ii<args.size(); ii++) {
             if (args[ii]) {
-                if (args[ii][0] == '-' && strcmp(args[ii], "-") != 0) {
+                if (args[ii][0] == '-' && ::strcmp(args[ii], "-") != 0) {
                     fprintf(
                         stderr, "Error: found '%s' instead of input file name", args[ii]
                     );
                     exit(-1);
                 }
-                str result = args[ii];
+                string result = args[ii];
                 args[ii] = 0;
                 return result;
             }
@@ -6883,7 +6883,7 @@ namespace xm {
         return "";
     }
 
-    str cmdline::getoutput(str name, str doc) {
+    string cmdline::getoutput(string name, string doc) {
         switches_done = true;
         if (need_help) {
             fprintf(
@@ -6894,14 +6894,14 @@ namespace xm {
         }
         for (int64 ii = 0; ii<args.size(); ii++) {
             if (args[ii]) {
-                if (args[ii][0] == '-' && strcmp(args[ii], "-") != 0) {
+                if (args[ii][0] == '-' && ::strcmp(args[ii], "-") != 0) {
                     fprintf(
                         stderr, "Error: found '%s' instead of output file name\n"
                         "Use -help for a complete list of arguments\n", args[ii]
                     );
                     exit(-1);
                 }
-                str result = args[ii];
+                string result = args[ii];
                 args[ii] = 0;
                 return result;
             }
@@ -6914,19 +6914,19 @@ namespace xm {
         return "";
     }
 
-    list<str> cmdline::getinputs(str name, str doc) {
+    list<string> cmdline::getinputs(string name, string doc) {
         switches_done = true;
         if (need_help) {
             fprintf(
                 stderr, "    <%s, multiple inputs> ...\n\t%s\n",
                 name.data(), doc.data()
             );
-            return list<str>();
+            return list<string>();
         }
-        list<str> results;
+        list<string> results;
         for (int64 ii = 0; ii<args.size(); ii++) {
             if (args[ii]) {
-                if (args[ii][0] == '-' && strcmp(args[ii], "-") != 0) {
+                if (args[ii][0] == '-' && ::strcmp(args[ii], "-") != 0) {
                     fprintf(
                         stderr, "Error: found '%s' instead of input file name\n"
                         "Use -help for a complete list of arguments\n", args[ii]
@@ -6962,7 +6962,7 @@ namespace xm {
         done_called = true;
     }
 
-    const char* cmdline::find_argument(const str& name) {
+    const char* cmdline::find_argument(const string& name) {
         for (int64 ii = 0; ii<args.size(); ii++) {
             if (args[ii] && args[ii] == name) {
                 if (ii + 1 == args.size() || args[ii + 1] == 0) {
@@ -6982,7 +6982,7 @@ namespace xm {
     }
 
     bool cmdline::scan_argument(
-        str name, bool required, const char* type, const str& doc,
+        string name, bool required, const char* type, const string& doc,
         int count, const char* format, ...
     ) {
         check(switches_done == false, "switches must be processed first");
@@ -7218,7 +7218,7 @@ namespace xm {
             return 0;
         }
 
-        static int64 xmbytesize(const str& format) {
+        static int64 xmbytesize(const string& format) {
             //if (memcmp(format, "NH", 2) == 0)  // record files
             //if (memcmp(format, "KW", 2) == 0)  // keyword files
             check(format.size() == 2, "expected two characters '%s'", format.data());
@@ -7402,8 +7402,8 @@ namespace xm {
                 if (sscanf(ptr, " TC_PREC = %lf", &tcprec) == 1) {
                     return tcprec;
                 }
-                ptr += strlen(ptr) + 1;
-                len -= strlen(ptr) + 1;
+                ptr += ::strlen(ptr) + 1;
+                len -= ::strlen(ptr) + 1;
             }
             return 0;
         }
@@ -7420,7 +7420,7 @@ namespace xm {
             double whole, fract = modf(time.fract*1e6, &whole);
             blue->timecode = time.whole + whole*1e-6;
             sprintf(blue->keywords, "TC_PREC=%.6le", fract*1e-6);
-            blue->keylength = strlen(blue->keywords) + 1;
+            blue->keylength = ::strlen(blue->keywords) + 1;
         }
 
         static int64 xmxcount(const xmheader* blue) {
@@ -7450,16 +7450,16 @@ namespace xm {
             return 1;
         }
 
-        static str terminated(const char* ptr, int64 len) {
+        static string terminated(const char* ptr, int64 len) {
             vec<char> temp(len + 1);
             memcpy(temp.data(), ptr, len);
             temp[len] = 0;
-            return str(temp.data());
+            return string(temp.data());
         }
 
         // Field names are fixed length, but a space or a null means
         // that the string is shorter than the total length.
-        static str fortranstr(const char* ptr, int64 len) {
+        static string fortranstr(const char* ptr, int64 len) {
             vec<char> temp(len + 1);
             memcpy(temp.data(), ptr, len);
             temp[len] = 0;
@@ -7469,7 +7469,7 @@ namespace xm {
                     break;
                 }
             }
-            return str(temp.data());
+            return string(temp.data());
         }
 
     }
@@ -7502,21 +7502,21 @@ namespace xm {
     //
 
     struct bluekeyword {
-        str name;
+        string name;
         char code;
         vec<char> bytes;
 
-        inline str          getstr() const;
+        inline string       getstr() const;
         inline vec<double>  getflt() const;
         inline vec<int64>   getint() const;
     };
 
     namespace internal {
         template<class type>
-        str intkwdtostr(const bluekeyword& kwd) {
+        string intkwdtostr(const bluekeyword& kwd) {
             int64 len = kwd.bytes.size() / sizeof(type);
             int64 show = min(len, (int64)3);
-            list<str> out;
+            list<string> out;
             for (int64 ii = 0; ii<show; ++ii) {
                 int64_t value = *(type*)&kwd.bytes[ii*sizeof(type)];
                 out.append(format("%ld", value));
@@ -7531,10 +7531,10 @@ namespace xm {
         }
 
         template<class type>
-        str unskwdtostr(const bluekeyword& kwd) {
+        string unskwdtostr(const bluekeyword& kwd) {
             int64 len = kwd.bytes.size() / sizeof(type);
             int64 show = min(len, (int64)3);
-            list<str> out;
+            list<string> out;
             for (int64 ii = 0; ii<show; ++ii) {
                 uint64_t value = *(type*)&kwd.bytes[ii*sizeof(type)];
                 out.append(format("%lu", value));
@@ -7549,10 +7549,10 @@ namespace xm {
         }
 
         template<class type>
-        str fltkwdtostr(const bluekeyword& kwd) {
+        string fltkwdtostr(const bluekeyword& kwd) {
             int64 len = kwd.bytes.size() / sizeof(type);
             int64 show = min(len, (int64)3);
-            list<str> out;
+            list<string> out;
             for (int64 ii = 0; ii<show; ++ii) {
                 double value = *(type*)&kwd.bytes[ii*sizeof(type)];
                 out.append(format("%.18lf", value));
@@ -7603,7 +7603,7 @@ namespace xm {
         }
     }
 
-    str bluekeyword::getstr() const {
+    string bluekeyword::getstr() const {
         using namespace internal;
         switch (code) {
             case 'S': case 's':
@@ -7622,7 +7622,7 @@ namespace xm {
             case 'D': case 'd': return fltkwdtostr<double>(*this);
         }
         // XXX: Is this the right thing to do?
-        return str();
+        return string();
     }
 
     vec<double> bluekeyword::getflt() const {
@@ -7630,9 +7630,9 @@ namespace xm {
         switch (code) {
             case 'S': case 's':
             case 'A': case 'a': {
-                str str = getstr();
+                string str = getstr();
                 char* end = 0;
-                double val = strtod(str.data(), &end);
+                double val = ::strtod(str.data(), &end);
                 check(end != 0 && (end == str.data() + str.size()), "convert '%s' to double", str.data());
                 vec<double> result(1);
                 result[0] = val;
@@ -7656,9 +7656,9 @@ namespace xm {
         switch (code) {
             case 'S': case 's':
             case 'A': case 'a': {
-                str str = getstr();
+                string str = getstr();
                 char* end = 0;
-                int64 val = strtoll(str.data(), &end, 0);
+                int64 val = ::strtoll(str.data(), &end, 0);
                 if (end != str.data() + str.size()) {
                     double flt = strtod(str.data(), &end);
                     check(end != 0 && end == str.data() + str.size(), "convert '%s' to double", str.data());
@@ -7686,36 +7686,36 @@ namespace xm {
     struct bluekeywords {
         list<bluekeyword> storage;
 
-        inline int64 count(const str& name) const;
+        inline int64 count(const string& name) const;
 
-        inline bluekeyword  getkwd(const str& name, int64 which=0) const;
-        inline str          getstr(const str& name, int64 which=0) const;
-        inline vec<double>  getflt(const str& name, int64 which=0) const;
-        inline vec<int64>   getint(const str& name, int64 which=0) const;
+        inline bluekeyword  getkwd(const string& name, int64 which=0) const;
+        inline string       getstr(const string& name, int64 which=0) const;
+        inline vec<double>  getflt(const string& name, int64 which=0) const;
+        inline vec<int64>   getint(const string& name, int64 which=0) const;
 
-        inline void update(const str& name, char code, const void* data, int64 len, int64 which);
-        inline void update(const str& name, const str&   value,  int64 which=0);
-        inline void update(const str& name, double       value,  int64 which=0);
-        inline void update(const str& name, vec<double>  values, int64 which=0);
-        inline void update(const str& name, int32_t      value,  int64 which=0);
-        inline void update(const str& name, vec<int32_t> values, int64 which=0);
-        inline void update(const str& name, int64_t      value,  int64 which=0);
-        inline void update(const str& name, vec<int64_t> values, int64 which=0);
+        inline void update(const string& name, char code, const void* data, int64 len, int64 which);
+        inline void update(const string& name, const string&   value,  int64 which=0);
+        inline void update(const string& name, double       value,  int64 which=0);
+        inline void update(const string& name, vec<double>  values, int64 which=0);
+        inline void update(const string& name, int32_t      value,  int64 which=0);
+        inline void update(const string& name, vec<int32_t> values, int64 which=0);
+        inline void update(const string& name, int64_t      value,  int64 which=0);
+        inline void update(const string& name, vec<int64_t> values, int64 which=0);
 
-        inline void insert(const str& name, char code, const void* data, int64 len, int64 where);
-        inline void insert(const str& name, const str&   value,  int64 where=-1);
-        inline void insert(const str& name, double       value,  int64 where=-1);
-        inline void insert(const str& name, vec<double>  values, int64 where=-1);
-        inline void insert(const str& name, int32_t      value,  int64 where=-1);
-        inline void insert(const str& name, vec<int32_t> values, int64 where=-1);
-        inline void insert(const str& name, int64_t      value,  int64 where=-1);
-        inline void insert(const str& name, vec<int64_t> values, int64 where=-1);
+        inline void insert(const string& name, char code, const void* data, int64 len, int64 where);
+        inline void insert(const string& name, const string&   value,  int64 where=-1);
+        inline void insert(const string& name, double       value,  int64 where=-1);
+        inline void insert(const string& name, vec<double>  values, int64 where=-1);
+        inline void insert(const string& name, int32_t      value,  int64 where=-1);
+        inline void insert(const string& name, vec<int32_t> values, int64 where=-1);
+        inline void insert(const string& name, int64_t      value,  int64 where=-1);
+        inline void insert(const string& name, vec<int64_t> values, int64 where=-1);
 
-        inline void remove(const str& name, int64 which=0);
+        inline void remove(const string& name, int64 which=0);
 
     };
 
-    int64 bluekeywords::count(const str& name) const {
+    int64 bluekeywords::count(const string& name) const {
         int64 total = 0;
         for (int64 ii = 0; ii<storage.size(); ii++) {
             if (storage[ii].name == name) total++;
@@ -7777,7 +7777,7 @@ namespace xm {
                 if (byteswap) byteswap4(&kwd->next_offset);
                 if (byteswap) byteswap2(&kwd->non_value);
                 int64 data_len = kwd->next_offset - kwd->non_value;
-                str name = terminated(kwd->buffer + data_len, kwd->key_length);
+                string name = terminated(kwd->buffer + data_len, kwd->key_length);
                 vec<char> bytes(data_len);
                 memcpy(bytes.data(), kwd->buffer, data_len);
                 result.storage.append((bluekeyword){ name, kwd->format_code, bytes});
@@ -7820,7 +7820,7 @@ namespace xm {
         }
     }
 
-    bluekeyword bluekeywords::getkwd(const str& name, int64 which) const {
+    bluekeyword bluekeywords::getkwd(const string& name, int64 which) const {
         check(which >= 0, "keyword index must be non-negative (%lld)", which);
         for (int64 ii = 0; ii<storage.size(); ii++) {
             const bluekeyword& kwd = storage[ii];
@@ -7835,19 +7835,19 @@ namespace xm {
         return (bluekeyword){ "", 0, vec<char>() };
     }
 
-    str bluekeywords::getstr(const str& name, int64 which) const {
+    string bluekeywords::getstr(const string& name, int64 which) const {
         return getkwd(name, which).getstr();
     }
 
-    vec<int64> bluekeywords::getint(const str& name, int64 which) const {
+    vec<int64> bluekeywords::getint(const string& name, int64 which) const {
         return getkwd(name, which).getint();
     }
 
-    vec<double> bluekeywords::getflt(const str& name, int64 which) const {
+    vec<double> bluekeywords::getflt(const string& name, int64 which) const {
         return getkwd(name, which).getflt();
     }
 
-    void bluekeywords::update(const str& name, char code, const void* data, int64 len,  int64 which) {
+    void bluekeywords::update(const string& name, char code, const void* data, int64 len,  int64 which) {
         check(which >= 0, "must specify non-negative keyword index (%lld)", which);
         for (int64 ii = 0; ii<storage.size(); ii++) {
             bluekeyword& kwd = storage[ii];
@@ -7866,35 +7866,35 @@ namespace xm {
         check(false, "keyword to update not found '%s' (%lld)", name.data(), which);
     }
 
-    void bluekeywords::update(const str& name, const str& value, int64 which) {
+    void bluekeywords::update(const string& name, const string& value, int64 which) {
         update(name, 'A', value.data(), value.size(), which);
     }
 
-    void bluekeywords::update(const str& name, double value, int64 which) {
+    void bluekeywords::update(const string& name, double value, int64 which) {
         update(name, 'D', &value, sizeof(double), which);
     }
 
-    void bluekeywords::update(const str& name, vec<double> values, int64 which) {
+    void bluekeywords::update(const string& name, vec<double> values, int64 which) {
         update(name, 'D', values.data(), values.size()*sizeof(double), which);
     }
 
-    void bluekeywords::update(const str& name, int32_t value, int64 which) {
+    void bluekeywords::update(const string& name, int32_t value, int64 which) {
         update(name, 'L', &value, sizeof(int32_t), which);
     }
 
-    void bluekeywords::update(const str& name, vec<int32_t> values, int64 which) {
+    void bluekeywords::update(const string& name, vec<int32_t> values, int64 which) {
         update(name, 'L', values.data(), values.size()*sizeof(int32_t), which);
     }
 
-    void bluekeywords::update(const str& name, int64_t value, int64 which) {
+    void bluekeywords::update(const string& name, int64_t value, int64 which) {
         update(name, 'X', &value, sizeof(int64), which);
     }
 
-    void bluekeywords::update(const str& name, vec<int64_t> values, int64 which) {
+    void bluekeywords::update(const string& name, vec<int64_t> values, int64 which) {
         update(name, 'X', values.data(), values.size()*sizeof(int64), which);
     }
 
-    void bluekeywords::insert(const str& name, char code, const void* data, int64 len, int64 where) {
+    void bluekeywords::insert(const string& name, char code, const void* data, int64 len, int64 where) {
         if (where < 0) where = storage.size();
         check(where <= storage.size(), "index in bounds %lld [0, %lld]", where, storage.size());
         vec<char> bytes(len);
@@ -7902,35 +7902,35 @@ namespace xm {
         storage.insert(where, (bluekeyword){ name, code, bytes });
     }
 
-    void bluekeywords::insert(const str& name, const str& value, int64 where) {
+    void bluekeywords::insert(const string& name, const string& value, int64 where) {
         insert(name, 'A', value.data(), value.size(), where);
     }
 
-    void bluekeywords::insert(const str& name, double value,  int64 where) {
+    void bluekeywords::insert(const string& name, double value,  int64 where) {
         insert(name, 'D', &value, sizeof(double), where);
     }
 
-    void bluekeywords::insert(const str& name, vec<double>  values, int64 where) {
+    void bluekeywords::insert(const string& name, vec<double>  values, int64 where) {
         insert(name, 'D', values.data(), values.size()*sizeof(double), where);
     }
 
-    void bluekeywords::insert(const str& name, int64_t value, int64 where) {
+    void bluekeywords::insert(const string& name, int64_t value, int64 where) {
         insert(name, 'X', &value, sizeof(int64), where);
     }
 
-    void bluekeywords::insert(const str& name, vec<int64_t> values, int64 where) {
+    void bluekeywords::insert(const string& name, vec<int64_t> values, int64 where) {
         insert(name, 'X', values.data(), values.size()*sizeof(int64), where);
     }
 
-    void bluekeywords::insert(const str& name, int32_t value, int64 where) {
+    void bluekeywords::insert(const string& name, int32_t value, int64 where) {
         insert(name, 'L', &value, sizeof(int32_t), where);
     }
 
-    void bluekeywords::insert(const str& name, vec<int32_t> values, int64 where) {
+    void bluekeywords::insert(const string& name, vec<int32_t> values, int64 where) {
         insert(name, 'L', values.data(), values.size()*sizeof(int32_t), where);
     }
 
-    void bluekeywords::remove(const str& name, int64 which) {
+    void bluekeywords::remove(const string& name, int64 which) {
         check(which >= 0, "must specify non-negative keyword index (%lld)", which);
         for (int64 ii = 0; ii<storage.size(); ii++) {
             if (storage[ii].name == name) {
@@ -7944,8 +7944,8 @@ namespace xm {
     //}}}
     //{{{ bluefield
     struct bluefield {
-        str name;
-        str format;
+        string name;
+        string format;
         int16_t offset;
     };
     //}}}
@@ -7974,7 +7974,7 @@ namespace xm {
     }
 
     namespace internal {
-        static inline str xmunits (uint8_t code) {
+        static inline string xmunits (uint8_t code) {
             switch (code) {
                 case blueunits::none:    return "none (unitless)";
                 case blueunits::time:    return "time (seconds)";
@@ -8002,7 +8002,7 @@ namespace xm {
     struct bluemeta {
         int32_t type;
         timecode time;
-        str format;
+        string format;
         int32_t itemsize;
         int64   xcount, ycount;
         double  xstart, ystart;
@@ -8146,7 +8146,7 @@ namespace xm {
         //inline ~bluereader() = default;
         //inline bluereader() = default;
         //inline bluereader(const bluereader&) = default;
-        inline bluereader(const str& path);
+        inline bluereader(const string& path);
 
         //inline bluereader& operator =(const bluereader&) = default;
 
@@ -8183,7 +8183,7 @@ namespace xm {
             shared<implementation> pimpl;
     };
 
-    bluereader::bluereader(const str& path) {
+    bluereader::bluereader(const string& path) {
         using namespace internal;
         check(sizeof(xmheader) == 512, "sanity");
 
@@ -8214,7 +8214,7 @@ namespace xm {
             // open the detached data portion of the file
             int64 pos = rfind(path, ".");
             check(pos >= 0, "need file extension: %s", path.data());
-            str detpath = substr(path, 0, pos) + ".det";
+            string detpath = substr(path, 0, pos) + ".det";
             int detfd = open(detpath.data(), O_RDONLY);
             check(detfd >= 0, "opening '%s' for reading", detpath.data());
             rawfile detfile(detfd);
@@ -8340,7 +8340,7 @@ namespace xm {
                 */
 
                 for (int64 offset = 0, ii = 0; ii<hdr.subsize; ii++) {
-                    str format = terminated(hdr.u.eph.fields[ii].format, 2);
+                    string format = terminated(hdr.u.eph.fields[ii].format, 2);
                     int64 bytes = xmbytesize(format);
                     pimpl->meta.fields.append(
                         (bluefield){
@@ -8591,7 +8591,7 @@ namespace xm {
         inline ~bluewriter();
         //inline bluewriter() = default;
         //inline bluewriter(const bluewriter&) = default;
-        inline bluewriter(const str& path);
+        inline bluewriter(const string& path);
 
         //inline bluewriter& operator =(const bluewriter&) = default;
 
@@ -8622,7 +8622,7 @@ namespace xm {
         );
     }
 
-    bluewriter::bluewriter(const str& path) {
+    bluewriter::bluewriter(const string& path) {
         using namespace internal;
 
         int fd = path == "-" ? dup(1) : open(
@@ -8703,7 +8703,7 @@ namespace xm {
     //}}}
     //{{{ dump2000 dump1000
     static inline void dump1000(
-        const str& path, const str& format, const void* ptr, timecode time,
+        const string& path, const string& format, const void* ptr, timecode time,
         double xstart, double xdelta, int xunits, int64 xcount
     ) {
         using namespace internal;
@@ -8720,7 +8720,7 @@ namespace xm {
     }
 
     static inline void dump2000(
-        const str& path, const str& format, const void* ptr, timecode time,
+        const string& path, const string& format, const void* ptr, timecode time,
         double xstart, double xdelta, int xunits, int64 xcount,
         double ystart, double ydelta, int yunits, int64 ycount
     ) {
@@ -8744,11 +8744,11 @@ namespace xm {
     //}}}
     //{{{ bluedetach
     static inline void bluedetach(
-        const str& datapath, int64 byteoffset,
-        const str& bluepath, const bluemeta& meta
+        const string& datapath, int64 byteoffset,
+        const string& bluepath, const bluemeta& meta
     ) {
-        str detfile = bluepath + ".det";
-        str tmpfile = bluepath + ".tmp";
+        string detfile = bluepath + ".det";
+        string tmpfile = bluepath + ".tmp";
 
         using namespace internal;
         xmheader hdr = init_header(meta);
@@ -8957,7 +8957,7 @@ namespace xm {
         //ephemeris(const ephemeris&) = default;
         inline ephemeris(const statevec&);
         inline ephemeris(const geodetic&);
-        inline ephemeris(const str& path);
+        inline ephemeris(const string& path);
         //ephemeris& operator =(const ephemeris&) = default;
 
         inline statevec lookup(timecode tc) const;
@@ -8980,7 +8980,7 @@ namespace xm {
         };
     }
 
-    ephemeris::ephemeris(const str& path) {
+    ephemeris::ephemeris(const string& path) {
         using namespace internal;
         bluereader input(path);
         check(input->type/1000 == 5, "expected a Type 5000 file");
@@ -9114,11 +9114,11 @@ namespace xm {
         }
     }
 
-    static inline str ephpath(int64 veh, datetime dt) {
+    static inline string ephpath(int64 veh, datetime dt) {
         const char* ephdir = getenv("EPHEMERIS_DIR");
         check(ephdir != 0, "EPHEMERIS_DIR must be set");
 
-        list<str> paths;
+        list<string> paths;
         // We put the "u" versions first because they are supposed to be "updated" (newer and better).
         paths.append(format("%s/sv%d_%04d%02d%02du.prm", ephdir, (int)veh, dt.year, dt.month, dt.day));
         paths.append(format("%s/sv%d_%04d%02d%02du.tmp", ephdir, (int)veh, dt.year, dt.month, dt.day));
@@ -9131,7 +9131,7 @@ namespace xm {
         paths.append(format("%s/%04d/%02d/sv%d_%04d%02d%02d.tmp", ephdir, dt.year, dt.month, (int)veh, dt.year, dt.month, dt.day));
 
         for (int64 ii = 0; ii<paths.size(); ii++) {
-            const str& path = paths[ii];
+            const string& path = paths[ii];
             struct stat buf;
             if (stat(path.data(), &buf) == 0) return path;
         }
@@ -9224,7 +9224,7 @@ namespace xm {
     }
 
     struct dtedtile {
-        inline dtedtile(const str& path);
+        inline dtedtile(const string& path);
 
         //inline ~dtedtile() = default;
         inline dtedtile() : lats(0), lons(0) {}
@@ -9241,7 +9241,7 @@ namespace xm {
             vec<int16_t> data;
     };
 
-    dtedtile::dtedtile(const str& path) {
+    dtedtile::dtedtile(const string& path) {
         using namespace internal;
 
         // An empty path is used to indicate the absence of a tile.
@@ -9396,7 +9396,7 @@ namespace xm {
         inline double lookup(double lat, double lon);
 
         private:
-            inline str trypath(int32_t lat, int32_t lon);
+            inline string trypath(int32_t lat, int32_t lon);
             int64 maxsize;
             int64 counter;
             struct countdted {
@@ -9444,7 +9444,7 @@ namespace xm {
         check(msl[5] == .25, "expected 5");
     }
 
-    str dtedcache::trypath(int32_t lat, int32_t lon) {
+    string dtedcache::trypath(int32_t lat, int32_t lon) {
         const char* dteddir = getenv("DTED_DIR");
         check(dteddir != 0, "DTED_DIR must be set");
 
@@ -9459,13 +9459,13 @@ namespace xm {
             lon *= -1;
         }
 
-        list<str> paths;
+        list<string> paths;
         paths.append(format("%s/%c%03d/%c%02d.cdt2", dteddir, ew, lon, ns, lat));
         paths.append(format("%s/%c%03d/%c%02d.cdt1", dteddir, ew, lon, ns, lat));
         paths.append(format("%s/%c%03d/%c%02d.dt0",  dteddir, ew, lon, ns, lat));
 
         for (int64 ii = 0; ii<paths.size(); ii++) {
-            const str& path = paths[ii];
+            const string& path = paths[ii];
             struct stat buf;
             if (stat(path.data(), &buf) == 0) {
                 return path;
@@ -9939,7 +9939,7 @@ namespace xm {
     struct uniqueid {
         uint8_t bytes[16];
 
-        static inline uniqueid parse(const str& text);
+        static inline uniqueid parse(const string& text);
     };
 
     static inline size_t hash(const uniqueid& uuid) {
@@ -9971,7 +9971,7 @@ namespace xm {
         return result;
     }
 
-    static inline str format(const uniqueid& uuid) {
+    static inline string format(const uniqueid& uuid) {
         return format(
             "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
             uuid.bytes[ 0], uuid.bytes[ 1], uuid.bytes[ 2], uuid.bytes[ 3],
@@ -9981,7 +9981,7 @@ namespace xm {
         );
     }
 
-    inline uniqueid uniqueid::parse(const str &text) {
+    inline uniqueid uniqueid::parse(const string &text) {
         uniqueid uuid;
         if(text.size() == 32) {
             check(sscanf(

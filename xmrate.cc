@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
     double percent  = args.getdouble("percent", 80, "percentage of bandwidth to preserve");
     int64 window    = args.getint64("firwin", 2, "FIR window for resampling");
     bool copykwds   = args.getswitch("copykwds", "copy the input keywords to the output file");
-    str inpath      = args.getinput("input.tmp", "input blue file");
-    str outpath     = args.getoutput("output.tmp", "output blue file");
+    string inpath      = args.getinput("input.tmp", "input blue file");
+    string outpath     = args.getoutput("output.tmp", "output blue file");
     args.done();
 
     check(outrate > 0, "need positive sample rate");

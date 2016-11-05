@@ -7,20 +7,21 @@ INCLUDES = \
     xmkwds.h \
 
 PROGRAMS = \
-    xmtest \
-    xmstat \
-    xmkwds \
-    xmcut \
-    xmcat \
-    xmrate \
-    xmtone \
-    xmnoise \
-    xmspec \
     xmbase \
-    xmhalf \
-    xmlfsr \
-    xmgps \
+    xmcat \
+    xmcut \
     xmfirpm \
+    xmgps \
+    xmhalf \
+    xmkwds \
+    xmkwds \
+    xmlfsr \
+    xmnoise \
+    xmrate \
+    xmspec \
+    xmstat \
+    xmtest \
+    xmtone \
     covar \
 
 all: $(PROGRAMS)

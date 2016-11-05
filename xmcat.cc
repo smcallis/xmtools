@@ -4,12 +4,12 @@ using namespace xm;
 int main(int argc, char* argv[]) {
     cmdline args(argc, argv, "cut out a piece out of a file");
 
-    bool ignore     = args.getswitch("override", "ignore mismatched timecodes");
-    bool remove     = args.getswitch("delete", "delete input files after concatenation");
-    bool copykwds   = args.getswitch("copykwds", "copy keywords from the first input");
-    bool getstdin   = args.getswitch("stdin", "take file names from stdin");
-    str outpath     = args.getoutput("output.tmp", "output file");
-    list<str> inpaths = args.getinputs("input.tmp", "input file");
+    bool ignore    = args.getswitch("override", "ignore mismatched timecodes");
+    bool remove    = args.getswitch("delete", "delete input files after concatenation");
+    bool copykwds  = args.getswitch("copykwds", "copy keywords from the first input");
+    bool getstdin  = args.getswitch("stdin", "take file names from stdin");
+    string outpath = args.getoutput("output.tmp", "output file");
+    list<string> inpaths = args.getinputs("input.tmp", "input file");
     args.done();
 
     if (getstdin) {
@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
 
     bluemeta meta;
     timecode expect;
-    str format;
+    string format;
     int64 total = 0;
     {
         bluereader input(inpaths[0]);

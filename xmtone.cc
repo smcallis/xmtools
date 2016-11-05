@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
     const double rate      = args.getdouble("rate", 1e6, "sample rate");
     const double freq      = args.getdouble("freq", 0, "frequency of the tone");
     const double phase     = args.getdouble("phase", 0, "phase in cycles at first sample");
-    const str outpath      = args.getoutput("output.tmp", "output file");
+    const string outpath   = args.getoutput("output.tmp", "output file");
 
     args.done();
 

@@ -15,8 +15,8 @@ int main(int argc, char* argv[]) {
     double bandwidth = args.getdouble("bandwidth", 0, "pass band to preserve, default is 80%");
     timecode tstart  = args.gettimecode("tstart", (timecode){0,0}, "starting timecode, default is the beginning");
     double tspan     = args.getdouble("tspan", 0, "amount of time to keep, default is whole file");
-    str    inpath    = args.getinput("input.tmp", "input real-valued data");
-    str    outpath   = args.getoutput("output.tmp", "output complex float");
+    string inpath    = args.getinput("input.tmp", "input real-valued data");
+    string outpath   = args.getoutput("output.tmp", "output complex float");
     args.done();
 
     bluereader input(inpath);

@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
     const double tspan     = args.getdouble("tspan", 1.0, "time stpan");
     const double rate      = args.getdouble("rate", 1e6, "sample rate");
     const int64 seed       = args.getint64("seed", 0, "seed for random number generator");
-    const str outpath      = args.getoutput("output.tmp", "output file");
+    const string outpath   = args.getoutput("output.tmp", "output file");
 
     args.done();
 

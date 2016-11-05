@@ -5,9 +5,9 @@ int main(int argc, char* argv[]) {
 
     cmdline args(argc, argv, "make GPS C/A code");
 
-    int64 prn   = args.getint64("prn", 1, "PRN 1-37");
-    int64 count = args.getint64("count", 1023, "how many chips to make");
-    str outpath = args.getoutput("output.tmp", "output blue file");
+    int64 prn      = args.getint64("prn", 1, "PRN 1-37");
+    int64 count    = args.getint64("count", 1023, "how many chips to make");
+    string outpath = args.getoutput("output.tmp", "output blue file");
 
     args.done();
 

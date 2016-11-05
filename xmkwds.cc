@@ -8,8 +8,8 @@ int main(int argc, char* argv[]) {
         "Prints a JSON representation of the keywords from a BLUE file.\n"
     );
 
-    bool debug = args.getswitch("debug", "binary debug of the keywords");
-    str inpath = args.getinput("input.tmp", "input BLUE file");
+    bool debug    = args.getswitch("debug", "binary debug of the keywords");
+    string inpath = args.getinput("input.tmp", "input BLUE file");
     args.done();
 
     bluereader input(inpath);
