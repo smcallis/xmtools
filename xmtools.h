@@ -31,28 +31,11 @@ typedef long long int64;
 
 //}}}
 
-// TODO:
-//
-//  check() with line numbers
-//  svdecomp()
-//  symeigens()
-//  adaptmin()
-//  quasimin()
-//  covarmin()
-//  quickselect()
-//  prng.sample()
-//  prng.shuffle()
-//  upper(str), lower(str)
-//  struct heap<>
-//  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
-//  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
-//  struct autodiff<>
-//  xmtest.cc for unit tests
-//
-
 namespace xm {
-    //{{{ promotions 
-    template<class t0, class t1> struct promotion;
+
+    //{{{ Type Promotions:               conditional, arithmetic 
+    //{{{ arithmetic
+    template<class t0, class t1> struct arithmetic;
 
     //
     // These are the "usual arithmetic conversions" according to the standard,
@@ -65,218 +48,439 @@ namespace xm {
     // These were tested with both gcc and clang, and are part of xmtest.cc
     //
     
-    template<> struct promotion<              char,               char> { typedef         signed int type; };
-    template<> struct promotion<              char,        signed char> { typedef         signed int type; };
-    template<> struct promotion<              char,      unsigned char> { typedef         signed int type; };
-    template<> struct promotion<              char,       signed short> { typedef         signed int type; };
-    template<> struct promotion<              char,     unsigned short> { typedef         signed int type; };
-    template<> struct promotion<              char,         signed int> { typedef         signed int type; };
-    template<> struct promotion<              char,       unsigned int> { typedef       unsigned int type; };
-    template<> struct promotion<              char,        signed long> { typedef        signed long type; };
-    template<> struct promotion<              char,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<              char,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<              char, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<              char,              float> { typedef              float type; };
-    template<> struct promotion<              char,             double> { typedef             double type; };
-    template<> struct promotion<              char,        long double> { typedef        long double type; };
+    template<> struct arithmetic<              char,               char> { typedef         signed int type; };
+    template<> struct arithmetic<              char,        signed char> { typedef         signed int type; };
+    template<> struct arithmetic<              char,      unsigned char> { typedef         signed int type; };
+    template<> struct arithmetic<              char,       signed short> { typedef         signed int type; };
+    template<> struct arithmetic<              char,     unsigned short> { typedef         signed int type; };
+    template<> struct arithmetic<              char,         signed int> { typedef         signed int type; };
+    template<> struct arithmetic<              char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct arithmetic<              char,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<              char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<              char,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<              char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<              char,              float> { typedef              float type; };
+    template<> struct arithmetic<              char,             double> { typedef             double type; };
+    template<> struct arithmetic<              char,        long double> { typedef        long double type; };
 
-    template<> struct promotion<       signed char,               char> { typedef         signed int type; };
-    template<> struct promotion<       signed char,        signed char> { typedef         signed int type; };
-    template<> struct promotion<       signed char,      unsigned char> { typedef         signed int type; };
-    template<> struct promotion<       signed char,       signed short> { typedef         signed int type; };
-    template<> struct promotion<       signed char,     unsigned short> { typedef         signed int type; };
-    template<> struct promotion<       signed char,         signed int> { typedef         signed int type; };
-    template<> struct promotion<       signed char,       unsigned int> { typedef       unsigned int type; };
-    template<> struct promotion<       signed char,        signed long> { typedef        signed long type; };
-    template<> struct promotion<       signed char,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<       signed char,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<       signed char, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<       signed char,              float> { typedef              float type; };
-    template<> struct promotion<       signed char,             double> { typedef             double type; };
-    template<> struct promotion<       signed char,        long double> { typedef        long double type; };
+    template<> struct arithmetic<       signed char,               char> { typedef         signed int type; };
+    template<> struct arithmetic<       signed char,        signed char> { typedef         signed int type; };
+    template<> struct arithmetic<       signed char,      unsigned char> { typedef         signed int type; };
+    template<> struct arithmetic<       signed char,       signed short> { typedef         signed int type; };
+    template<> struct arithmetic<       signed char,     unsigned short> { typedef         signed int type; };
+    template<> struct arithmetic<       signed char,         signed int> { typedef         signed int type; };
+    template<> struct arithmetic<       signed char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct arithmetic<       signed char,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<       signed char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<       signed char,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<       signed char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<       signed char,              float> { typedef              float type; };
+    template<> struct arithmetic<       signed char,             double> { typedef             double type; };
+    template<> struct arithmetic<       signed char,        long double> { typedef        long double type; };
 
-    template<> struct promotion<     unsigned char,               char> { typedef         signed int type; };
-    template<> struct promotion<     unsigned char,        signed char> { typedef         signed int type; };
-    template<> struct promotion<     unsigned char,      unsigned char> { typedef         signed int type; };
-    template<> struct promotion<     unsigned char,       signed short> { typedef         signed int type; };
-    template<> struct promotion<     unsigned char,     unsigned short> { typedef         signed int type; };
-    template<> struct promotion<     unsigned char,         signed int> { typedef         signed int type; };
-    template<> struct promotion<     unsigned char,       unsigned int> { typedef       unsigned int type; };
-    template<> struct promotion<     unsigned char,        signed long> { typedef        signed long type; };
-    template<> struct promotion<     unsigned char,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned char,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<     unsigned char, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<     unsigned char,              float> { typedef              float type; };
-    template<> struct promotion<     unsigned char,             double> { typedef             double type; };
-    template<> struct promotion<     unsigned char,        long double> { typedef        long double type; };
+    template<> struct arithmetic<     unsigned char,               char> { typedef         signed int type; };
+    template<> struct arithmetic<     unsigned char,        signed char> { typedef         signed int type; };
+    template<> struct arithmetic<     unsigned char,      unsigned char> { typedef         signed int type; };
+    template<> struct arithmetic<     unsigned char,       signed short> { typedef         signed int type; };
+    template<> struct arithmetic<     unsigned char,     unsigned short> { typedef         signed int type; };
+    template<> struct arithmetic<     unsigned char,         signed int> { typedef         signed int type; };
+    template<> struct arithmetic<     unsigned char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct arithmetic<     unsigned char,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<     unsigned char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned char,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<     unsigned char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<     unsigned char,              float> { typedef              float type; };
+    template<> struct arithmetic<     unsigned char,             double> { typedef             double type; };
+    template<> struct arithmetic<     unsigned char,        long double> { typedef        long double type; };
 
-    template<> struct promotion<      signed short,               char> { typedef         signed int type; };
-    template<> struct promotion<      signed short,        signed char> { typedef         signed int type; };
-    template<> struct promotion<      signed short,      unsigned char> { typedef         signed int type; };
-    template<> struct promotion<      signed short,       signed short> { typedef         signed int type; };
-    template<> struct promotion<      signed short,     unsigned short> { typedef         signed int type; };
-    template<> struct promotion<      signed short,         signed int> { typedef         signed int type; };
-    template<> struct promotion<      signed short,       unsigned int> { typedef       unsigned int type; };
-    template<> struct promotion<      signed short,        signed long> { typedef        signed long type; };
-    template<> struct promotion<      signed short,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<      signed short,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<      signed short, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<      signed short,              float> { typedef              float type; };
-    template<> struct promotion<      signed short,             double> { typedef             double type; };
-    template<> struct promotion<      signed short,        long double> { typedef        long double type; };
+    template<> struct arithmetic<      signed short,               char> { typedef         signed int type; };
+    template<> struct arithmetic<      signed short,        signed char> { typedef         signed int type; };
+    template<> struct arithmetic<      signed short,      unsigned char> { typedef         signed int type; };
+    template<> struct arithmetic<      signed short,       signed short> { typedef         signed int type; };
+    template<> struct arithmetic<      signed short,     unsigned short> { typedef         signed int type; };
+    template<> struct arithmetic<      signed short,         signed int> { typedef         signed int type; };
+    template<> struct arithmetic<      signed short,       unsigned int> { typedef       unsigned int type; };
+    template<> struct arithmetic<      signed short,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<      signed short,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<      signed short,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<      signed short, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<      signed short,              float> { typedef              float type; };
+    template<> struct arithmetic<      signed short,             double> { typedef             double type; };
+    template<> struct arithmetic<      signed short,        long double> { typedef        long double type; };
 
-    template<> struct promotion<    unsigned short,               char> { typedef         signed int type; };
-    template<> struct promotion<    unsigned short,        signed char> { typedef         signed int type; };
-    template<> struct promotion<    unsigned short,      unsigned char> { typedef         signed int type; };
-    template<> struct promotion<    unsigned short,       signed short> { typedef         signed int type; };
-    template<> struct promotion<    unsigned short,     unsigned short> { typedef         signed int type; };
-    template<> struct promotion<    unsigned short,         signed int> { typedef         signed int type; };
-    template<> struct promotion<    unsigned short,       unsigned int> { typedef       unsigned int type; };
-    template<> struct promotion<    unsigned short,        signed long> { typedef        signed long type; };
-    template<> struct promotion<    unsigned short,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<    unsigned short,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<    unsigned short, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<    unsigned short,              float> { typedef              float type; };
-    template<> struct promotion<    unsigned short,             double> { typedef             double type; };
-    template<> struct promotion<    unsigned short,        long double> { typedef        long double type; };
+    template<> struct arithmetic<    unsigned short,               char> { typedef         signed int type; };
+    template<> struct arithmetic<    unsigned short,        signed char> { typedef         signed int type; };
+    template<> struct arithmetic<    unsigned short,      unsigned char> { typedef         signed int type; };
+    template<> struct arithmetic<    unsigned short,       signed short> { typedef         signed int type; };
+    template<> struct arithmetic<    unsigned short,     unsigned short> { typedef         signed int type; };
+    template<> struct arithmetic<    unsigned short,         signed int> { typedef         signed int type; };
+    template<> struct arithmetic<    unsigned short,       unsigned int> { typedef       unsigned int type; };
+    template<> struct arithmetic<    unsigned short,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<    unsigned short,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<    unsigned short,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<    unsigned short, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<    unsigned short,              float> { typedef              float type; };
+    template<> struct arithmetic<    unsigned short,             double> { typedef             double type; };
+    template<> struct arithmetic<    unsigned short,        long double> { typedef        long double type; };
 
-    template<> struct promotion<        signed int,               char> { typedef         signed int type; };
-    template<> struct promotion<        signed int,        signed char> { typedef         signed int type; };
-    template<> struct promotion<        signed int,      unsigned char> { typedef         signed int type; };
-    template<> struct promotion<        signed int,       signed short> { typedef         signed int type; };
-    template<> struct promotion<        signed int,     unsigned short> { typedef         signed int type; };
-    template<> struct promotion<        signed int,         signed int> { typedef         signed int type; };
-    template<> struct promotion<        signed int,       unsigned int> { typedef       unsigned int type; };
-    template<> struct promotion<        signed int,        signed long> { typedef        signed long type; };
-    template<> struct promotion<        signed int,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<        signed int,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<        signed int, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<        signed int,              float> { typedef              float type; };
-    template<> struct promotion<        signed int,             double> { typedef             double type; };
-    template<> struct promotion<        signed int,        long double> { typedef        long double type; };
+    template<> struct arithmetic<        signed int,               char> { typedef         signed int type; };
+    template<> struct arithmetic<        signed int,        signed char> { typedef         signed int type; };
+    template<> struct arithmetic<        signed int,      unsigned char> { typedef         signed int type; };
+    template<> struct arithmetic<        signed int,       signed short> { typedef         signed int type; };
+    template<> struct arithmetic<        signed int,     unsigned short> { typedef         signed int type; };
+    template<> struct arithmetic<        signed int,         signed int> { typedef         signed int type; };
+    template<> struct arithmetic<        signed int,       unsigned int> { typedef       unsigned int type; };
+    template<> struct arithmetic<        signed int,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<        signed int,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<        signed int,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<        signed int, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<        signed int,              float> { typedef              float type; };
+    template<> struct arithmetic<        signed int,             double> { typedef             double type; };
+    template<> struct arithmetic<        signed int,        long double> { typedef        long double type; };
 
-    template<> struct promotion<      unsigned int,               char> { typedef       unsigned int type; };
-    template<> struct promotion<      unsigned int,        signed char> { typedef       unsigned int type; };
-    template<> struct promotion<      unsigned int,      unsigned char> { typedef       unsigned int type; };
-    template<> struct promotion<      unsigned int,       signed short> { typedef       unsigned int type; };
-    template<> struct promotion<      unsigned int,     unsigned short> { typedef       unsigned int type; };
-    template<> struct promotion<      unsigned int,         signed int> { typedef       unsigned int type; };
-    template<> struct promotion<      unsigned int,       unsigned int> { typedef       unsigned int type; };
-    template<> struct promotion<      unsigned int,        signed long> { typedef        signed long type; };
-    template<> struct promotion<      unsigned int,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<      unsigned int,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<      unsigned int, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<      unsigned int,              float> { typedef              float type; };
-    template<> struct promotion<      unsigned int,             double> { typedef             double type; };
-    template<> struct promotion<      unsigned int,        long double> { typedef        long double type; };
+    template<> struct arithmetic<      unsigned int,               char> { typedef       unsigned int type; };
+    template<> struct arithmetic<      unsigned int,        signed char> { typedef       unsigned int type; };
+    template<> struct arithmetic<      unsigned int,      unsigned char> { typedef       unsigned int type; };
+    template<> struct arithmetic<      unsigned int,       signed short> { typedef       unsigned int type; };
+    template<> struct arithmetic<      unsigned int,     unsigned short> { typedef       unsigned int type; };
+    template<> struct arithmetic<      unsigned int,         signed int> { typedef       unsigned int type; };
+    template<> struct arithmetic<      unsigned int,       unsigned int> { typedef       unsigned int type; };
+    template<> struct arithmetic<      unsigned int,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<      unsigned int,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<      unsigned int,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<      unsigned int, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<      unsigned int,              float> { typedef              float type; };
+    template<> struct arithmetic<      unsigned int,             double> { typedef             double type; };
+    template<> struct arithmetic<      unsigned int,        long double> { typedef        long double type; };
 
-    template<> struct promotion<       signed long,               char> { typedef        signed long type; };
-    template<> struct promotion<       signed long,        signed char> { typedef        signed long type; };
-    template<> struct promotion<       signed long,      unsigned char> { typedef        signed long type; };
-    template<> struct promotion<       signed long,       signed short> { typedef        signed long type; };
-    template<> struct promotion<       signed long,     unsigned short> { typedef        signed long type; };
-    template<> struct promotion<       signed long,         signed int> { typedef        signed long type; };
-    template<> struct promotion<       signed long,       unsigned int> { typedef        signed long type; };
-    template<> struct promotion<       signed long,        signed long> { typedef        signed long type; };
-    template<> struct promotion<       signed long,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<       signed long,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<       signed long, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<       signed long,              float> { typedef              float type; };
-    template<> struct promotion<       signed long,             double> { typedef             double type; };
-    template<> struct promotion<       signed long,        long double> { typedef        long double type; };
+    template<> struct arithmetic<       signed long,               char> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,        signed char> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,      unsigned char> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,       signed short> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,     unsigned short> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,         signed int> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,       unsigned int> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,        signed long> { typedef        signed long type; };
+    template<> struct arithmetic<       signed long,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<       signed long,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<       signed long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<       signed long,              float> { typedef              float type; };
+    template<> struct arithmetic<       signed long,             double> { typedef             double type; };
+    template<> struct arithmetic<       signed long,        long double> { typedef        long double type; };
 
-    template<> struct promotion<     unsigned long,               char> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,        signed char> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,      unsigned char> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,       signed short> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,     unsigned short> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,         signed int> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,       unsigned int> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,        signed long> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,      unsigned long> { typedef      unsigned long type; };
-    template<> struct promotion<     unsigned long,   signed long long> { typedef unsigned long long type; };
-    template<> struct promotion<     unsigned long, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<     unsigned long,              float> { typedef              float type; };
-    template<> struct promotion<     unsigned long,             double> { typedef             double type; };
-    template<> struct promotion<     unsigned long,        long double> { typedef        long double type; };
+    template<> struct arithmetic<     unsigned long,               char> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,        signed char> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,      unsigned char> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,       signed short> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,     unsigned short> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,         signed int> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,       unsigned int> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,        signed long> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,      unsigned long> { typedef      unsigned long type; };
+    template<> struct arithmetic<     unsigned long,   signed long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<     unsigned long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<     unsigned long,              float> { typedef              float type; };
+    template<> struct arithmetic<     unsigned long,             double> { typedef             double type; };
+    template<> struct arithmetic<     unsigned long,        long double> { typedef        long double type; };
 
-    template<> struct promotion<  signed long long,               char> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,        signed char> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,      unsigned char> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,       signed short> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,     unsigned short> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,         signed int> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,       unsigned int> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,        signed long> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long,      unsigned long> { typedef unsigned long long type; };
-    template<> struct promotion<  signed long long,   signed long long> { typedef   signed long long type; };
-    template<> struct promotion<  signed long long, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<  signed long long,              float> { typedef              float type; };
-    template<> struct promotion<  signed long long,             double> { typedef             double type; };
-    template<> struct promotion<  signed long long,        long double> { typedef        long double type; };
+    template<> struct arithmetic<  signed long long,               char> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,        signed char> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,      unsigned char> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,       signed short> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,     unsigned short> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,         signed int> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,       unsigned int> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,        signed long> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long,      unsigned long> { typedef unsigned long long type; };
+    template<> struct arithmetic<  signed long long,   signed long long> { typedef   signed long long type; };
+    template<> struct arithmetic<  signed long long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<  signed long long,              float> { typedef              float type; };
+    template<> struct arithmetic<  signed long long,             double> { typedef             double type; };
+    template<> struct arithmetic<  signed long long,        long double> { typedef        long double type; };
 
-    template<> struct promotion<unsigned long long,               char> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,        signed char> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,      unsigned char> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,       signed short> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,     unsigned short> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,         signed int> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,       unsigned int> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,        signed long> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,      unsigned long> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,   signed long long> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long, unsigned long long> { typedef unsigned long long type; };
-    template<> struct promotion<unsigned long long,              float> { typedef              float type; };
-    template<> struct promotion<unsigned long long,             double> { typedef             double type; };
-    template<> struct promotion<unsigned long long,        long double> { typedef        long double type; };
+    template<> struct arithmetic<unsigned long long,               char> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,        signed char> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,      unsigned char> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,       signed short> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,     unsigned short> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,         signed int> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,       unsigned int> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,        signed long> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,      unsigned long> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,   signed long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct arithmetic<unsigned long long,              float> { typedef              float type; };
+    template<> struct arithmetic<unsigned long long,             double> { typedef             double type; };
+    template<> struct arithmetic<unsigned long long,        long double> { typedef        long double type; };
 
-    template<> struct promotion<             float,               char> { typedef              float type; };
-    template<> struct promotion<             float,        signed char> { typedef              float type; };
-    template<> struct promotion<             float,      unsigned char> { typedef              float type; };
-    template<> struct promotion<             float,       signed short> { typedef              float type; };
-    template<> struct promotion<             float,     unsigned short> { typedef              float type; };
-    template<> struct promotion<             float,         signed int> { typedef              float type; };
-    template<> struct promotion<             float,       unsigned int> { typedef              float type; };
-    template<> struct promotion<             float,        signed long> { typedef              float type; };
-    template<> struct promotion<             float,      unsigned long> { typedef              float type; };
-    template<> struct promotion<             float,   signed long long> { typedef              float type; };
-    template<> struct promotion<             float, unsigned long long> { typedef              float type; };
-    template<> struct promotion<             float,              float> { typedef              float type; };
-    template<> struct promotion<             float,             double> { typedef             double type; };
-    template<> struct promotion<             float,        long double> { typedef        long double type; };
+    template<> struct arithmetic<             float,               char> { typedef              float type; };
+    template<> struct arithmetic<             float,        signed char> { typedef              float type; };
+    template<> struct arithmetic<             float,      unsigned char> { typedef              float type; };
+    template<> struct arithmetic<             float,       signed short> { typedef              float type; };
+    template<> struct arithmetic<             float,     unsigned short> { typedef              float type; };
+    template<> struct arithmetic<             float,         signed int> { typedef              float type; };
+    template<> struct arithmetic<             float,       unsigned int> { typedef              float type; };
+    template<> struct arithmetic<             float,        signed long> { typedef              float type; };
+    template<> struct arithmetic<             float,      unsigned long> { typedef              float type; };
+    template<> struct arithmetic<             float,   signed long long> { typedef              float type; };
+    template<> struct arithmetic<             float, unsigned long long> { typedef              float type; };
+    template<> struct arithmetic<             float,              float> { typedef              float type; };
+    template<> struct arithmetic<             float,             double> { typedef             double type; };
+    template<> struct arithmetic<             float,        long double> { typedef        long double type; };
 
-    template<> struct promotion<            double,               char> { typedef             double type; };
-    template<> struct promotion<            double,        signed char> { typedef             double type; };
-    template<> struct promotion<            double,      unsigned char> { typedef             double type; };
-    template<> struct promotion<            double,       signed short> { typedef             double type; };
-    template<> struct promotion<            double,     unsigned short> { typedef             double type; };
-    template<> struct promotion<            double,         signed int> { typedef             double type; };
-    template<> struct promotion<            double,       unsigned int> { typedef             double type; };
-    template<> struct promotion<            double,        signed long> { typedef             double type; };
-    template<> struct promotion<            double,      unsigned long> { typedef             double type; };
-    template<> struct promotion<            double,   signed long long> { typedef             double type; };
-    template<> struct promotion<            double, unsigned long long> { typedef             double type; };
-    template<> struct promotion<            double,              float> { typedef             double type; };
-    template<> struct promotion<            double,             double> { typedef             double type; };
-    template<> struct promotion<            double,        long double> { typedef        long double type; };
+    template<> struct arithmetic<            double,               char> { typedef             double type; };
+    template<> struct arithmetic<            double,        signed char> { typedef             double type; };
+    template<> struct arithmetic<            double,      unsigned char> { typedef             double type; };
+    template<> struct arithmetic<            double,       signed short> { typedef             double type; };
+    template<> struct arithmetic<            double,     unsigned short> { typedef             double type; };
+    template<> struct arithmetic<            double,         signed int> { typedef             double type; };
+    template<> struct arithmetic<            double,       unsigned int> { typedef             double type; };
+    template<> struct arithmetic<            double,        signed long> { typedef             double type; };
+    template<> struct arithmetic<            double,      unsigned long> { typedef             double type; };
+    template<> struct arithmetic<            double,   signed long long> { typedef             double type; };
+    template<> struct arithmetic<            double, unsigned long long> { typedef             double type; };
+    template<> struct arithmetic<            double,              float> { typedef             double type; };
+    template<> struct arithmetic<            double,             double> { typedef             double type; };
+    template<> struct arithmetic<            double,        long double> { typedef        long double type; };
 
-    template<> struct promotion<       long double,               char> { typedef        long double type; };
-    template<> struct promotion<       long double,        signed char> { typedef        long double type; };
-    template<> struct promotion<       long double,      unsigned char> { typedef        long double type; };
-    template<> struct promotion<       long double,       signed short> { typedef        long double type; };
-    template<> struct promotion<       long double,     unsigned short> { typedef        long double type; };
-    template<> struct promotion<       long double,         signed int> { typedef        long double type; };
-    template<> struct promotion<       long double,       unsigned int> { typedef        long double type; };
-    template<> struct promotion<       long double,        signed long> { typedef        long double type; };
-    template<> struct promotion<       long double,      unsigned long> { typedef        long double type; };
-    template<> struct promotion<       long double,   signed long long> { typedef        long double type; };
-    template<> struct promotion<       long double, unsigned long long> { typedef        long double type; };
-    template<> struct promotion<       long double,              float> { typedef        long double type; };
-    template<> struct promotion<       long double,             double> { typedef        long double type; };
-    template<> struct promotion<       long double,        long double> { typedef        long double type; };
+    template<> struct arithmetic<       long double,               char> { typedef        long double type; };
+    template<> struct arithmetic<       long double,        signed char> { typedef        long double type; };
+    template<> struct arithmetic<       long double,      unsigned char> { typedef        long double type; };
+    template<> struct arithmetic<       long double,       signed short> { typedef        long double type; };
+    template<> struct arithmetic<       long double,     unsigned short> { typedef        long double type; };
+    template<> struct arithmetic<       long double,         signed int> { typedef        long double type; };
+    template<> struct arithmetic<       long double,       unsigned int> { typedef        long double type; };
+    template<> struct arithmetic<       long double,        signed long> { typedef        long double type; };
+    template<> struct arithmetic<       long double,      unsigned long> { typedef        long double type; };
+    template<> struct arithmetic<       long double,   signed long long> { typedef        long double type; };
+    template<> struct arithmetic<       long double, unsigned long long> { typedef        long double type; };
+    template<> struct arithmetic<       long double,              float> { typedef        long double type; };
+    template<> struct arithmetic<       long double,             double> { typedef        long double type; };
+    template<> struct arithmetic<       long double,        long double> { typedef        long double type; };
+    //}}}
+    //{{{ conditional
+    template<class t0, class t1> struct conditional;
+
+    //
+    // These are the conversions that result from the ternary (conditional)
+    // operator.  We really only need these for min() and max() to be correct.
+    //
+    // These were tested with both gcc and clang, and are part of xmtest.cc
+    //
+    
+    template<> struct conditional<              char,               char> { typedef               char type; };
+    template<> struct conditional<              char,        signed char> { typedef         signed int type; };
+    template<> struct conditional<              char,      unsigned char> { typedef         signed int type; };
+    template<> struct conditional<              char,       signed short> { typedef         signed int type; };
+    template<> struct conditional<              char,     unsigned short> { typedef         signed int type; };
+    template<> struct conditional<              char,         signed int> { typedef         signed int type; };
+    template<> struct conditional<              char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct conditional<              char,        signed long> { typedef        signed long type; };
+    template<> struct conditional<              char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<              char,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<              char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<              char,              float> { typedef              float type; };
+    template<> struct conditional<              char,             double> { typedef             double type; };
+    template<> struct conditional<              char,        long double> { typedef        long double type; };
+
+    template<> struct conditional<       signed char,               char> { typedef         signed int type; };
+    template<> struct conditional<       signed char,        signed char> { typedef        signed char type; };
+    template<> struct conditional<       signed char,      unsigned char> { typedef         signed int type; };
+    template<> struct conditional<       signed char,       signed short> { typedef         signed int type; };
+    template<> struct conditional<       signed char,     unsigned short> { typedef         signed int type; };
+    template<> struct conditional<       signed char,         signed int> { typedef         signed int type; };
+    template<> struct conditional<       signed char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct conditional<       signed char,        signed long> { typedef        signed long type; };
+    template<> struct conditional<       signed char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<       signed char,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<       signed char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<       signed char,              float> { typedef              float type; };
+    template<> struct conditional<       signed char,             double> { typedef             double type; };
+    template<> struct conditional<       signed char,        long double> { typedef        long double type; };
+
+    template<> struct conditional<     unsigned char,               char> { typedef         signed int type; };
+    template<> struct conditional<     unsigned char,        signed char> { typedef         signed int type; };
+    template<> struct conditional<     unsigned char,      unsigned char> { typedef      unsigned char type; };
+    template<> struct conditional<     unsigned char,       signed short> { typedef         signed int type; };
+    template<> struct conditional<     unsigned char,     unsigned short> { typedef         signed int type; };
+    template<> struct conditional<     unsigned char,         signed int> { typedef         signed int type; };
+    template<> struct conditional<     unsigned char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct conditional<     unsigned char,        signed long> { typedef        signed long type; };
+    template<> struct conditional<     unsigned char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned char,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<     unsigned char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<     unsigned char,              float> { typedef              float type; };
+    template<> struct conditional<     unsigned char,             double> { typedef             double type; };
+    template<> struct conditional<     unsigned char,        long double> { typedef        long double type; };
+
+    template<> struct conditional<      signed short,               char> { typedef         signed int type; };
+    template<> struct conditional<      signed short,        signed char> { typedef         signed int type; };
+    template<> struct conditional<      signed short,      unsigned char> { typedef         signed int type; };
+    template<> struct conditional<      signed short,       signed short> { typedef       signed short type; };
+    template<> struct conditional<      signed short,     unsigned short> { typedef         signed int type; };
+    template<> struct conditional<      signed short,         signed int> { typedef         signed int type; };
+    template<> struct conditional<      signed short,       unsigned int> { typedef       unsigned int type; };
+    template<> struct conditional<      signed short,        signed long> { typedef        signed long type; };
+    template<> struct conditional<      signed short,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<      signed short,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<      signed short, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<      signed short,              float> { typedef              float type; };
+    template<> struct conditional<      signed short,             double> { typedef             double type; };
+    template<> struct conditional<      signed short,        long double> { typedef        long double type; };
+
+    template<> struct conditional<    unsigned short,               char> { typedef         signed int type; };
+    template<> struct conditional<    unsigned short,        signed char> { typedef         signed int type; };
+    template<> struct conditional<    unsigned short,      unsigned char> { typedef         signed int type; };
+    template<> struct conditional<    unsigned short,       signed short> { typedef         signed int type; };
+    template<> struct conditional<    unsigned short,     unsigned short> { typedef     unsigned short type; };
+    template<> struct conditional<    unsigned short,         signed int> { typedef         signed int type; };
+    template<> struct conditional<    unsigned short,       unsigned int> { typedef       unsigned int type; };
+    template<> struct conditional<    unsigned short,        signed long> { typedef        signed long type; };
+    template<> struct conditional<    unsigned short,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<    unsigned short,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<    unsigned short, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<    unsigned short,              float> { typedef              float type; };
+    template<> struct conditional<    unsigned short,             double> { typedef             double type; };
+    template<> struct conditional<    unsigned short,        long double> { typedef        long double type; };
+
+    template<> struct conditional<        signed int,               char> { typedef         signed int type; };
+    template<> struct conditional<        signed int,        signed char> { typedef         signed int type; };
+    template<> struct conditional<        signed int,      unsigned char> { typedef         signed int type; };
+    template<> struct conditional<        signed int,       signed short> { typedef         signed int type; };
+    template<> struct conditional<        signed int,     unsigned short> { typedef         signed int type; };
+    template<> struct conditional<        signed int,         signed int> { typedef         signed int type; };
+    template<> struct conditional<        signed int,       unsigned int> { typedef       unsigned int type; };
+    template<> struct conditional<        signed int,        signed long> { typedef        signed long type; };
+    template<> struct conditional<        signed int,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<        signed int,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<        signed int, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<        signed int,              float> { typedef              float type; };
+    template<> struct conditional<        signed int,             double> { typedef             double type; };
+    template<> struct conditional<        signed int,        long double> { typedef        long double type; };
+
+    template<> struct conditional<      unsigned int,               char> { typedef       unsigned int type; };
+    template<> struct conditional<      unsigned int,        signed char> { typedef       unsigned int type; };
+    template<> struct conditional<      unsigned int,      unsigned char> { typedef       unsigned int type; };
+    template<> struct conditional<      unsigned int,       signed short> { typedef       unsigned int type; };
+    template<> struct conditional<      unsigned int,     unsigned short> { typedef       unsigned int type; };
+    template<> struct conditional<      unsigned int,         signed int> { typedef       unsigned int type; };
+    template<> struct conditional<      unsigned int,       unsigned int> { typedef       unsigned int type; };
+    template<> struct conditional<      unsigned int,        signed long> { typedef        signed long type; };
+    template<> struct conditional<      unsigned int,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<      unsigned int,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<      unsigned int, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<      unsigned int,              float> { typedef              float type; };
+    template<> struct conditional<      unsigned int,             double> { typedef             double type; };
+    template<> struct conditional<      unsigned int,        long double> { typedef        long double type; };
+
+    template<> struct conditional<       signed long,               char> { typedef        signed long type; };
+    template<> struct conditional<       signed long,        signed char> { typedef        signed long type; };
+    template<> struct conditional<       signed long,      unsigned char> { typedef        signed long type; };
+    template<> struct conditional<       signed long,       signed short> { typedef        signed long type; };
+    template<> struct conditional<       signed long,     unsigned short> { typedef        signed long type; };
+    template<> struct conditional<       signed long,         signed int> { typedef        signed long type; };
+    template<> struct conditional<       signed long,       unsigned int> { typedef        signed long type; };
+    template<> struct conditional<       signed long,        signed long> { typedef        signed long type; };
+    template<> struct conditional<       signed long,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<       signed long,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<       signed long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<       signed long,              float> { typedef              float type; };
+    template<> struct conditional<       signed long,             double> { typedef             double type; };
+    template<> struct conditional<       signed long,        long double> { typedef        long double type; };
+
+    template<> struct conditional<     unsigned long,               char> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,        signed char> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,      unsigned char> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,       signed short> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,     unsigned short> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,         signed int> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,       unsigned int> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,        signed long> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,      unsigned long> { typedef      unsigned long type; };
+    template<> struct conditional<     unsigned long,   signed long long> { typedef unsigned long long type; };
+    template<> struct conditional<     unsigned long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<     unsigned long,              float> { typedef              float type; };
+    template<> struct conditional<     unsigned long,             double> { typedef             double type; };
+    template<> struct conditional<     unsigned long,        long double> { typedef        long double type; };
+
+    template<> struct conditional<  signed long long,               char> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,        signed char> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,      unsigned char> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,       signed short> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,     unsigned short> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,         signed int> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,       unsigned int> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,        signed long> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long,      unsigned long> { typedef unsigned long long type; };
+    template<> struct conditional<  signed long long,   signed long long> { typedef   signed long long type; };
+    template<> struct conditional<  signed long long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<  signed long long,              float> { typedef              float type; };
+    template<> struct conditional<  signed long long,             double> { typedef             double type; };
+    template<> struct conditional<  signed long long,        long double> { typedef        long double type; };
+
+    template<> struct conditional<unsigned long long,               char> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,        signed char> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,      unsigned char> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,       signed short> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,     unsigned short> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,         signed int> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,       unsigned int> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,        signed long> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,      unsigned long> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,   signed long long> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct conditional<unsigned long long,              float> { typedef              float type; };
+    template<> struct conditional<unsigned long long,             double> { typedef             double type; };
+    template<> struct conditional<unsigned long long,        long double> { typedef        long double type; };
+
+    template<> struct conditional<             float,               char> { typedef              float type; };
+    template<> struct conditional<             float,        signed char> { typedef              float type; };
+    template<> struct conditional<             float,      unsigned char> { typedef              float type; };
+    template<> struct conditional<             float,       signed short> { typedef              float type; };
+    template<> struct conditional<             float,     unsigned short> { typedef              float type; };
+    template<> struct conditional<             float,         signed int> { typedef              float type; };
+    template<> struct conditional<             float,       unsigned int> { typedef              float type; };
+    template<> struct conditional<             float,        signed long> { typedef              float type; };
+    template<> struct conditional<             float,      unsigned long> { typedef              float type; };
+    template<> struct conditional<             float,   signed long long> { typedef              float type; };
+    template<> struct conditional<             float, unsigned long long> { typedef              float type; };
+    template<> struct conditional<             float,              float> { typedef              float type; };
+    template<> struct conditional<             float,             double> { typedef             double type; };
+    template<> struct conditional<             float,        long double> { typedef        long double type; };
+
+    template<> struct conditional<            double,               char> { typedef             double type; };
+    template<> struct conditional<            double,        signed char> { typedef             double type; };
+    template<> struct conditional<            double,      unsigned char> { typedef             double type; };
+    template<> struct conditional<            double,       signed short> { typedef             double type; };
+    template<> struct conditional<            double,     unsigned short> { typedef             double type; };
+    template<> struct conditional<            double,         signed int> { typedef             double type; };
+    template<> struct conditional<            double,       unsigned int> { typedef             double type; };
+    template<> struct conditional<            double,        signed long> { typedef             double type; };
+    template<> struct conditional<            double,      unsigned long> { typedef             double type; };
+    template<> struct conditional<            double,   signed long long> { typedef             double type; };
+    template<> struct conditional<            double, unsigned long long> { typedef             double type; };
+    template<> struct conditional<            double,              float> { typedef             double type; };
+    template<> struct conditional<            double,             double> { typedef             double type; };
+    template<> struct conditional<            double,        long double> { typedef        long double type; };
+
+    template<> struct conditional<       long double,               char> { typedef        long double type; };
+    template<> struct conditional<       long double,        signed char> { typedef        long double type; };
+    template<> struct conditional<       long double,      unsigned char> { typedef        long double type; };
+    template<> struct conditional<       long double,       signed short> { typedef        long double type; };
+    template<> struct conditional<       long double,     unsigned short> { typedef        long double type; };
+    template<> struct conditional<       long double,         signed int> { typedef        long double type; };
+    template<> struct conditional<       long double,       unsigned int> { typedef        long double type; };
+    template<> struct conditional<       long double,        signed long> { typedef        long double type; };
+    template<> struct conditional<       long double,      unsigned long> { typedef        long double type; };
+    template<> struct conditional<       long double,   signed long long> { typedef        long double type; };
+    template<> struct conditional<       long double, unsigned long long> { typedef        long double type; };
+    template<> struct conditional<       long double,              float> { typedef        long double type; };
+    template<> struct conditional<       long double,             double> { typedef        long double type; };
+    template<> struct conditional<       long double,        long double> { typedef        long double type; };
 
     //}}}
-    //{{{ basics 
+    //}}}
+    //{{{ Fundamental Functions:         check, alloc, swap, hash, max, min 
 
     __attribute__ ((format (printf, 2, 3))) 
     static inline void check(bool cond, const char* format, ...) {
@@ -364,14 +568,14 @@ namespace xm {
     size_t hash(int64    val) { return hash(&val, sizeof(int64   ), 1); }
 
     template<class atype, class btype>
-    typename promotion<atype, btype>::type min(
+    typename conditional<atype, btype>::type min(
         const atype& aa, const btype& bb
     ) { 
         return aa < bb ? aa : bb;
     }
 
     template<class atype, class btype>
-    typename promotion<atype, btype>::type max(
+    typename conditional<atype, btype>::type max(
         const atype& aa, const btype& bb
     ) { 
         return bb < aa ? aa : bb;
@@ -383,436 +587,7 @@ namespace xm {
         return ts.tv_sec + 1e-9*ts.tv_nsec;
     }
     //}}}
-    //{{{ cx  
-
-    //{{{ struct cx<T> 
-    template<class type>
-    struct cx {
-        ~cx();
-        cx();
-        template<class tt>
-        cx(const tt& other);
-        cx(const type& other);
-        cx(const type& re, const type& im);
-
-        template<class tt>
-        cx(const cx<tt>& other);
-        cx(const cx<type>& other);
-
-        template<class tt>
-        cx<type>& operator =(const tt& other);
-        cx<type>& operator =(const type& other);
-
-        template<class tt>
-        cx<type>& operator =(const cx<tt>& other);
-        cx<type>& operator =(const cx<type>& other);
-
-        // these are intentionally public and not
-        // initialized in the default constructor
-        type re, im;
-    };
-
-    template<class type>
-    cx<type>::~cx() {}
-
-    template<class type>
-    cx<type>::cx() {}
-
-    template<class type>
-    template<class tt>
-    cx<type>::cx(const tt& other) : re(other), im(0) {}
-
-    template<class type>
-    cx<type>::cx(const type& other) : re(other), im(0) {}
-
-    template<class type>
-    cx<type>::cx(const type& re, const type& im) : re(re), im(im) {}
-
-    template<class type>
-    template<class tt>
-    cx<type>::cx(const cx<tt>& other) : re(other.re), im(other.im) {}
-
-    template<class type>
-    cx<type>::cx(const cx<type>& other) : re(other.re), im(other.im) {}
-
-    template<class type>
-    template<class tt>
-    cx<type>& cx<type>::operator =(const tt& other) {
-        re = other;
-        im = 0;
-        return *this;
-    }
-
-    template<class type>
-    cx<type>& cx<type>::operator =(const type& other) {
-        re = other;
-        im = 0;
-        return *this;
-    }
-
-    template<class type>
-    template<class tt>
-    cx<type>& cx<type>::operator =(const cx<tt>& other) {
-        re = other.re;
-        im = other.im;
-        return *this;
-    }
-
-    template<class type>
-    cx<type>& cx<type>::operator =(const cx<type>& other) {
-        re = other.re;
-        im = other.im;
-        return *this;
-    }
-
-    //}}}
-    //{{{ cx promotions 
-
-    // Augment the type promotions for complex types
-    template<class t0, class t1> struct promotion<cx<t0>, cx<t1> > {
-        // promote complex and complex
-        typedef cx<typename promotion<t0, t1>::type> type; 
-    };
-    template<class t0, class t1> struct promotion<cx<t0>, t1> {
-        // promote complex and real
-        typedef cx<typename promotion<t0, t1>::type> type; 
-    };
-    template<class t0, class t1> struct promotion<t0, cx<t1> > {
-        // promote real and complex
-        typedef cx<typename promotion<t0, t1>::type> type; 
-    };
-
-    //}}}
-    //{{{ cx typedefs 
-
-    // common complex types
-    typedef cx<int8_t>  cbyte;
-    typedef cx<int16_t> cshort;
-    typedef cx<float>   cfloat;
-    typedef cx<double>  cdouble;
-
-    //}}}
-    //{{{ complex operators 
-    
-    //{{{ prefix -
-    template<class type>
-    cx<type> operator -(const cx<type>& zz) {
-        return cx<type>(-zz.re, -zz.im);
-    }
-    //}}}
-    //{{{ prefix +
-    template<class type>
-    cx<type> operator +(const cx<type>& zz) {
-        return zz;
-    }
-    //}}}
-    //{{{ binary == 
-    template<class atype, class btype>
-    bool operator ==(const cx<atype>& aa, const cx<btype>& bb) {
-        return (aa.re == bb.re) && (aa.im == bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator ==(const atype& aa, const cx<btype>& bb) {
-        return (aa == bb.re) && (0 == bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator ==(const cx<atype>& aa, const btype& bb) {
-        return (aa.re == bb) && (aa.im == 0);
-    }
-    //}}}
-    //{{{ binary != 
-    template<class atype, class btype>
-    bool operator !=(const cx<atype>& aa, const cx<btype>& bb) {
-        return (aa.re != bb.re) || (aa.im != bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator !=(const atype& aa, const cx<btype>& bb) {
-        return (aa != bb.re) || (0 != bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator !=(const cx<atype>& aa, const btype& bb) {
-        return (aa.re != bb) || (aa.im != 0);
-    }
-    //}}}
-    //{{{ binary + 
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator +(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa.re + bb.re, aa.im + bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator +(
-        atype aa, cx<btype> bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa + bb.re, bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator +(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa.re + bb, aa.im
-        );
-    }
-    //}}}
-    //{{{ binary - 
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator -(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa.re - bb.re, aa.im - bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator -(
-        atype aa, cx<btype> bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa - bb.re, -bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator -(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa.re - bb, aa.im
-        );
-    }
-    //}}}
-    //{{{ binary * 
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator *(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa.re*bb.re - aa.im*bb.im,
-            aa.re*bb.im + aa.im*bb.re
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator *(
-        atype aa, cx<btype> bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa*bb.re, aa*bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator *(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa.re*bb, aa.im*bb
-        );
-    }
-    //}}}
-    //{{{ binary / 
-    namespace internal {
-        static inline void smith_division(
-            double aa, double bb, double cc, double dd, double& ee, double& ff
-        ) {
-            if (fabs(cc) < fabs(dd)) {
-                double rr = cc/dd;
-                double ll = cc*rr + dd;
-                ee = (aa*rr + bb)/ll;
-                ff = (bb*rr - aa)/ll;
-            } else {
-                double rr = dd/cc;
-                double ll = cc + dd*rr;
-                ee = (aa + bb*rr)/ll;
-                ff = (bb - aa*rr)/ll;
-            }
-        }
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator /(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        using namespace internal;
-        double ee, ff;
-        smith_division(aa.re, aa.im, bb.re, bb.im, ee, ff);
-        return cx<typename promotion<atype, btype>::type>(ee, ff);
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator /(
-        atype aa, cx<btype> bb
-    ) {
-        using namespace internal;
-        double ee, ff;
-        smith_division(aa, 0, bb.re, bb.im, ee, ff);
-        return cx<typename promotion<atype, btype>::type>(ee, ff);
-    }
-
-    template<class atype, class btype>
-    cx<typename promotion<atype, btype>::type> operator /(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename promotion<atype, btype>::type>(
-            aa.re/bb, aa.im/bb
-        );
-    }
-    //}}}
-    //{{{ operator += 
-    template<class atype, class btype>
-    cx<atype>& operator += (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa + bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator += (cx<atype>& aa, const btype& bb) {
-        return aa = aa + bb;
-    }
-    //}}}
-    //{{{ operator -= 
-    template<class atype, class btype>
-    cx<atype>& operator -= (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa - bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator -= (cx<atype>& aa, const btype& bb) {
-        return aa = aa - bb;
-    }
-    //}}}
-    //{{{ operator *= 
-    template<class atype, class btype>
-    cx<atype>& operator *= (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa * bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator *= (cx<atype>& aa, const btype& bb) {
-        return aa = aa * bb;
-    }
-    //}}}
-    //{{{ operator /= 
-    template<class atype, class btype>
-    cx<atype>& operator /= (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa / bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator /= (cx<atype>& aa, const btype& bb) {
-        return aa = aa / bb;
-    }
-    //}}}
-
-    //}}}
-    //{{{ complex functions 
-
-    template<class type>
-    type real(const cx<type>& aa) {
-        return aa.re;
-    }
-
-    template<class type>
-    type real(const type& aa) {
-        return aa;
-    }
-
-    template<class type>
-    type imag(const cx<type>& aa) {
-        return aa.im;
-    }
-
-    template<class type>
-    type imag(const type& aa) {
-        return 0;
-    }
-
-    template<class type>
-    cx<type> conj(const cx<type>& aa) {
-        return cx<type>(aa.re, -aa.im);
-    }
-
-    template<class type>
-    type conj(const type& aa) {
-        return aa;
-    }
-
-    template<class type>
-    type magsqr(const cx<type>& aa) {
-        return aa.re*aa.re + aa.im*aa.im;
-    }
-
-    template<class type>
-    type magsqr(const type& aa) {
-        return aa*aa;
-    }
-
-    template<class atype, class btype>
-    double hypot(const cx<atype>& aa, const cx<btype>& bb) {
-        return ::hypot(::hypot(aa.re, aa.im), ::hypot(bb.re, bb.im));
-    }
-
-    template<class atype, class btype>
-    double hypot(const atype& aa, const cx<btype>& bb) {
-        return ::hypot(aa, ::hypot(bb.re, bb.im));
-    }
-
-    template<class atype, class btype>
-    double hypot(const cx<atype>& aa, const btype& bb) {
-        return ::hypot(::hypot(aa.re, aa.im), bb);
-    }
-
-    template<class atype, class btype>
-    double hypot(const atype& aa, const btype& bb) {
-        return ::hypot(aa, bb);
-    }
-
-    template<class type>
-    type abs(const cx<type>& aa) {
-        return ::hypot(aa.re, aa.im);
-    }
-
-    template<class type>
-    type angle(const cx<type>& aa) {
-        return ::atan2(aa.im, aa.re);
-    }
-
-    template<class type>
-    static cx<type> expj(type aa) {
-        return cx<type>(cos(aa), sin(aa));
-    }
-
-    template<class type>
-    cx<type> log(const cx<type>& zz) {
-        return cx<type>(::log(::hypot(zz.re, zz.im)), ::atan2(zz.im, zz.re));
-    }
-
-    template<class type>
-    static type sqr(type xx) { return xx*xx; }
-
-    /*
-    template<class type>
-    static inline std::ostream& operator <<(std::ostream& os, const cmplx<type>& zz) {
-        os << zz.re << " " << std::showpos << zz.im << "j" << std::noshowpos;
-        return os;
-    }
-    */
-
-    //}}}
-
-    //}}}
+    //{{{ Basic Containers:              list, dict, shared 
     //{{{ list 
     template<class type>
     struct list {
@@ -1173,406 +948,6 @@ namespace xm {
         swap(flip.storage, flop.storage);
     }
     //}}}
-//{{{ str 
-    struct str;
-    static inline void swap(str& flip, str& flop);
-    static inline str substr(const str& ss, int64 off, int64 len);
-    static inline str join(const list<str>& ll);
-
-    struct str {
-        inline ~str();
-        inline str();
-        inline str(const str& other);
-        inline str(const char* ptr);
-        inline str& operator =(const str& other);
-        inline str& operator =(const char* ptr);
-
-        inline int64 size() const;
-        inline int64 codes() const;
-        inline const char* data() const;
-
-        private:
-            // only friend functions can see these two
-            inline str(int64 len);
-            inline char* ptr();
-
-            friend str substr(const str& ss, int64 off, int64 len);
-            friend str join(const list<str>& ll);
-
-            friend void swap(str& flip, str& flop);
-            char* storage;
-    };
-
-    //{{{ utf-8
-    namespace internal {
-
-        static inline bool utf8trail(
-            const char*& ptr, int32_t mask, int64 len, int32_t& code
-        ) {
-            int32_t sum = *ptr++ & mask;
-            for (int64 ii = 0; ii<len; ii++) {
-                if (*ptr == 0) return false;
-                if ((*ptr & 0xC0) != 0x80) {
-                    ++ptr;
-                    return false;
-                }
-                sum <<= 6;
-                sum |= *ptr++ & 0x3F;
-            }
-            code = sum;
-            return true;
-        }
-
-        static inline bool utf8decode(const char*& ptr, int32_t& code) {
-            check(*ptr != 0, "can't decode null terminator");
-            if ((0x80 & *ptr) == 0) {
-                code = *ptr++;
-                return true;
-            }
-            if ((0xE0 & *ptr) == 0xC0) return utf8trail(ptr, 0x1F, 1, code);
-            if ((0xF0 & *ptr) == 0xE0) return utf8trail(ptr, 0x0F, 2, code);
-            if ((0xF8 & *ptr) == 0xF0) return utf8trail(ptr, 0x07, 3, code);
-            if ((0xFC & *ptr) == 0xF8) return utf8trail(ptr, 0x03, 4, code);
-            if ((0xFE & *ptr) == 0xFC) return utf8trail(ptr, 0x01, 5, code);
-            ++ptr;
-            code = 0xFFFD;
-            return false;
-        }
-
-        static inline int64 utf8bytes(int32_t code) {
-            check(code >= 0, "non-negative code point");
-            if (code == 0) return 2; // modified UTF-8 with embedded nulls
-            if (code < 0x80) return 1;
-            if (code < 0x800) return 2;
-            if (code < 0x10000) return 3;
-            if (code < 0x200000) return 4;
-            if (code < 0x4000000) return 5;
-            return 6;
-        }
-
-        static inline int64 utf8encode(char* ptr, int32_t code) {
-            check(code >= 0, "non-negative code point");
-            if (code == 0) { // modified UTF-8 with embedded nulls
-                ptr[0] = 0xC0;
-                ptr[1] = 0x80;
-                return 2;
-            }
-            if (code < 0x80) {
-                ptr[0] = code;
-                return 1;
-            }
-            if (code < 0x800) {
-                ptr[0] = (code>>6) | 0xC0;
-                ptr[1] = (code & 0x3F) | 0x80;
-                return 2;
-            }
-            if (code < 0x10000) {
-                ptr[0] =  (code>>12) | 0xE0;
-                ptr[1] = ((code>> 6) & 0x3F) | 0x80;
-                ptr[2] = ((code    ) & 0x3F) | 0x80;
-                return 3;
-            }
-            if (code < 0x200000) {
-                ptr[0] =  (code>>18) | 0xF0;
-                ptr[1] = ((code>>12) & 0x3F) | 0x80;
-                ptr[2] = ((code>> 6) & 0x3F) | 0x80;
-                ptr[3] = ((code    ) & 0x3F) | 0x80;
-                return 4;
-            }
-            if (code < 0x4000000) {
-                ptr[0] =  (code>>24) | 0xF8;
-                ptr[1] = ((code>>18) & 0x3F) | 0x80;
-                ptr[2] = ((code>>12) & 0x3F) | 0x80;
-                ptr[3] = ((code>> 6) & 0x3F) | 0x80;
-                ptr[4] = ((code    ) & 0x3F) | 0x80;
-                return 5;
-            }
-            ptr[0] =  (code>>30) | 0xFC;
-            ptr[1] = ((code>>24) & 0x3F) | 0x80;
-            ptr[2] = ((code>>18) & 0x3F) | 0x80;
-            ptr[3] = ((code>>12) & 0x3F) | 0x80;
-            ptr[4] = ((code>> 6) & 0x3F) | 0x80;
-            ptr[5] = ((code    ) & 0x3F) | 0x80;
-            return 6;
-        }
-
-        static inline int64 utf8sanitize(char* writer, const char* reader) {
-            int64 len = 0;
-            // We use the "Replacement Character" for all decoding errors
-            const int32_t error = 0xFFFD;
-            while (*reader) {
-                int32_t code = -1;
-                if (utf8decode(reader, code)) {
-                    // check for the first of a Surrogate Pair
-                    if (0xD800 <= code && code < 0xDC00) {
-                        // grab the second of a Surrogate Pair
-                        int32_t pair = -1;
-                        if (*reader && utf8decode(reader, pair)) {
-                            if (0xDC00 <= pair && pair < 0xE000) {
-                                // it's a valid pair
-                                code = ((code-0xD800)<<10) | (pair-0xDC00);
-                            } else {
-                                code = error;
-                            }
-                        } else {
-                            code = error;
-                        }
-                    }
-                    // check these after surrogate processing
-                    // quietly discard any Byte Order Marks
-                    if (code == 0xFEFF) continue;
-                    if (code == 0xFFFE) continue;
-                    // surrogate encoded surrogates become errors
-                    if (0xD800 <= code && code < 0xE000) code = error;
-                    // this would be pedantic and discard non-unicode
-                    // if (code > 0x10FFFF) code = error;
-                } else {
-                    code = error;
-                }
-                len += utf8bytes(code);
-                if (writer) writer += utf8encode(writer, code);
-            }
-            if (writer) *writer = 0;
-            return len;
-        }
-    }
-    //}}}
-    //{{{ str implementation
-    str::~str() { if (storage) free(storage); }
-
-    str::str() : storage(0) {}
-
-    str::str(const str& other) : storage(0) {
-        if (other.storage) {
-            int64 len = ::strlen(other.storage);
-            storage = alloc<char>(len*sizeof(char));
-            memcpy(storage, other.storage, len + 1);
-        }
-    }
-
-    str::str(const char* ptr) : storage(0) {
-        using namespace internal;
-        if (*ptr) {
-            int64 len = utf8sanitize(0, ptr);
-            storage = alloc<char>(len*sizeof(char));
-            utf8sanitize(storage, ptr);
-        }
-    }
-
-    str::str(int64 len) : storage(alloc<char>(len*sizeof(char))) {
-        storage[len] = 0;
-    }
-
-    str& str::operator =(const str& other) {
-        if (&other == this) return *this;
-        if (storage) free(storage);
-        if (other.storage) {
-            int64 len = ::strlen(other.storage);
-            storage = alloc<char>(len*sizeof(char));
-            memcpy(storage, other.storage, len + 1);
-        } else {
-            storage = 0;
-        }
-        return *this;
-    }
-
-    str& str::operator =(const char* ptr) {
-        using namespace internal;
-        if (storage) free(storage);
-        if (*ptr) {
-            int64 len = utf8sanitize(0, ptr);
-            storage = alloc<char>(len*sizeof(char));
-            utf8sanitize(storage, ptr);
-        } else {
-            storage = 0;
-        }
-        return *this;
-    }
-
-    int64 str::size() const {
-        return storage ? ::strlen(storage) : 0;
-    }
-
-    int64 str::codes() const {
-        using namespace internal;
-        if (!storage) return 0;
-        const char* ptr = storage;
-        int64 len = 0;
-        while (*ptr) {
-            int32_t code;
-            utf8decode(ptr, code);
-            ++len;
-        }
-        return len;
-    }
-
-    const char* str::data() const {
-        return storage ? storage : "";
-    }
-
-    char* str::ptr() {
-        return storage;
-    }
-    //}}}
-    //{{{ str functions
-    __attribute__ ((format (printf, 1, 2))) 
-    static inline str format(const char* fmt, ...) {
-        char buffer[64];
-        va_list args;
-        va_start(args, fmt);
-        int64 bytes;
-        if ((bytes = vsnprintf(buffer, 64, fmt, args)) < 64) {
-            va_end(args);
-            return str(buffer);
-        }
-        va_end(args);
-
-        va_list again;
-        va_start(again, fmt);
-        char* scratch = alloc<char>(bytes*sizeof(char));
-        vsnprintf(scratch, bytes + 1, fmt, again);
-        va_end(again);
-        str result(scratch);
-        free(scratch);
-        return result;
-    }
-
-    static inline str substr(const str& ss, int64 off, int64 len) {
-        str result(len);
-        memcpy(result.ptr(), ss.data() + off, len);
-        return result;
-    }
-
-    static inline str strip(const str& text) {
-        // XXX: Is this correct for UTF-8 codes?
-        const char* ptr = text.data();
-        int64 off = 0;
-        int64 len = text.size();
-
-        while (len > 0 && ::isspace(ptr[off])) { off++; len--; }
-        while (len > 0 && ::isspace(ptr[off + len - 1])) { len--; }
-
-        return substr(text, off, len);
-    }
-
-    static inline list<str> split(const str& text) {
-        int64 off = 0;
-        int64 len = text.size();
-        const char* ptr = text.data();
-
-        while (len > 0 && isspace(ptr[off])) { off++; len--; }
-
-        list<str> result;
-
-        while (len > 0) {
-            int64 cut = 0;
-            while (cut < len && !isspace(ptr[off + cut])) { cut++; }
-            if (cut > 0) result.append(substr(text, off, cut));
-            off += cut;
-            len -= cut;
-            while (len > 0 && isspace(ptr[off])) { off++; len--; }
-        }
-
-        return result;
-    }
-
-    /* XXX: finish this
-    static inline list<str> split(const str& text, const str& regex, int64 max = -1) {
-        list<str> result;
-        int64 off = 0;
-
-        regex_t pattern;
-        check(regcomp(&pattern, regex.data(), REG_EXTENDED) == 0, "compiling regex");
-        for (;;) {
-            regmatch_t match;
-            int rc = regexec(&pattern, text.data() + off, 1, &match, 0);
-            if (rc == REG_NOMATCH) break;
-            result.append(substr(text, off, match.rm_so));
-            off += match.rm_eo;
-
-            if (max >= 0 && result.size() >= max - 1) {
-                break;
-            }
-
-        }
-        regfree(&pattern);
-
-        result.append(substr(text, off)); // XXX: need the length
-
-        return result;
-    }
-    */
-
-    static inline str join(const list<str>& ll) {
-        int64 max = 0;
-        for (int64 ii = 0; ii<ll.size(); ii++) {
-            max += ll[ii].size();
-        }
-        str result(max);
-        char* ptr = result.ptr();
-        for (int64 ii = 0; ii<ll.size(); ii++) {
-            int64 len = ll[ii].size();
-            memcpy(ptr, ll[ii].data(), len);
-            ptr += len;
-        }
-        return result;
-    }
-
-    static inline int64 rfind(const str& haystack, const str& needle) {
-        int64 hlen = haystack.size();
-        int64 nlen = needle.size();
-        int64 off = hlen - nlen;
-        while (off >= 0) {
-            if (memcmp(haystack.data() + off, needle.data(), nlen) == 0) {
-                return off;
-            }
-            --off;
-        }
-        return -1;
-    }
-
-    static inline void swap(str& flip, str& flop) {
-        swap(flip.storage, flop.storage);
-    }
-
-    static inline size_t hash(const str& ss) {
-        return hash(ss.data(), ss.size(), 0);
-    }
-    //}}}
-    //{{{ str operators
-    static inline str operator +(const str& aa, const str& bb) {
-        list<str> ll;
-        ll.append(aa);
-        ll.append(bb);
-        return join(ll);
-    }
-
-    static inline bool operator <(const str& aa, const str& bb) {
-        return ::strcmp(aa.data(), bb.data()) < 0;
-    }
-
-    static inline bool operator <=(const str& aa, const str& bb) {
-        return ::strcmp(aa.data(), bb.data()) <= 0;
-    }
-
-    static inline bool operator >=(const str& aa, const str& bb) {
-        return ::strcmp(aa.data(), bb.data()) >= 0;
-    }
-
-    static inline bool operator >(const str& aa, const str& bb) {
-        return ::strcmp(aa.data(), bb.data()) > 0;
-    }
-
-    static inline bool operator ==(const str& aa, const str& bb) {
-        return ::strcmp(aa.data(), bb.data()) == 0;
-    }
-
-    static inline bool operator !=(const str& aa, const str& bb) {
-        return ::strcmp(aa.data(), bb.data()) != 0;
-    }
-    //}}}
-
-//}}}
     //{{{ dict 
     // A sentinel type for dict sets with only keys (no vals)
     struct none {};
@@ -2077,6 +1452,894 @@ namespace xm {
     }
 
     //}}}
+    //{{{ shared
+    template<class type>
+    struct shared {
+        ~shared();
+        shared();
+        shared(type* pp);
+        shared(const shared<type>& other);
+        shared<type>& operator =(const shared<type>& other);
+
+        type& operator *();
+        const type& operator *() const;
+
+        type* operator ->();
+        const type* operator ->() const;
+
+        type* borrow();
+        const type* borrow() const;
+
+        private:
+
+            template<class tt> friend void swap(
+                shared<tt>& flip, shared<tt>& flop
+            );
+
+            struct counted {
+                type* pointer;
+                ssize_t refcount;
+            };
+
+            void decref();
+            counted* incref();
+
+            counted* storage;
+    };
+
+    //{{{ implementation 
+    template<class type>
+    shared<type>::~shared() {
+        decref();
+    }
+
+    template<class type>
+    shared<type>::shared() : storage(0) {}
+
+    template<class type>
+    shared<type>::shared(type* pp) : storage(new counted) {
+        storage->refcount = 1;
+        storage->pointer = pp;
+    }
+
+    template<class type>
+    shared<type>::shared(const shared<type>& other) : storage(other.incref()) {}
+
+    template<class type>
+    shared<type>& shared<type>::operator =(const shared<type>& other) {
+        if (this == &other) return *this;
+        if (storage == other.storage) return *this;
+        decref();
+        // XXX: incref() needs a mutable refcount...
+        storage = other.incref();
+        return *this;
+    }
+
+    template<class type>
+    type& shared<type>::operator *() {
+        check(storage != 0, "can't dereference a null ptr");
+        return *storage->pointer;
+    }
+
+    template<class type>
+    const type& shared<type>::operator *() const {
+        check(storage != 0, "can't dereference a null ptr");
+        return *storage->pointer;
+    }
+
+    template<class type>
+    type* shared<type>::operator ->() {
+        check(storage != 0, "can't dereference a null ptr");
+        return storage->pointer;
+    }
+
+    template<class type>
+    const type* shared<type>::operator ->() const {
+        check(storage != 0, "can't dereference a null ptr");
+        return storage->pointer;
+    }
+
+    template<class type>
+    type* shared<type>::borrow() {
+        return storage ? storage->pointer : 0;
+    }
+
+    template<class type>
+    const type* shared<type>::borrow() const {
+        return storage ? storage->pointer : 0;
+    }
+
+    template<class type>
+    void shared<type>::decref() {
+        if (storage) {
+            if (--storage->refcount == 0) {
+                delete storage->pointer;
+                delete storage;
+            }
+        }
+    }
+
+    template<class type>
+    typename shared<type>::counted* shared<type>::incref() {
+        if (storage) ++storage->refcount;
+        return storage;
+    }
+
+    template<class type> 
+    void swap(shared<type>& flip, shared<type>& flop) {
+        swap(flip.storage, flop.storage);
+    }
+    //}}}
+    //}}}
+    //}}}
+    //{{{ Special Containers:            tuple, queue 
+    //{{{ tuple
+    //{{{ tuple 8
+    template<
+        class type1=none, class type2=none, class type3=none, class type4=none,
+        class type5=none, class type6=none, class type7=none, class type8=none
+    >
+    struct tuple {
+        type1 first; type2 second; type3 third; type4 fourth;
+        type5 fifth; type6 sixth; type7 seventh; type8 eighth;
+
+        tuple() {}
+
+        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5, type6 v6, type7 v7, type8 v8) :
+            first(v1), second(v2), third(v3), fourth(v4),
+            fifth(v5), sixth(v6), seventh(v7), eighth(v8) {
+        }
+
+        template<
+            class t1, class t2, class t3, class t4, 
+            class t5, class t6, class t7, class t8
+        >
+        tuple(const tuple<t1, t2, t3, t4, t5, t6, t7, t8>& tt) :
+            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
+            fifth(tt.fifth), sixth(tt.sixth), seventh(tt.seventh), eighth(tt.eighth) {
+        }
+
+        template<
+            class t1, class t2, class t3, class t4, 
+            class t5, class t6, class t7, class t8
+        >
+        tuple<type1, type2, type3, type4, type5, type6, type7, type8>&
+        operator =(const tuple<t1, t2, t3, t4, t5, t6, t7, t8>& that) {
+            first   = that.first;   second = that.second;
+            third   = that.third;   fourth = that.fourth;
+            fifth   = that.fifth;   sixth  = that.sixth;
+            seventh = that.seventh; eighth = that.eighth;
+            return *this;
+        }
+    };
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6, class type7, class type8
+    >
+    tuple<type1, type2, type3, type4, type5, type6, type7, type8>
+    multival(
+        const type1& val1, const type2& val2,
+        const type3& val3, const type4& val4,
+        const type5& val5, const type6& val6,
+        const type7& val7, const type8& val8
+    ) {
+        return tuple<
+            type1, type2, type3, type4,
+            type5, type6, type7, type8
+        >(val1, val2, val3, val4, val5, val6, val7, val8);
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6, class type7, class type8
+    >
+    tuple<type1&, type2&, type3&, type4&, type5&, type6&, type7&, type8&>
+    multiref(
+        type1& ref1, type2& ref2,
+        type3& ref3, type4& ref4,
+        type5& ref5, type6& ref6,
+        type7& ref7, type8& ref8
+    ) {
+        return tuple<
+            type1&, type2&, type3&, type4&,
+            type5&, type6&, type7&, type8&
+        >(ref1, ref2, ref3, ref4, ref5, ref6, ref7, ref8);
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6, class type7, class type8
+    >
+    size_t hash(
+        const tuple<
+            type1, type2, type3, type4, 
+            type5, type6, type7, type8
+        >& tt
+    ) {
+        return (
+            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
+            11*hash(tt.fifth) + 13*hash(tt.sixth) + 17*hash(tt.seventh) + 19*hash(tt.eighth)
+        );
+    }
+
+    template<
+        class a1, class a2, class a3, class a4, class a5, class a6, class a7, class a8,
+        class b1, class b2, class b3, class b4, class b5, class b6, class b7, class b8
+    >
+    bool operator ==(
+        const tuple<a1, a2, a3, a4, a5, a6, a7, a8>& aa,
+        const tuple<b1, b2, b3, b4, b5, b6, b7, b8>& bb
+    ) {
+        return (
+            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
+            aa.fifth == bb.fifth && aa.sixth == bb.sixth && aa.seventh == bb.seventh && aa.eighth == bb.eighth
+        );
+    }
+
+    //}}}
+    //{{{ tuple 7
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6, class type7
+    > 
+    struct tuple<type1, type2, type3, type4, type5, type6, type7> {
+        type1 first; type2 second; type3 third; type4 fourth;
+        type5 fifth; type6 sixth; type7 seventh;
+
+        tuple() {}
+
+        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5, type6 v6, type7 v7) :
+            first(v1), second(v2), third(v3), fourth(v4),
+            fifth(v5), sixth(v6), seventh(v7) {
+        }
+
+        template<
+            class t1, class t2, class t3, class t4, 
+            class t5, class t6, class t7
+        >
+        tuple(const tuple<t1, t2, t3, t4, t5, t6, t7>& tt) :
+            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
+            fifth(tt.fifth), sixth(tt.sixth), seventh(tt.seventh) {
+        }
+
+        template<
+            class t1, class t2, class t3, class t4, 
+            class t5, class t6, class t7
+        >
+        tuple<type1, type2, type3, type4, type5, type6, type7>&
+        operator =(const tuple<t1, t2, t3, t4, t5, t6, t7>& that) {
+            first   = that.first;   second = that.second;
+            third   = that.third;   fourth = that.fourth;
+            fifth   = that.fifth;   sixth  = that.sixth;
+            seventh = that.seventh;
+            return *this;
+        }
+    };
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6, class type7
+    >
+    tuple<type1, type2, type3, type4, type5, type6, type7>
+    multival(
+        const type1& val1, const type2& val2,
+        const type3& val3, const type4& val4,
+        const type5& val5, const type6& val6,
+        const type7& val7
+    ) {
+        return tuple<
+            type1, type2, type3, type4,
+            type5, type6, type7
+        >(val1, val2, val3, val4, val5, val6, val7);
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6, class type7
+    >
+    tuple<type1&, type2&, type3&, type4&, type5&, type6&, type7&>
+    multiref(
+        type1& ref1, type2& ref2,
+        type3& ref3, type4& ref4,
+        type5& ref5, type6& ref6,
+        type7& ref7
+    ) {
+        return tuple<
+            type1&, type2&, type3&, type4&,
+            type5&, type6&, type7&
+        >(ref1, ref2, ref3, ref4, ref5, ref6, ref7);
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6, class type7
+    >
+    size_t hash(
+        const tuple<
+            type1, type2, type3, type4, 
+            type5, type6, type7
+        >& tt
+    ) {
+        return (
+            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
+            11*hash(tt.fifth) + 13*hash(tt.sixth) + 17*hash(tt.seventh)
+        );
+    }
+
+    template<
+        class a1, class a2, class a3, class a4, class a5, class a6, class a7,
+        class b1, class b2, class b3, class b4, class b5, class b6, class b7
+    >
+    bool operator ==(
+        const tuple<a1, a2, a3, a4, a5, a6, a7>& aa,
+        const tuple<b1, b2, b3, b4, b5, b6, b7>& bb
+    ) {
+        return (
+            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
+            aa.fifth == bb.fifth && aa.sixth == bb.sixth && aa.seventh == bb.seventh
+        );
+    }
+
+    //}}}
+    //{{{ tuple 6
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6
+    > 
+    struct tuple<type1, type2, type3, type4, type5, type6> {
+        type1 first; type2 second; type3 third; type4 fourth;
+        type5 fifth; type6 sixth;
+
+        tuple() {}
+
+        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5, type6 v6) :
+            first(v1), second(v2), third(v3), fourth(v4),
+            fifth(v5), sixth(v6) {
+        }
+
+        template<
+            class t1, class t2, class t3, class t4, 
+            class t5, class t6
+        >
+        tuple(const tuple<t1, t2, t3, t4, t5, t6>& tt) :
+            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
+            fifth(tt.fifth), sixth(tt.sixth) {
+        }
+
+        template<
+            class t1, class t2, class t3, class t4, 
+            class t5, class t6
+        >
+        tuple<type1, type2, type3, type4, type5, type6>&
+        operator =(const tuple<t1, t2, t3, t4, t5, t6>& that) {
+            first   = that.first;   second = that.second;
+            third   = that.third;   fourth = that.fourth;
+            fifth   = that.fifth;   sixth  = that.sixth;
+            return *this;
+        }
+    };
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6
+    >
+    tuple<type1, type2, type3, type4, type5, type6>
+    multival(
+        const type1& val1, const type2& val2,
+        const type3& val3, const type4& val4,
+        const type5& val5, const type6& val6
+    ) {
+        return tuple<
+            type1, type2, type3, type4,
+            type5, type6
+        >(val1, val2, val3, val4, val5, val6);
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6
+    >
+    tuple<type1&, type2&, type3&, type4&, type5&, type6&>
+    multiref(
+        type1& ref1, type2& ref2,
+        type3& ref3, type4& ref4,
+        type5& ref5, type6& ref6
+    ) {
+        return tuple<
+            type1&, type2&, type3&, type4&,
+            type5&, type6&
+        >(ref1, ref2, ref3, ref4, ref5, ref6);
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5, class type6
+    >
+    size_t hash(
+        const tuple<
+            type1, type2, type3, type4, 
+            type5, type6
+        >& tt
+    ) {
+        return (
+            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
+            11*hash(tt.fifth) + 13*hash(tt.sixth)
+        );
+    }
+
+    template<
+        class a1, class a2, class a3, class a4, class a5, class a6,
+        class b1, class b2, class b3, class b4, class b5, class b6
+    >
+    bool operator ==(
+        const tuple<a1, a2, a3, a4, a5, a6>& aa,
+        const tuple<b1, b2, b3, b4, b5, b6>& bb
+    ) {
+        return (
+            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
+            aa.fifth == bb.fifth && aa.sixth == bb.sixth
+        );
+    }
+
+    //}}}
+    //{{{ tuple 5
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5
+    > 
+    struct tuple<type1, type2, type3, type4, type5> {
+        type1 first; type2 second; type3 third; type4 fourth;
+        type5 fifth;
+
+        tuple() {}
+
+        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5) :
+            first(v1), second(v2), third(v3), fourth(v4), fifth(v5) {
+        }
+
+        template<class t1, class t2, class t3, class t4, class t5>
+        tuple(const tuple<t1, t2, t3, t4, t5>& tt) :
+            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
+            fifth(tt.fifth) {
+        }
+
+        template<
+            class t1, class t2, class t3, class t4, 
+            class t5
+        >
+        tuple<type1, type2, type3, type4, type5>&
+        operator =(const tuple<t1, t2, t3, t4, t5>& that) {
+            first   = that.first;   second = that.second;
+            third   = that.third;   fourth = that.fourth;
+            fifth   = that.fifth;
+            return *this;
+        }
+    };
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5
+    >
+    tuple<type1, type2, type3, type4, type5>
+    multival(
+        const type1& val1, const type2& val2,
+        const type3& val3, const type4& val4,
+        const type5& val5
+    ) {
+        return tuple<type1, type2, type3, type4, type5>(
+            val1, val2, val3, val4, val5
+        );
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5
+    >
+    tuple<type1&, type2&, type3&, type4&, type5&>
+    multiref(
+        type1& ref1, type2& ref2,
+        type3& ref3, type4& ref4,
+        type5& ref5
+    ) {
+        return tuple<type1&, type2&, type3&, type4&, type5&>(
+            ref1, ref2, ref3, ref4, ref5
+        );
+    }
+
+    template<
+        class type1, class type2, class type3, class type4,
+        class type5
+    >
+    size_t hash(const tuple<type1, type2, type3, type4, type5>& tt) {
+        return (
+            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
+            11*hash(tt.fifth)
+        );
+    }
+
+    template<
+        class a1, class a2, class a3, class a4, class a5,
+        class b1, class b2, class b3, class b4, class b5
+    >
+    bool operator ==(
+        const tuple<a1, a2, a3, a4, a5>& aa,
+        const tuple<b1, b2, b3, b4, b5>& bb
+    ) {
+        return (
+            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
+            aa.fifth == bb.fifth
+        );
+    }
+
+    //}}}
+    //{{{ tuple 4
+    template<class type1, class type2, class type3, class type4> 
+    struct tuple<type1, type2, type3, type4> {
+        type1 first; type2 second; type3 third; type4 fourth;
+
+        tuple() {}
+
+        tuple(type1 v1, type2 v2, type3 v3, type4 v4) :
+            first(v1), second(v2), third(v3), fourth(v4) {
+        }
+
+        template<class t1, class t2, class t3, class t4>
+        tuple(const tuple<t1, t2, t3, t4>& tt) :
+            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth) {
+        }
+
+        template<class t1, class t2, class t3, class t4>
+        tuple<type1, type2, type3, type4>&
+        operator =(const tuple<t1, t2, t3, t4>& that) {
+            first   = that.first;   second = that.second;
+            third   = that.third;   fourth = that.fourth;
+            return *this;
+        }
+    };
+
+    template<class type1, class type2, class type3, class type4>
+    tuple<type1, type2, type3, type4>
+    multival(
+        const type1& val1, const type2& val2,
+        const type3& val3, const type4& val4
+    ) {
+        return tuple<type1, type2, type3, type4>(
+            val1, val2, val3, val4
+        );
+    }
+
+    template<class type1, class type2, class type3, class type4>
+    tuple<type1&, type2&, type3&, type4&>
+    multiref(
+        type1& ref1, type2& ref2,
+        type3& ref3, type4& ref4
+    ) {
+        return tuple<type1&, type2&, type3&, type4&>(
+            ref1, ref2, ref3, ref4
+        );
+    }
+
+    template<class type1, class type2, class type3, class type4>
+    size_t hash(const tuple<type1, type2, type3, type4>& tt) {
+        return (
+            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth)
+        );
+    }
+
+    template<
+        class a1, class a2, class a3, class a4,
+        class b1, class b2, class b3, class b4
+    >
+    bool operator ==(
+        const tuple<a1, a2, a3, a4>& aa,
+        const tuple<b1, b2, b3, b4>& bb
+    ) {
+        return (
+            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth
+        );
+    }
+
+    //}}}
+    //{{{ tuple 3
+    template<class type1, class type2, class type3> 
+    struct tuple<type1, type2, type3> {
+        type1 first; type2 second; type3 third;
+
+        tuple() {}
+
+        tuple(type1 v1, type2 v2, type3 v3) :
+            first(v1), second(v2), third(v3) {
+        }
+
+        template<class t1, class t2, class t3>
+        tuple(const tuple<t1, t2, t3>& tt) :
+            first(tt.first), second(tt.second), third(tt.third) {
+        }
+
+        template<class t1, class t2, class t3>
+        tuple<type1, type2, type3>&
+        operator =(const tuple<t1, t2, t3>& that) {
+            first   = that.first;   second = that.second;
+            third   = that.third;
+            return *this;
+        }
+    };
+
+    template<class type1, class type2, class type3>
+    tuple<type1, type2, type3>
+    multival(
+        const type1& val1, const type2& val2,
+        const type3& val3
+    ) {
+        return tuple<type1, type2, type3>(
+            val1, val2, val3
+        );
+    }
+
+    template<class type1, class type2, class type3>
+    tuple<type1&, type2&, type3&>
+    multiref(
+        type1& ref1, type2& ref2,
+        type3& ref3
+    ) {
+        return tuple<type1&, type2&, type3&>(
+            ref1, ref2, ref3
+        );
+    }
+
+    template<class type1, class type2, class type3>
+    size_t hash(const tuple<type1, type2, type3>& tt) {
+        return 1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third);
+    }
+
+    template<
+        class a1, class a2, class a3,
+        class b1, class b2, class b3
+    >
+    bool operator ==(
+        const tuple<a1, a2, a3>& aa,
+        const tuple<b1, b2, b3>& bb
+    ) {
+        return (
+            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third
+        );
+    }
+
+    //}}}
+    //{{{ tuple 2
+    template<class type1, class type2> 
+    struct tuple<type1, type2> {
+        type1 first; type2 second;
+
+        tuple() {}
+
+        tuple(type1 v1, type2 v2) :
+            first(v1), second(v2) {
+        }
+
+        template<class t1, class t2>
+        tuple(const tuple<t1, t2>& tt) :
+            first(tt.first), second(tt.second) {
+        }
+
+        template<class t1, class t2>
+        tuple<type1, type2>&
+        operator =(const tuple<t1, t2>& that) {
+            first   = that.first;   second = that.second;
+            return *this;
+        }
+    };
+
+    template<class type1, class type2>
+    tuple<type1, type2>
+    multival(
+        const type1& val1, const type2& val2
+    ) {
+        return tuple<type1, type2>(val1, val2);
+    }
+
+    template<class type1, class type2>
+    tuple<type1&, type2&>
+    multiref(
+        type1& ref1, type2& ref2
+    ) {
+        return tuple<type1&, type2&>(ref1, ref2);
+    }
+
+    template<class type1, class type2>
+    size_t hash(const tuple<type1, type2>& tt) {
+        return 1*hash(tt.first) + 3*hash(tt.second);
+    }
+
+    template<
+        class a1, class a2,
+        class b1, class b2
+    >
+    bool operator ==(
+        const tuple<a1, a2>& aa,
+        const tuple<b1, b2>& bb
+    ) {
+        return (
+            aa.first == bb.first && aa.second == bb.second
+        );
+    }
+
+    //}}}
+    //{{{ tuple 1
+    template<class type1> 
+    struct tuple<type1> {
+        type1 first;
+
+        tuple() {}
+
+        tuple(type1 v1) : first(v1) {
+        }
+
+        template<class t1>
+        tuple(const tuple<t1>& tt) : first(tt.first) {}
+
+        template<class t1>
+        tuple<type1>&
+        operator =(const tuple<t1>& that) {
+            first   = that.first;
+            return *this;
+        }
+    };
+
+    template<class type1>
+    tuple<type1>
+    multival(const type1& val1) {
+        return tuple<type1>(val1);
+    }
+
+    template<class type1>
+    tuple<type1&>
+    multiref(type1& ref1) {
+        return tuple<type1&>(ref1);
+    }
+
+    template<class type1>
+    size_t hash(const tuple<type1>& tt) {
+        return hash(tt.first);
+    }
+
+    template<class a1, class b1>
+    bool operator ==(const tuple<a1>& aa, const tuple<b1>& bb) {
+        return aa.first == bb.first;
+    }
+
+    //}}}
+    //{{{ tuple 0
+    template<> struct tuple<> {};
+
+    tuple<> multival() {
+        return tuple<>();
+    }
+
+    tuple<> multiref() {
+        return tuple<>();
+    }
+
+    template<>
+    size_t hash(const tuple<>& tt) {
+        (void)tt;
+        return 0;
+    }
+
+    template<>
+    bool operator ==(const tuple<>& aa, const tuple<>& bb) {
+        (void)aa; (void)bb;
+        return true;
+    }
+
+    //}}}
+    //}}}
+    //{{{ queue
+    template<class type>
+    struct queue {
+        queue();
+        ~queue();
+
+        void give(type& item);
+        void push(const type& item);
+        type pull();
+        bool pull(type& item, double seconds);
+
+        private:
+            queue(const queue&); // deleted
+            queue& operator =(const queue&); // deleted
+
+            list<type> data;     
+            pthread_mutex_t mutex;
+            pthread_cond_t condvar;
+    };
+
+    template<class type>
+    queue<type>::queue() {
+        pthread_condattr_t attr;
+        pthread_condattr_init(&attr);
+        pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+        pthread_mutex_init(&mutex, 0);
+        pthread_cond_init(&condvar, &attr);
+    }
+
+    template<class type>
+    queue<type>::~queue() {
+        pthread_mutex_destroy(&mutex);
+        pthread_cond_destroy(&condvar);
+    }
+
+    template<class type>
+    void queue<type>::give(type& item) {
+        pthread_mutex_lock(&mutex);
+
+        data.append(type());
+        swap(data[data.size() - 1], item);
+
+        pthread_cond_signal(&condvar);
+        pthread_mutex_unlock(&mutex);
+    }
+
+    template<class type>
+    void queue<type>::push(const type& item) {
+        pthread_mutex_lock(&mutex);
+
+        data.append(item);
+
+        pthread_cond_signal(&condvar);
+        pthread_mutex_unlock(&mutex);
+    }
+
+    template<class type>
+    type queue<type>::pull() {
+        type item;
+        pthread_mutex_lock(&mutex);
+
+        while (data.size() == 0) {
+            pthread_cond_wait(&condvar, &mutex);
+        }
+
+        swap(item, data[0]);
+        data.remove(0);
+
+        pthread_mutex_unlock(&mutex);
+
+        return item;
+    }
+
+    template<class type>
+    bool queue<type>::pull(type& item, double seconds) {
+        struct timespec tv;
+        clock_gettime(CLOCK_MONOTONIC, &tv);
+        int64 nanos = tv.tv_sec*1000000000LL + tv.tv_nsec;
+
+        nanos += llrint(seconds*1e9);
+
+        tv.tv_sec  = nanos/1000000000LL;
+        tv.tv_nsec = nanos%1000000000LL;
+
+        pthread_mutex_lock(&mutex);
+
+        while (data.size() == 0) {
+            int result = pthread_cond_timedwait(&condvar, &mutex, &tv);
+            if (result == ETIMEDOUT) {
+                pthread_mutex_unlock(&mutex);
+                return false;
+            }
+        }
+
+        swap(item, data[0]);
+        data.remove(0);
+
+        pthread_mutex_unlock(&mutex);
+
+        return true;
+    }
+
+    //}}}
+    //}}}
+    //{{{ Sorting and Selection:         introsort, mergesort, quickselect 
     //{{{ comparisons
     template<class type>
     bool compare_lt(const type& aa, const type& bb) { return aa <  bb; }
@@ -2256,6 +2519,919 @@ namespace xm {
         introsort(vv.data(), vv.size(), compare_lt<type>);
     }
     */
+    //}}}
+    //}}}
+    //{{{ Unicode Strings (UTF-8):       string 
+    struct str;
+    static inline void swap(str& flip, str& flop);
+    static inline str substr(const str& ss, int64 off, int64 len);
+    static inline str join(const list<str>& ll);
+
+    struct str {
+        inline ~str();
+        inline str();
+        inline str(const str& other);
+        inline str(const char* ptr);
+        inline str& operator =(const str& other);
+        inline str& operator =(const char* ptr);
+
+        inline int64 size() const;
+        inline int64 codes() const;
+        inline const char* data() const;
+
+        private:
+            // only friend functions can see these two
+            inline str(int64 len);
+            inline char* ptr();
+
+            friend str substr(const str& ss, int64 off, int64 len);
+            friend str join(const list<str>& ll);
+
+            friend void swap(str& flip, str& flop);
+            char* storage;
+    };
+
+    //{{{ utf-8
+    namespace internal {
+
+        static inline bool utf8trail(
+            const char*& ptr, int32_t mask, int64 len, int32_t& code
+        ) {
+            int32_t sum = *ptr++ & mask;
+            for (int64 ii = 0; ii<len; ii++) {
+                if (*ptr == 0) return false;
+                if ((*ptr & 0xC0) != 0x80) {
+                    ++ptr;
+                    return false;
+                }
+                sum <<= 6;
+                sum |= *ptr++ & 0x3F;
+            }
+            code = sum;
+            return true;
+        }
+
+        static inline bool utf8decode(const char*& ptr, int32_t& code) {
+            check(*ptr != 0, "can't decode null terminator");
+            if ((0x80 & *ptr) == 0) {
+                code = *ptr++;
+                return true;
+            }
+            if ((0xE0 & *ptr) == 0xC0) return utf8trail(ptr, 0x1F, 1, code);
+            if ((0xF0 & *ptr) == 0xE0) return utf8trail(ptr, 0x0F, 2, code);
+            if ((0xF8 & *ptr) == 0xF0) return utf8trail(ptr, 0x07, 3, code);
+            if ((0xFC & *ptr) == 0xF8) return utf8trail(ptr, 0x03, 4, code);
+            if ((0xFE & *ptr) == 0xFC) return utf8trail(ptr, 0x01, 5, code);
+            ++ptr;
+            code = 0xFFFD;
+            return false;
+        }
+
+        static inline int64 utf8bytes(int32_t code) {
+            check(code >= 0, "non-negative code point");
+            if (code == 0) return 2; // modified UTF-8 with embedded nulls
+            if (code < 0x80) return 1;
+            if (code < 0x800) return 2;
+            if (code < 0x10000) return 3;
+            if (code < 0x200000) return 4;
+            if (code < 0x4000000) return 5;
+            return 6;
+        }
+
+        static inline int64 utf8encode(char* ptr, int32_t code) {
+            check(code >= 0, "non-negative code point");
+            if (code == 0) { // modified UTF-8 with embedded nulls
+                ptr[0] = 0xC0;
+                ptr[1] = 0x80;
+                return 2;
+            }
+            if (code < 0x80) {
+                ptr[0] = code;
+                return 1;
+            }
+            if (code < 0x800) {
+                ptr[0] = (code>>6) | 0xC0;
+                ptr[1] = (code & 0x3F) | 0x80;
+                return 2;
+            }
+            if (code < 0x10000) {
+                ptr[0] =  (code>>12) | 0xE0;
+                ptr[1] = ((code>> 6) & 0x3F) | 0x80;
+                ptr[2] = ((code    ) & 0x3F) | 0x80;
+                return 3;
+            }
+            if (code < 0x200000) {
+                ptr[0] =  (code>>18) | 0xF0;
+                ptr[1] = ((code>>12) & 0x3F) | 0x80;
+                ptr[2] = ((code>> 6) & 0x3F) | 0x80;
+                ptr[3] = ((code    ) & 0x3F) | 0x80;
+                return 4;
+            }
+            if (code < 0x4000000) {
+                ptr[0] =  (code>>24) | 0xF8;
+                ptr[1] = ((code>>18) & 0x3F) | 0x80;
+                ptr[2] = ((code>>12) & 0x3F) | 0x80;
+                ptr[3] = ((code>> 6) & 0x3F) | 0x80;
+                ptr[4] = ((code    ) & 0x3F) | 0x80;
+                return 5;
+            }
+            ptr[0] =  (code>>30) | 0xFC;
+            ptr[1] = ((code>>24) & 0x3F) | 0x80;
+            ptr[2] = ((code>>18) & 0x3F) | 0x80;
+            ptr[3] = ((code>>12) & 0x3F) | 0x80;
+            ptr[4] = ((code>> 6) & 0x3F) | 0x80;
+            ptr[5] = ((code    ) & 0x3F) | 0x80;
+            return 6;
+        }
+
+        static inline int64 utf8sanitize(char* writer, const char* reader) {
+            int64 len = 0;
+            // We use the "Replacement Character" for all decoding errors
+            const int32_t error = 0xFFFD;
+            while (*reader) {
+                int32_t code = -1;
+                if (utf8decode(reader, code)) {
+                    // check for the first of a Surrogate Pair
+                    if (0xD800 <= code && code < 0xDC00) {
+                        // grab the second of a Surrogate Pair
+                        int32_t pair = -1;
+                        if (*reader && utf8decode(reader, pair)) {
+                            if (0xDC00 <= pair && pair < 0xE000) {
+                                // it's a valid pair
+                                code = ((code-0xD800)<<10) | (pair-0xDC00);
+                            } else {
+                                code = error;
+                            }
+                        } else {
+                            code = error;
+                        }
+                    }
+                    // check these after surrogate processing
+                    // quietly discard any Byte Order Marks
+                    if (code == 0xFEFF) continue;
+                    if (code == 0xFFFE) continue;
+                    // surrogate encoded surrogates become errors
+                    if (0xD800 <= code && code < 0xE000) code = error;
+                    // this would be pedantic and discard non-unicode
+                    // if (code > 0x10FFFF) code = error;
+                } else {
+                    code = error;
+                }
+                len += utf8bytes(code);
+                if (writer) writer += utf8encode(writer, code);
+            }
+            if (writer) *writer = 0;
+            return len;
+        }
+    }
+    //}}}
+    //{{{ str implementation
+    str::~str() { if (storage) free(storage); }
+
+    str::str() : storage(0) {}
+
+    str::str(const str& other) : storage(0) {
+        if (other.storage) {
+            int64 len = ::strlen(other.storage);
+            storage = alloc<char>(len*sizeof(char));
+            memcpy(storage, other.storage, len + 1);
+        }
+    }
+
+    str::str(const char* ptr) : storage(0) {
+        using namespace internal;
+        if (*ptr) {
+            int64 len = utf8sanitize(0, ptr);
+            storage = alloc<char>(len*sizeof(char));
+            utf8sanitize(storage, ptr);
+        }
+    }
+
+    str::str(int64 len) : storage(alloc<char>(len*sizeof(char))) {
+        storage[len] = 0;
+    }
+
+    str& str::operator =(const str& other) {
+        if (&other == this) return *this;
+        if (storage) free(storage);
+        if (other.storage) {
+            int64 len = ::strlen(other.storage);
+            storage = alloc<char>(len*sizeof(char));
+            memcpy(storage, other.storage, len + 1);
+        } else {
+            storage = 0;
+        }
+        return *this;
+    }
+
+    str& str::operator =(const char* ptr) {
+        using namespace internal;
+        if (storage) free(storage);
+        if (*ptr) {
+            int64 len = utf8sanitize(0, ptr);
+            storage = alloc<char>(len*sizeof(char));
+            utf8sanitize(storage, ptr);
+        } else {
+            storage = 0;
+        }
+        return *this;
+    }
+
+    int64 str::size() const {
+        return storage ? ::strlen(storage) : 0;
+    }
+
+    int64 str::codes() const {
+        using namespace internal;
+        if (!storage) return 0;
+        const char* ptr = storage;
+        int64 len = 0;
+        while (*ptr) {
+            int32_t code;
+            utf8decode(ptr, code);
+            ++len;
+        }
+        return len;
+    }
+
+    const char* str::data() const {
+        return storage ? storage : "";
+    }
+
+    char* str::ptr() {
+        return storage;
+    }
+    //}}}
+    //{{{ str operators
+    static inline str operator +(const str& aa, const str& bb) {
+        list<str> ll;
+        ll.append(aa);
+        ll.append(bb);
+        return join(ll);
+    }
+
+    static inline bool operator <(const str& aa, const str& bb) {
+        return ::strcmp(aa.data(), bb.data()) < 0;
+    }
+
+    static inline bool operator <=(const str& aa, const str& bb) {
+        return ::strcmp(aa.data(), bb.data()) <= 0;
+    }
+
+    static inline bool operator >=(const str& aa, const str& bb) {
+        return ::strcmp(aa.data(), bb.data()) >= 0;
+    }
+
+    static inline bool operator >(const str& aa, const str& bb) {
+        return ::strcmp(aa.data(), bb.data()) > 0;
+    }
+
+    static inline bool operator ==(const str& aa, const str& bb) {
+        return ::strcmp(aa.data(), bb.data()) == 0;
+    }
+
+    static inline bool operator !=(const str& aa, const str& bb) {
+        return ::strcmp(aa.data(), bb.data()) != 0;
+    }
+    //}}}
+
+    //}}}
+    //{{{ String Functions               format, substr, strip, split, join, rfind 
+    //{{{ str functions
+    __attribute__ ((format (printf, 1, 2))) 
+    static inline str format(const char* fmt, ...) {
+        char buffer[64];
+        va_list args;
+        va_start(args, fmt);
+        int64 bytes;
+        if ((bytes = vsnprintf(buffer, 64, fmt, args)) < 64) {
+            va_end(args);
+            return str(buffer);
+        }
+        va_end(args);
+
+        va_list again;
+        va_start(again, fmt);
+        char* scratch = alloc<char>(bytes*sizeof(char));
+        vsnprintf(scratch, bytes + 1, fmt, again);
+        va_end(again);
+        str result(scratch);
+        free(scratch);
+        return result;
+    }
+
+    static inline str substr(const str& ss, int64 off, int64 len) {
+        str result(len);
+        memcpy(result.ptr(), ss.data() + off, len);
+        return result;
+    }
+
+    static inline str strip(const str& text) {
+        // XXX: Is this correct for UTF-8 codes?
+        const char* ptr = text.data();
+        int64 off = 0;
+        int64 len = text.size();
+
+        while (len > 0 && ::isspace(ptr[off])) { off++; len--; }
+        while (len > 0 && ::isspace(ptr[off + len - 1])) { len--; }
+
+        return substr(text, off, len);
+    }
+
+    static inline list<str> split(const str& text) {
+        int64 off = 0;
+        int64 len = text.size();
+        const char* ptr = text.data();
+
+        while (len > 0 && isspace(ptr[off])) { off++; len--; }
+
+        list<str> result;
+
+        while (len > 0) {
+            int64 cut = 0;
+            while (cut < len && !isspace(ptr[off + cut])) { cut++; }
+            if (cut > 0) result.append(substr(text, off, cut));
+            off += cut;
+            len -= cut;
+            while (len > 0 && isspace(ptr[off])) { off++; len--; }
+        }
+
+        return result;
+    }
+
+    /* XXX: finish this
+    static inline list<str> split(const str& text, const str& regex, int64 max = -1) {
+        list<str> result;
+        int64 off = 0;
+
+        regex_t pattern;
+        check(regcomp(&pattern, regex.data(), REG_EXTENDED) == 0, "compiling regex");
+        for (;;) {
+            regmatch_t match;
+            int rc = regexec(&pattern, text.data() + off, 1, &match, 0);
+            if (rc == REG_NOMATCH) break;
+            result.append(substr(text, off, match.rm_so));
+            off += match.rm_eo;
+
+            if (max >= 0 && result.size() >= max - 1) {
+                break;
+            }
+
+        }
+        regfree(&pattern);
+
+        result.append(substr(text, off)); // XXX: need the length
+
+        return result;
+    }
+    */
+
+    static inline str join(const list<str>& ll) {
+        int64 max = 0;
+        for (int64 ii = 0; ii<ll.size(); ii++) {
+            max += ll[ii].size();
+        }
+        str result(max);
+        char* ptr = result.ptr();
+        for (int64 ii = 0; ii<ll.size(); ii++) {
+            int64 len = ll[ii].size();
+            memcpy(ptr, ll[ii].data(), len);
+            ptr += len;
+        }
+        return result;
+    }
+
+    static inline int64 rfind(const str& haystack, const str& needle) {
+        int64 hlen = haystack.size();
+        int64 nlen = needle.size();
+        int64 off = hlen - nlen;
+        while (off >= 0) {
+            if (memcmp(haystack.data() + off, needle.data(), nlen) == 0) {
+                return off;
+            }
+            --off;
+        }
+        return -1;
+    }
+
+    static inline void swap(str& flip, str& flop) {
+        swap(flip.storage, flop.storage);
+    }
+
+    static inline size_t hash(const str& ss) {
+        return hash(ss.data(), ss.size(), 0);
+    }
+    //}}}
+    //}}}
+    //{{{ Unique Identifier              uniqueid 
+    //}}}
+    //{{{ Arithmetic Containers          complex, vector, matrix 
+    //}}}
+    //{{{ Arithmetic Operators:          operator + - * / % etc 
+    //}}}
+    //{{{ Basic Complex Functions:       real, imag, conj, abs, magsqr
+    //}}}
+    //{{{ Complex Trancendentals:        hypot, cos, sin, expj
+    //}}}
+    //{{{ Matrix Decompositions:         qrdecomp, lqdecomp, lddecomp, cholesky 
+    //}}}
+    //{{{ Eigen and SV Decomps:          svdecomp, symeigens, geneigens 
+    //}}}
+    //{{{ Linear Solvers:                gensolve, symsolve 
+    //}}}
+    //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak
+    //}}}
+    //{{{ Numerical Optimization:        adaptmin, covarmin, quasimin 
+    //}}}
+    //{{{ Automatic Differentiation:     autodiff 
+    //}}}
+    //{{{ Random Number Generation:      random 
+    //}}}
+    //{{{ Pseudo Random Sequences:       shiftreg, gpsgold 
+    //}}}
+    //{{{ Statistics Functions:          ricepdf, ricecdf 
+    //}}}
+    //{{{ Fourier Transforms:            kissfft, kisssse, fftshift, ifftshift, shift2d
+    //}}}
+    //{{{ Window Functions:              firwin, kaiswin, chebwin
+    //}}}
+    //{{{ IIR and FIR Filters:           firparks, halfpass 
+    //}}}
+    //{{{ Signal Processing:             blocktuner, polyphase, singleton 
+    //}}}
+    //{{{ Coordinate Systems:            cartesian, geodetic, transform 
+    //}}}
+    //{{{ Precision Time:                timecode, datetime 
+    //}}}
+    //{{{ Raw Files and Memory Mapping:  rawfile 
+    //}}}
+    //{{{ Blue File Metadata:            bluekeyword, bluefield
+    //}}}
+    //{{{ Blue File Reader:              bluereader, load1000, load2000 
+    //}}}
+    //{{{ Blue File Writers:             bluewriter, dump1000, dump2000 
+    //}}}
+    //{{{ State Vectors:                 statevec, timestate, ephemeris, ephcache
+    //}}}
+    //{{{ Light Time:                    lighttime_forward, lighttime_reverse 
+    //}}}
+    //{{{ DTED Processing:               dtedtile, dtedcache 
+    //}}}
+    //{{{ Graphical Windows:             graphics, message, runwin
+    //}}}
+    //{{{ Drawing Functions:             drawline, fillrect, drawtext
+    //}}}
+    //{{{ Plotting Functions:            plotframe, plotseries, plotpoints
+    //}}}
+    //{{{ Command Line Parsing:          cmdline
+    //}}}
+
+// TODO:
+//
+//  check() with line numbers
+//  symeigens()
+//  adaptmin()
+//  quasimin()
+//  covarmin()
+//  quickselect()
+//  prng.sample()
+//  prng.shuffle()
+//  upper(str), lower(str)
+//  struct heap<>
+//  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
+//  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
+//  struct autodiff<>
+//
+
+    //{{{ cx  
+
+    //{{{ struct cx<T> 
+    template<class type>
+    struct cx {
+        ~cx();
+        cx();
+        template<class tt>
+        cx(const tt& other);
+        cx(const type& other);
+        cx(const type& re, const type& im);
+
+        template<class tt>
+        cx(const cx<tt>& other);
+        cx(const cx<type>& other);
+
+        template<class tt>
+        cx<type>& operator =(const tt& other);
+        cx<type>& operator =(const type& other);
+
+        template<class tt>
+        cx<type>& operator =(const cx<tt>& other);
+        cx<type>& operator =(const cx<type>& other);
+
+        // these are intentionally public and not
+        // initialized in the default constructor
+        type re, im;
+    };
+
+    template<class type>
+    cx<type>::~cx() {}
+
+    template<class type>
+    cx<type>::cx() {}
+
+    template<class type>
+    template<class tt>
+    cx<type>::cx(const tt& other) : re(other), im(0) {}
+
+    template<class type>
+    cx<type>::cx(const type& other) : re(other), im(0) {}
+
+    template<class type>
+    cx<type>::cx(const type& re, const type& im) : re(re), im(im) {}
+
+    template<class type>
+    template<class tt>
+    cx<type>::cx(const cx<tt>& other) : re(other.re), im(other.im) {}
+
+    template<class type>
+    cx<type>::cx(const cx<type>& other) : re(other.re), im(other.im) {}
+
+    template<class type>
+    template<class tt>
+    cx<type>& cx<type>::operator =(const tt& other) {
+        re = other;
+        im = 0;
+        return *this;
+    }
+
+    template<class type>
+    cx<type>& cx<type>::operator =(const type& other) {
+        re = other;
+        im = 0;
+        return *this;
+    }
+
+    template<class type>
+    template<class tt>
+    cx<type>& cx<type>::operator =(const cx<tt>& other) {
+        re = other.re;
+        im = other.im;
+        return *this;
+    }
+
+    template<class type>
+    cx<type>& cx<type>::operator =(const cx<type>& other) {
+        re = other.re;
+        im = other.im;
+        return *this;
+    }
+
+    //}}}
+    //{{{ cx arithmetic 
+
+    // Augment the type promotions for complex types
+    template<class t0, class t1> struct arithmetic<cx<t0>, cx<t1> > {
+        // promote complex and complex
+        typedef cx<typename arithmetic<t0, t1>::type> type; 
+    };
+    template<class t0, class t1> struct arithmetic<cx<t0>, t1> {
+        // promote complex and real
+        typedef cx<typename arithmetic<t0, t1>::type> type; 
+    };
+    template<class t0, class t1> struct arithmetic<t0, cx<t1> > {
+        // promote real and complex
+        typedef cx<typename arithmetic<t0, t1>::type> type; 
+    };
+
+    //}}}
+    //{{{ cx typedefs 
+
+    // common complex types
+    typedef cx<int8_t>  cbyte;
+    typedef cx<int16_t> cshort;
+    typedef cx<float>   cfloat;
+    typedef cx<double>  cdouble;
+
+    //}}}
+    //{{{ complex operators 
+    
+    //{{{ prefix -
+    template<class type>
+    cx<type> operator -(const cx<type>& zz) {
+        return cx<type>(-zz.re, -zz.im);
+    }
+    //}}}
+    //{{{ prefix +
+    template<class type>
+    cx<type> operator +(const cx<type>& zz) {
+        return zz;
+    }
+    //}}}
+    //{{{ binary == 
+    template<class atype, class btype>
+    bool operator ==(const cx<atype>& aa, const cx<btype>& bb) {
+        return (aa.re == bb.re) && (aa.im == bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator ==(const atype& aa, const cx<btype>& bb) {
+        return (aa == bb.re) && (0 == bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator ==(const cx<atype>& aa, const btype& bb) {
+        return (aa.re == bb) && (aa.im == 0);
+    }
+    //}}}
+    //{{{ binary != 
+    template<class atype, class btype>
+    bool operator !=(const cx<atype>& aa, const cx<btype>& bb) {
+        return (aa.re != bb.re) || (aa.im != bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator !=(const atype& aa, const cx<btype>& bb) {
+        return (aa != bb.re) || (0 != bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator !=(const cx<atype>& aa, const btype& bb) {
+        return (aa.re != bb) || (aa.im != 0);
+    }
+    //}}}
+    //{{{ binary + 
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator +(
+        cx<atype> aa, cx<btype> bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa.re + bb.re, aa.im + bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator +(
+        atype aa, cx<btype> bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa + bb.re, bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator +(
+        cx<atype> aa, btype bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa.re + bb, aa.im
+        );
+    }
+    //}}}
+    //{{{ binary - 
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator -(
+        cx<atype> aa, cx<btype> bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa.re - bb.re, aa.im - bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator -(
+        atype aa, cx<btype> bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa - bb.re, -bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator -(
+        cx<atype> aa, btype bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa.re - bb, aa.im
+        );
+    }
+    //}}}
+    //{{{ binary * 
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator *(
+        cx<atype> aa, cx<btype> bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa.re*bb.re - aa.im*bb.im,
+            aa.re*bb.im + aa.im*bb.re
+        );
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator *(
+        atype aa, cx<btype> bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa*bb.re, aa*bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator *(
+        cx<atype> aa, btype bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa.re*bb, aa.im*bb
+        );
+    }
+    //}}}
+    //{{{ binary / 
+    namespace internal {
+        static inline void smith_division(
+            double aa, double bb, double cc, double dd, double& ee, double& ff
+        ) {
+            if (fabs(cc) < fabs(dd)) {
+                double rr = cc/dd;
+                double ll = cc*rr + dd;
+                ee = (aa*rr + bb)/ll;
+                ff = (bb*rr - aa)/ll;
+            } else {
+                double rr = dd/cc;
+                double ll = cc + dd*rr;
+                ee = (aa + bb*rr)/ll;
+                ff = (bb - aa*rr)/ll;
+            }
+        }
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator /(
+        cx<atype> aa, cx<btype> bb
+    ) {
+        using namespace internal;
+        double ee, ff;
+        smith_division(aa.re, aa.im, bb.re, bb.im, ee, ff);
+        return cx<typename arithmetic<atype, btype>::type>(ee, ff);
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator /(
+        atype aa, cx<btype> bb
+    ) {
+        using namespace internal;
+        double ee, ff;
+        smith_division(aa, 0, bb.re, bb.im, ee, ff);
+        return cx<typename arithmetic<atype, btype>::type>(ee, ff);
+    }
+
+    template<class atype, class btype>
+    cx<typename arithmetic<atype, btype>::type> operator /(
+        cx<atype> aa, btype bb
+    ) {
+        return cx<typename arithmetic<atype, btype>::type>(
+            aa.re/bb, aa.im/bb
+        );
+    }
+    //}}}
+    //{{{ operator += 
+    template<class atype, class btype>
+    cx<atype>& operator += (cx<atype>& aa, const cx<btype>& bb) {
+        return aa = aa + bb;
+    }
+
+    template<class atype, class btype>
+    cx<atype>& operator += (cx<atype>& aa, const btype& bb) {
+        return aa = aa + bb;
+    }
+    //}}}
+    //{{{ operator -= 
+    template<class atype, class btype>
+    cx<atype>& operator -= (cx<atype>& aa, const cx<btype>& bb) {
+        return aa = aa - bb;
+    }
+
+    template<class atype, class btype>
+    cx<atype>& operator -= (cx<atype>& aa, const btype& bb) {
+        return aa = aa - bb;
+    }
+    //}}}
+    //{{{ operator *= 
+    template<class atype, class btype>
+    cx<atype>& operator *= (cx<atype>& aa, const cx<btype>& bb) {
+        return aa = aa * bb;
+    }
+
+    template<class atype, class btype>
+    cx<atype>& operator *= (cx<atype>& aa, const btype& bb) {
+        return aa = aa * bb;
+    }
+    //}}}
+    //{{{ operator /= 
+    template<class atype, class btype>
+    cx<atype>& operator /= (cx<atype>& aa, const cx<btype>& bb) {
+        return aa = aa / bb;
+    }
+
+    template<class atype, class btype>
+    cx<atype>& operator /= (cx<atype>& aa, const btype& bb) {
+        return aa = aa / bb;
+    }
+    //}}}
+
+    //}}}
+    //{{{ complex functions 
+
+    template<class type>
+    type real(const cx<type>& aa) {
+        return aa.re;
+    }
+
+    template<class type>
+    type real(const type& aa) {
+        return aa;
+    }
+
+    template<class type>
+    type imag(const cx<type>& aa) {
+        return aa.im;
+    }
+
+    template<class type>
+    type imag(const type& aa) {
+        return 0;
+    }
+
+    template<class type>
+    cx<type> conj(const cx<type>& aa) {
+        return cx<type>(aa.re, -aa.im);
+    }
+
+    template<class type>
+    type conj(const type& aa) {
+        return aa;
+    }
+
+    template<class type>
+    type magsqr(const cx<type>& aa) {
+        return aa.re*aa.re + aa.im*aa.im;
+    }
+
+    template<class type>
+    type magsqr(const type& aa) {
+        return aa*aa;
+    }
+
+    template<class atype, class btype>
+    double hypot(const cx<atype>& aa, const cx<btype>& bb) {
+        return ::hypot(::hypot(aa.re, aa.im), ::hypot(bb.re, bb.im));
+    }
+
+    template<class atype, class btype>
+    double hypot(const atype& aa, const cx<btype>& bb) {
+        return ::hypot(aa, ::hypot(bb.re, bb.im));
+    }
+
+    template<class atype, class btype>
+    double hypot(const cx<atype>& aa, const btype& bb) {
+        return ::hypot(::hypot(aa.re, aa.im), bb);
+    }
+
+    template<class atype, class btype>
+    double hypot(const atype& aa, const btype& bb) {
+        return ::hypot(aa, bb);
+    }
+
+    template<class type>
+    type abs(const cx<type>& aa) {
+        return ::hypot(aa.re, aa.im);
+    }
+
+    template<class type>
+    type angle(const cx<type>& aa) {
+        return ::atan2(aa.im, aa.re);
+    }
+
+    template<class type>
+    static cx<type> expj(type aa) {
+        return cx<type>(cos(aa), sin(aa));
+    }
+
+    template<class type>
+    cx<type> log(const cx<type>& zz) {
+        return cx<type>(::log(::hypot(zz.re, zz.im)), ::atan2(zz.im, zz.re));
+    }
+
+    template<class type>
+    static type sqr(type xx) { return xx*xx; }
+
+    /*
+    template<class type>
+    static inline std::ostream& operator <<(std::ostream& os, const cmplx<type>& zz) {
+        os << zz.re << " " << std::showpos << zz.im << "j" << std::noshowpos;
+        return os;
+    }
+    */
+
+    //}}}
+
     //}}}
     //{{{ vec 
     //{{{ fixed Size
@@ -2609,7 +3785,7 @@ namespace xm {
     template<class t0, int64 s0, class t1, int64 s1>
     struct vecaddtype {
         typedef vec<
-            typename promotion<t0, t1>::type,
+            typename arithmetic<t0, t1>::type,
             vecdynsize<s0, s1>::size
         > type;
     };
@@ -2656,11 +3832,11 @@ namespace xm {
     }
 
     template<class t0, class t1, int64 s1>
-    vec<typename promotion<t0, t1>::type, s1> operator *(
+    vec<typename arithmetic<t0, t1>::type, s1> operator *(
         const t0& scalar, const vec<t1, s1>& bb
     ) {
         const int64 size = bb.size();
-        vec<typename promotion<t0, t1>::type, s1> cc(size);
+        vec<typename arithmetic<t0, t1>::type, s1> cc(size);
         for (int64 ii = 0; ii<size; ii++) {
             cc[ii] = scalar*bb[ii];
         }
@@ -2668,11 +3844,11 @@ namespace xm {
     }
 
     template<class t0, int64 s0, class t1>
-    vec<typename promotion<t0, t1>::type, s0> operator *(
+    vec<typename arithmetic<t0, t1>::type, s0> operator *(
         const vec<t0, s0>& bb, const t1& scalar
     ) {
         const int64 size = bb.size();
-        vec<typename promotion<t0, t1>::type, s0> cc(size);
+        vec<typename arithmetic<t0, t1>::type, s0> cc(size);
         for (int64 ii = 0; ii<size; ii++) {
             cc[ii] = bb[ii]*scalar;
         }
@@ -3164,7 +4340,7 @@ namespace xm {
     template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
     struct mataddtype {
         typedef mat<
-            typename promotion<t0, t1>::type,
+            typename arithmetic<t0, t1>::type,
             matdynsize<r0, r1>::size,
             matdynsize<c0, c1>::size
         > type;
@@ -3178,7 +4354,7 @@ namespace xm {
     template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
     struct matmultype {
         typedef mat<
-            typename promotion<t0, t1>::type,
+            typename arithmetic<t0, t1>::type,
             matmulsize<r0, c1>::size,
             matmulsize<c1, r0>::size
         > type;
@@ -3251,7 +4427,7 @@ namespace xm {
         typename matmultype<cx<t0>, r0, c0, cx<t1>, r1, c1>::type cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
-                typename promotion<cx<t0>, cx<t1> >::type sum = 0;
+                typename arithmetic<cx<t0>, cx<t1> >::type sum = 0;
                 for (int64 kk = 0; kk<size; kk++) {
                     sum += aa(ii, kk)*bb(kk, jj);
                 }
@@ -3273,7 +4449,7 @@ namespace xm {
         typename matmultype<cx<t0>, r0, c0, t1, r1, c1>::type cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
-                typename promotion<cx<t0>, t1>::type sum = 0;
+                typename arithmetic<cx<t0>, t1>::type sum = 0;
                 for (int64 kk = 0; kk<size; kk++) {
                     sum += aa(ii, kk)*bb(kk, jj);
                 }
@@ -3295,7 +4471,7 @@ namespace xm {
         typename matmultype<t0, r0, c0, cx<t1>, r1, c1>::type cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
-                typename promotion<t0, cx<t1> >::type sum = 0;
+                typename arithmetic<t0, cx<t1> >::type sum = 0;
                 for (int64 kk = 0; kk<size; kk++) {
                     sum += aa(ii, kk)*bb(kk, jj);
                 }
@@ -3317,7 +4493,7 @@ namespace xm {
         typename matmultype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
-                typename promotion<t0, t1>::type sum = 0;
+                typename arithmetic<t0, t1>::type sum = 0;
                 for (int64 kk = 0; kk<size; kk++) {
                     sum += aa(ii, kk)*bb(kk, jj);
                 }
@@ -3329,12 +4505,12 @@ namespace xm {
 
     // specialized for complex*complex
     template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename promotion<cx<t0>, cx<t1> >::type, r1, c1> operator *(
+    mat<typename arithmetic<cx<t0>, cx<t1> >::type, r1, c1> operator *(
         const cx<t0>& scalar, const mat<cx<t1>, r1, c1>& bb
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<cx<t0>, cx<t1> >::type, r1, c1> cc(rows, cols);
+        mat<typename arithmetic<cx<t0>, cx<t1> >::type, r1, c1> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = scalar*bb(ii, jj);
@@ -3345,12 +4521,12 @@ namespace xm {
 
     // specialized for complex*real
     template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename promotion<cx<t0>, t1>::type, r1, c1> operator *(
+    mat<typename arithmetic<cx<t0>, t1>::type, r1, c1> operator *(
         const cx<t0>& scalar, const mat<t1, r1, c1>& bb
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<cx<t0>, t1>::type, r1, c1> cc(rows, cols);
+        mat<typename arithmetic<cx<t0>, t1>::type, r1, c1> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = scalar*bb(ii, jj);
@@ -3361,12 +4537,12 @@ namespace xm {
 
     // specialized for real*complex
     template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename promotion<t0, cx<t1> >::type, r1, c1> operator *(
+    mat<typename arithmetic<t0, cx<t1> >::type, r1, c1> operator *(
         const t0& scalar, const mat<cx<t1>, r1, c1>& bb
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<t0, cx<t1> >::type, r1, c1> cc(rows, cols);
+        mat<typename arithmetic<t0, cx<t1> >::type, r1, c1> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = scalar*bb(ii, jj);
@@ -3377,12 +4553,12 @@ namespace xm {
 
     // generalized without complex
     template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename promotion<t0, t1>::type, r1, c1> operator *(
+    mat<typename arithmetic<t0, t1>::type, r1, c1> operator *(
         const t0& scalar, const mat<t1, r1, c1>& bb
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<t0, t1>::type, r1, c1> cc(rows, cols);
+        mat<typename arithmetic<t0, t1>::type, r1, c1> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = scalar*bb(ii, jj);
@@ -3393,12 +4569,12 @@ namespace xm {
 
     // specialized for complex*complex
     template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename promotion<cx<t0>, cx<t1> >::type, r0, c0> operator *(
+    mat<typename arithmetic<cx<t0>, cx<t1> >::type, r0, c0> operator *(
         const mat<cx<t0>, r0, c0>& bb, const cx<t1>& scalar
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<cx<t0>, cx<t1> >::type, r0, c0> cc(rows, cols);
+        mat<typename arithmetic<cx<t0>, cx<t1> >::type, r0, c0> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = bb(ii, jj)*scalar;
@@ -3409,12 +4585,12 @@ namespace xm {
 
     // specialized for complex*real
     template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename promotion<cx<t0>, t1>::type, r0, c0> operator *(
+    mat<typename arithmetic<cx<t0>, t1>::type, r0, c0> operator *(
         const mat<cx<t0>, r0, c0>& bb, const t1& scalar
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<cx<t0>, t1>::type, r0, c0> cc(rows, cols);
+        mat<typename arithmetic<cx<t0>, t1>::type, r0, c0> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = bb(ii, jj)*scalar;
@@ -3425,12 +4601,12 @@ namespace xm {
 
     // specialized for real*complex
     template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename promotion<t0, cx<t1> >::type, r0, c0> operator *(
+    mat<typename arithmetic<t0, cx<t1> >::type, r0, c0> operator *(
         const mat<t0, r0, c0>& bb, const cx<t1>& scalar
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<t0, cx<t1> >::type, r0, c0> cc(rows, cols);
+        mat<typename arithmetic<t0, cx<t1> >::type, r0, c0> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = bb(ii, jj)*scalar;
@@ -3441,12 +4617,12 @@ namespace xm {
 
     // generalized without complex
     template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename promotion<t0, t1>::type, r0, c0> operator *(
+    mat<typename arithmetic<t0, t1>::type, r0, c0> operator *(
         const mat<t0, r0, c0>& bb, const t1& scalar
     ) {
         const int64 rows = bb.rows();
         const int64 cols = bb.cols();
-        mat<typename promotion<t0, t1>::type, r0, c0> cc(rows, cols);
+        mat<typename arithmetic<t0, t1>::type, r0, c0> cc(rows, cols);
         for (int64 ii = 0; ii<rows; ii++) {
             for (int64 jj = 0; jj<cols; jj++) {
                 cc(ii, jj) = bb(ii, jj)*scalar;
@@ -4704,890 +5880,6 @@ namespace xm {
     }
 
     //}}}
-    //{{{ tuple
-    //{{{ tuple 8
-    template<
-        class type1=none, class type2=none, class type3=none, class type4=none,
-        class type5=none, class type6=none, class type7=none, class type8=none
-    >
-    struct tuple {
-        type1 first; type2 second; type3 third; type4 fourth;
-        type5 fifth; type6 sixth; type7 seventh; type8 eighth;
-
-        tuple() {}
-
-        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5, type6 v6, type7 v7, type8 v8) :
-            first(v1), second(v2), third(v3), fourth(v4),
-            fifth(v5), sixth(v6), seventh(v7), eighth(v8) {
-        }
-
-        template<
-            class t1, class t2, class t3, class t4, 
-            class t5, class t6, class t7, class t8
-        >
-        tuple(const tuple<t1, t2, t3, t4, t5, t6, t7, t8>& tt) :
-            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
-            fifth(tt.fifth), sixth(tt.sixth), seventh(tt.seventh), eighth(tt.eighth) {
-        }
-
-        template<
-            class t1, class t2, class t3, class t4, 
-            class t5, class t6, class t7, class t8
-        >
-        tuple<type1, type2, type3, type4, type5, type6, type7, type8>&
-        operator =(const tuple<t1, t2, t3, t4, t5, t6, t7, t8>& that) {
-            first   = that.first;   second = that.second;
-            third   = that.third;   fourth = that.fourth;
-            fifth   = that.fifth;   sixth  = that.sixth;
-            seventh = that.seventh; eighth = that.eighth;
-            return *this;
-        }
-    };
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6, class type7, class type8
-    >
-    tuple<type1, type2, type3, type4, type5, type6, type7, type8>
-    multival(
-        const type1& val1, const type2& val2,
-        const type3& val3, const type4& val4,
-        const type5& val5, const type6& val6,
-        const type7& val7, const type8& val8
-    ) {
-        return tuple<
-            type1, type2, type3, type4,
-            type5, type6, type7, type8
-        >(val1, val2, val3, val4, val5, val6, val7, val8);
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6, class type7, class type8
-    >
-    tuple<type1&, type2&, type3&, type4&, type5&, type6&, type7&, type8&>
-    multiref(
-        type1& ref1, type2& ref2,
-        type3& ref3, type4& ref4,
-        type5& ref5, type6& ref6,
-        type7& ref7, type8& ref8
-    ) {
-        return tuple<
-            type1&, type2&, type3&, type4&,
-            type5&, type6&, type7&, type8&
-        >(ref1, ref2, ref3, ref4, ref5, ref6, ref7, ref8);
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6, class type7, class type8
-    >
-    size_t hash(
-        const tuple<
-            type1, type2, type3, type4, 
-            type5, type6, type7, type8
-        >& tt
-    ) {
-        return (
-            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
-            11*hash(tt.fifth) + 13*hash(tt.sixth) + 17*hash(tt.seventh) + 19*hash(tt.eighth)
-        );
-    }
-
-    template<
-        class a1, class a2, class a3, class a4, class a5, class a6, class a7, class a8,
-        class b1, class b2, class b3, class b4, class b5, class b6, class b7, class b8
-    >
-    bool operator ==(
-        const tuple<a1, a2, a3, a4, a5, a6, a7, a8>& aa,
-        const tuple<b1, b2, b3, b4, b5, b6, b7, b8>& bb
-    ) {
-        return (
-            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
-            aa.fifth == bb.fifth && aa.sixth == bb.sixth && aa.seventh == bb.seventh && aa.eighth == bb.eighth
-        );
-    }
-
-    //}}}
-    //{{{ tuple 7
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6, class type7
-    > 
-    struct tuple<type1, type2, type3, type4, type5, type6, type7> {
-        type1 first; type2 second; type3 third; type4 fourth;
-        type5 fifth; type6 sixth; type7 seventh;
-
-        tuple() {}
-
-        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5, type6 v6, type7 v7) :
-            first(v1), second(v2), third(v3), fourth(v4),
-            fifth(v5), sixth(v6), seventh(v7) {
-        }
-
-        template<
-            class t1, class t2, class t3, class t4, 
-            class t5, class t6, class t7
-        >
-        tuple(const tuple<t1, t2, t3, t4, t5, t6, t7>& tt) :
-            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
-            fifth(tt.fifth), sixth(tt.sixth), seventh(tt.seventh) {
-        }
-
-        template<
-            class t1, class t2, class t3, class t4, 
-            class t5, class t6, class t7
-        >
-        tuple<type1, type2, type3, type4, type5, type6, type7>&
-        operator =(const tuple<t1, t2, t3, t4, t5, t6, t7>& that) {
-            first   = that.first;   second = that.second;
-            third   = that.third;   fourth = that.fourth;
-            fifth   = that.fifth;   sixth  = that.sixth;
-            seventh = that.seventh;
-            return *this;
-        }
-    };
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6, class type7
-    >
-    tuple<type1, type2, type3, type4, type5, type6, type7>
-    multival(
-        const type1& val1, const type2& val2,
-        const type3& val3, const type4& val4,
-        const type5& val5, const type6& val6,
-        const type7& val7
-    ) {
-        return tuple<
-            type1, type2, type3, type4,
-            type5, type6, type7
-        >(val1, val2, val3, val4, val5, val6, val7);
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6, class type7
-    >
-    tuple<type1&, type2&, type3&, type4&, type5&, type6&, type7&>
-    multiref(
-        type1& ref1, type2& ref2,
-        type3& ref3, type4& ref4,
-        type5& ref5, type6& ref6,
-        type7& ref7
-    ) {
-        return tuple<
-            type1&, type2&, type3&, type4&,
-            type5&, type6&, type7&
-        >(ref1, ref2, ref3, ref4, ref5, ref6, ref7);
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6, class type7
-    >
-    size_t hash(
-        const tuple<
-            type1, type2, type3, type4, 
-            type5, type6, type7
-        >& tt
-    ) {
-        return (
-            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
-            11*hash(tt.fifth) + 13*hash(tt.sixth) + 17*hash(tt.seventh)
-        );
-    }
-
-    template<
-        class a1, class a2, class a3, class a4, class a5, class a6, class a7,
-        class b1, class b2, class b3, class b4, class b5, class b6, class b7
-    >
-    bool operator ==(
-        const tuple<a1, a2, a3, a4, a5, a6, a7>& aa,
-        const tuple<b1, b2, b3, b4, b5, b6, b7>& bb
-    ) {
-        return (
-            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
-            aa.fifth == bb.fifth && aa.sixth == bb.sixth && aa.seventh == bb.seventh
-        );
-    }
-
-    //}}}
-    //{{{ tuple 6
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6
-    > 
-    struct tuple<type1, type2, type3, type4, type5, type6> {
-        type1 first; type2 second; type3 third; type4 fourth;
-        type5 fifth; type6 sixth;
-
-        tuple() {}
-
-        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5, type6 v6) :
-            first(v1), second(v2), third(v3), fourth(v4),
-            fifth(v5), sixth(v6) {
-        }
-
-        template<
-            class t1, class t2, class t3, class t4, 
-            class t5, class t6
-        >
-        tuple(const tuple<t1, t2, t3, t4, t5, t6>& tt) :
-            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
-            fifth(tt.fifth), sixth(tt.sixth) {
-        }
-
-        template<
-            class t1, class t2, class t3, class t4, 
-            class t5, class t6
-        >
-        tuple<type1, type2, type3, type4, type5, type6>&
-        operator =(const tuple<t1, t2, t3, t4, t5, t6>& that) {
-            first   = that.first;   second = that.second;
-            third   = that.third;   fourth = that.fourth;
-            fifth   = that.fifth;   sixth  = that.sixth;
-            return *this;
-        }
-    };
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6
-    >
-    tuple<type1, type2, type3, type4, type5, type6>
-    multival(
-        const type1& val1, const type2& val2,
-        const type3& val3, const type4& val4,
-        const type5& val5, const type6& val6
-    ) {
-        return tuple<
-            type1, type2, type3, type4,
-            type5, type6
-        >(val1, val2, val3, val4, val5, val6);
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6
-    >
-    tuple<type1&, type2&, type3&, type4&, type5&, type6&>
-    multiref(
-        type1& ref1, type2& ref2,
-        type3& ref3, type4& ref4,
-        type5& ref5, type6& ref6
-    ) {
-        return tuple<
-            type1&, type2&, type3&, type4&,
-            type5&, type6&
-        >(ref1, ref2, ref3, ref4, ref5, ref6);
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5, class type6
-    >
-    size_t hash(
-        const tuple<
-            type1, type2, type3, type4, 
-            type5, type6
-        >& tt
-    ) {
-        return (
-            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
-            11*hash(tt.fifth) + 13*hash(tt.sixth)
-        );
-    }
-
-    template<
-        class a1, class a2, class a3, class a4, class a5, class a6,
-        class b1, class b2, class b3, class b4, class b5, class b6
-    >
-    bool operator ==(
-        const tuple<a1, a2, a3, a4, a5, a6>& aa,
-        const tuple<b1, b2, b3, b4, b5, b6>& bb
-    ) {
-        return (
-            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
-            aa.fifth == bb.fifth && aa.sixth == bb.sixth
-        );
-    }
-
-    //}}}
-    //{{{ tuple 5
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5
-    > 
-    struct tuple<type1, type2, type3, type4, type5> {
-        type1 first; type2 second; type3 third; type4 fourth;
-        type5 fifth;
-
-        tuple() {}
-
-        tuple(type1 v1, type2 v2, type3 v3, type4 v4, type5 v5) :
-            first(v1), second(v2), third(v3), fourth(v4), fifth(v5) {
-        }
-
-        template<class t1, class t2, class t3, class t4, class t5>
-        tuple(const tuple<t1, t2, t3, t4, t5>& tt) :
-            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth),
-            fifth(tt.fifth) {
-        }
-
-        template<
-            class t1, class t2, class t3, class t4, 
-            class t5
-        >
-        tuple<type1, type2, type3, type4, type5>&
-        operator =(const tuple<t1, t2, t3, t4, t5>& that) {
-            first   = that.first;   second = that.second;
-            third   = that.third;   fourth = that.fourth;
-            fifth   = that.fifth;
-            return *this;
-        }
-    };
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5
-    >
-    tuple<type1, type2, type3, type4, type5>
-    multival(
-        const type1& val1, const type2& val2,
-        const type3& val3, const type4& val4,
-        const type5& val5
-    ) {
-        return tuple<type1, type2, type3, type4, type5>(
-            val1, val2, val3, val4, val5
-        );
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5
-    >
-    tuple<type1&, type2&, type3&, type4&, type5&>
-    multiref(
-        type1& ref1, type2& ref2,
-        type3& ref3, type4& ref4,
-        type5& ref5
-    ) {
-        return tuple<type1&, type2&, type3&, type4&, type5&>(
-            ref1, ref2, ref3, ref4, ref5
-        );
-    }
-
-    template<
-        class type1, class type2, class type3, class type4,
-        class type5
-    >
-    size_t hash(const tuple<type1, type2, type3, type4, type5>& tt) {
-        return (
-            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth) +
-            11*hash(tt.fifth)
-        );
-    }
-
-    template<
-        class a1, class a2, class a3, class a4, class a5,
-        class b1, class b2, class b3, class b4, class b5
-    >
-    bool operator ==(
-        const tuple<a1, a2, a3, a4, a5>& aa,
-        const tuple<b1, b2, b3, b4, b5>& bb
-    ) {
-        return (
-            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth &&
-            aa.fifth == bb.fifth
-        );
-    }
-
-    //}}}
-    //{{{ tuple 4
-    template<class type1, class type2, class type3, class type4> 
-    struct tuple<type1, type2, type3, type4> {
-        type1 first; type2 second; type3 third; type4 fourth;
-
-        tuple() {}
-
-        tuple(type1 v1, type2 v2, type3 v3, type4 v4) :
-            first(v1), second(v2), third(v3), fourth(v4) {
-        }
-
-        template<class t1, class t2, class t3, class t4>
-        tuple(const tuple<t1, t2, t3, t4>& tt) :
-            first(tt.first), second(tt.second), third(tt.third), fourth(tt.fourth) {
-        }
-
-        template<class t1, class t2, class t3, class t4>
-        tuple<type1, type2, type3, type4>&
-        operator =(const tuple<t1, t2, t3, t4>& that) {
-            first   = that.first;   second = that.second;
-            third   = that.third;   fourth = that.fourth;
-            return *this;
-        }
-    };
-
-    template<class type1, class type2, class type3, class type4>
-    tuple<type1, type2, type3, type4>
-    multival(
-        const type1& val1, const type2& val2,
-        const type3& val3, const type4& val4
-    ) {
-        return tuple<type1, type2, type3, type4>(
-            val1, val2, val3, val4
-        );
-    }
-
-    template<class type1, class type2, class type3, class type4>
-    tuple<type1&, type2&, type3&, type4&>
-    multiref(
-        type1& ref1, type2& ref2,
-        type3& ref3, type4& ref4
-    ) {
-        return tuple<type1&, type2&, type3&, type4&>(
-            ref1, ref2, ref3, ref4
-        );
-    }
-
-    template<class type1, class type2, class type3, class type4>
-    size_t hash(const tuple<type1, type2, type3, type4>& tt) {
-        return (
-            1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third) + 7*hash(tt.fourth)
-        );
-    }
-
-    template<
-        class a1, class a2, class a3, class a4,
-        class b1, class b2, class b3, class b4
-    >
-    bool operator ==(
-        const tuple<a1, a2, a3, a4>& aa,
-        const tuple<b1, b2, b3, b4>& bb
-    ) {
-        return (
-            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third && aa.fourth == bb.fourth
-        );
-    }
-
-    //}}}
-    //{{{ tuple 3
-    template<class type1, class type2, class type3> 
-    struct tuple<type1, type2, type3> {
-        type1 first; type2 second; type3 third;
-
-        tuple() {}
-
-        tuple(type1 v1, type2 v2, type3 v3) :
-            first(v1), second(v2), third(v3) {
-        }
-
-        template<class t1, class t2, class t3>
-        tuple(const tuple<t1, t2, t3>& tt) :
-            first(tt.first), second(tt.second), third(tt.third) {
-        }
-
-        template<class t1, class t2, class t3>
-        tuple<type1, type2, type3>&
-        operator =(const tuple<t1, t2, t3>& that) {
-            first   = that.first;   second = that.second;
-            third   = that.third;
-            return *this;
-        }
-    };
-
-    template<class type1, class type2, class type3>
-    tuple<type1, type2, type3>
-    multival(
-        const type1& val1, const type2& val2,
-        const type3& val3
-    ) {
-        return tuple<type1, type2, type3>(
-            val1, val2, val3
-        );
-    }
-
-    template<class type1, class type2, class type3>
-    tuple<type1&, type2&, type3&>
-    multiref(
-        type1& ref1, type2& ref2,
-        type3& ref3
-    ) {
-        return tuple<type1&, type2&, type3&>(
-            ref1, ref2, ref3
-        );
-    }
-
-    template<class type1, class type2, class type3>
-    size_t hash(const tuple<type1, type2, type3>& tt) {
-        return 1*hash(tt.first) + 3*hash(tt.second) + 5*hash(tt.third);
-    }
-
-    template<
-        class a1, class a2, class a3,
-        class b1, class b2, class b3
-    >
-    bool operator ==(
-        const tuple<a1, a2, a3>& aa,
-        const tuple<b1, b2, b3>& bb
-    ) {
-        return (
-            aa.first == bb.first && aa.second == bb.second && aa.third == bb.third
-        );
-    }
-
-    //}}}
-    //{{{ tuple 2
-    template<class type1, class type2> 
-    struct tuple<type1, type2> {
-        type1 first; type2 second;
-
-        tuple() {}
-
-        tuple(type1 v1, type2 v2) :
-            first(v1), second(v2) {
-        }
-
-        template<class t1, class t2>
-        tuple(const tuple<t1, t2>& tt) :
-            first(tt.first), second(tt.second) {
-        }
-
-        template<class t1, class t2>
-        tuple<type1, type2>&
-        operator =(const tuple<t1, t2>& that) {
-            first   = that.first;   second = that.second;
-            return *this;
-        }
-    };
-
-    template<class type1, class type2>
-    tuple<type1, type2>
-    multival(
-        const type1& val1, const type2& val2
-    ) {
-        return tuple<type1, type2>(val1, val2);
-    }
-
-    template<class type1, class type2>
-    tuple<type1&, type2&>
-    multiref(
-        type1& ref1, type2& ref2
-    ) {
-        return tuple<type1&, type2&>(ref1, ref2);
-    }
-
-    template<class type1, class type2>
-    size_t hash(const tuple<type1, type2>& tt) {
-        return 1*hash(tt.first) + 3*hash(tt.second);
-    }
-
-    template<
-        class a1, class a2,
-        class b1, class b2
-    >
-    bool operator ==(
-        const tuple<a1, a2>& aa,
-        const tuple<b1, b2>& bb
-    ) {
-        return (
-            aa.first == bb.first && aa.second == bb.second
-        );
-    }
-
-    //}}}
-    //{{{ tuple 1
-    template<class type1> 
-    struct tuple<type1> {
-        type1 first;
-
-        tuple() {}
-
-        tuple(type1 v1) : first(v1) {
-        }
-
-        template<class t1>
-        tuple(const tuple<t1>& tt) : first(tt.first) {}
-
-        template<class t1>
-        tuple<type1>&
-        operator =(const tuple<t1>& that) {
-            first   = that.first;
-            return *this;
-        }
-    };
-
-    template<class type1>
-    tuple<type1>
-    multival(const type1& val1) {
-        return tuple<type1>(val1);
-    }
-
-    template<class type1>
-    tuple<type1&>
-    multiref(type1& ref1) {
-        return tuple<type1&>(ref1);
-    }
-
-    template<class type1>
-    size_t hash(const tuple<type1>& tt) {
-        return hash(tt.first);
-    }
-
-    template<class a1, class b1>
-    bool operator ==(const tuple<a1>& aa, const tuple<b1>& bb) {
-        return aa.first == bb.first;
-    }
-
-    //}}}
-    //{{{ tuple 0
-    template<> struct tuple<> {};
-
-    tuple<> multival() {
-        return tuple<>();
-    }
-
-    tuple<> multiref() {
-        return tuple<>();
-    }
-
-    template<>
-    size_t hash(const tuple<>& tt) {
-        (void)tt;
-        return 0;
-    }
-
-    template<>
-    bool operator ==(const tuple<>& aa, const tuple<>& bb) {
-        (void)aa; (void)bb;
-        return true;
-    }
-
-    //}}}
-    //}}}
-    //{{{ queue
-    template<class type>
-    struct queue {
-        queue();
-        ~queue();
-
-        void give(type& item);
-        void push(const type& item);
-        type pull();
-        bool pull(type& item, double seconds);
-
-        private:
-            queue(const queue&); // deleted
-            queue& operator =(const queue&); // deleted
-
-            list<type> data;     
-            pthread_mutex_t mutex;
-            pthread_cond_t condvar;
-    };
-
-    template<class type>
-    queue<type>::queue() {
-        pthread_condattr_t attr;
-        pthread_condattr_init(&attr);
-        pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
-        pthread_mutex_init(&mutex, 0);
-        pthread_cond_init(&condvar, &attr);
-    }
-
-    template<class type>
-    queue<type>::~queue() {
-        pthread_mutex_destroy(&mutex);
-        pthread_cond_destroy(&condvar);
-    }
-
-    template<class type>
-    void queue<type>::give(type& item) {
-        pthread_mutex_lock(&mutex);
-
-        data.append(type());
-        swap(data[data.size() - 1], item);
-
-        pthread_cond_signal(&condvar);
-        pthread_mutex_unlock(&mutex);
-    }
-
-    template<class type>
-    void queue<type>::push(const type& item) {
-        pthread_mutex_lock(&mutex);
-
-        data.append(item);
-
-        pthread_cond_signal(&condvar);
-        pthread_mutex_unlock(&mutex);
-    }
-
-    template<class type>
-    type queue<type>::pull() {
-        type item;
-        pthread_mutex_lock(&mutex);
-
-        while (data.size() == 0) {
-            pthread_cond_wait(&condvar, &mutex);
-        }
-
-        swap(item, data[0]);
-        data.remove(0);
-
-        pthread_mutex_unlock(&mutex);
-
-        return item;
-    }
-
-    template<class type>
-    bool queue<type>::pull(type& item, double seconds) {
-        struct timespec tv;
-        clock_gettime(CLOCK_MONOTONIC, &tv);
-        int64 nanos = tv.tv_sec*1000000000LL + tv.tv_nsec;
-
-        nanos += llrint(seconds*1e9);
-
-        tv.tv_sec  = nanos/1000000000LL;
-        tv.tv_nsec = nanos%1000000000LL;
-
-        pthread_mutex_lock(&mutex);
-
-        while (data.size() == 0) {
-            int result = pthread_cond_timedwait(&condvar, &mutex, &tv);
-            if (result == ETIMEDOUT) {
-                pthread_mutex_unlock(&mutex);
-                return false;
-            }
-        }
-
-        swap(item, data[0]);
-        data.remove(0);
-
-        pthread_mutex_unlock(&mutex);
-
-        return true;
-    }
-
-    //}}}
-    //{{{ shared
-    template<class type>
-    struct shared {
-        ~shared();
-        shared();
-        shared(type* pp);
-        shared(const shared<type>& other);
-        shared<type>& operator =(const shared<type>& other);
-
-        type& operator *();
-        const type& operator *() const;
-
-        type* operator ->();
-        const type* operator ->() const;
-
-        type* borrow();
-        const type* borrow() const;
-
-        private:
-
-            template<class tt> friend void swap(
-                shared<tt>& flip, shared<tt>& flop
-            );
-
-            struct counted {
-                type* pointer;
-                ssize_t refcount;
-            };
-
-            void decref();
-            counted* incref();
-
-            counted* storage;
-    };
-
-    //{{{ implementation 
-    template<class type>
-    shared<type>::~shared() {
-        decref();
-    }
-
-    template<class type>
-    shared<type>::shared() : storage(0) {}
-
-    template<class type>
-    shared<type>::shared(type* pp) : storage(new counted) {
-        storage->refcount = 1;
-        storage->pointer = pp;
-    }
-
-    template<class type>
-    shared<type>::shared(const shared<type>& other) : storage(other.incref()) {}
-
-    template<class type>
-    shared<type>& shared<type>::operator =(const shared<type>& other) {
-        if (this == &other) return *this;
-        if (storage == other.storage) return *this;
-        decref();
-        // XXX: incref() needs a mutable refcount...
-        storage = other.incref();
-        return *this;
-    }
-
-    template<class type>
-    type& shared<type>::operator *() {
-        check(storage != 0, "can't dereference a null ptr");
-        return *storage->pointer;
-    }
-
-    template<class type>
-    const type& shared<type>::operator *() const {
-        check(storage != 0, "can't dereference a null ptr");
-        return *storage->pointer;
-    }
-
-    template<class type>
-    type* shared<type>::operator ->() {
-        check(storage != 0, "can't dereference a null ptr");
-        return storage->pointer;
-    }
-
-    template<class type>
-    const type* shared<type>::operator ->() const {
-        check(storage != 0, "can't dereference a null ptr");
-        return storage->pointer;
-    }
-
-    template<class type>
-    type* shared<type>::borrow() {
-        return storage ? storage->pointer : 0;
-    }
-
-    template<class type>
-    const type* shared<type>::borrow() const {
-        return storage ? storage->pointer : 0;
-    }
-
-    template<class type>
-    void shared<type>::decref() {
-        if (storage) {
-            if (--storage->refcount == 0) {
-                delete storage->pointer;
-                delete storage;
-            }
-        }
-    }
-
-    template<class type>
-    typename shared<type>::counted* shared<type>::incref() {
-        if (storage) ++storage->refcount;
-        return storage;
-    }
-
-    template<class type> 
-    void swap(shared<type>& flip, shared<type>& flop) {
-        swap(flip.storage, flop.storage);
-    }
-    //}}}
-    //}}}
     //{{{ Rice PDF and CDF
     namespace internal {
         // XXX: verify this
@@ -5789,7 +6081,7 @@ namespace xm {
         //
         // Time domain Dolph-Chebyshev window.  It has a very flat stop band.
         //
-        // The equation is from, but this is not that source code:
+        // The equation is from the link here, but we did not use their code:
         //
         //       http://practicalcryptography.com/miscellaneous/ ...
         //       ... machine-learning/implementing-dolph-chebyshev-window/
@@ -10406,6 +10698,56 @@ namespace xm {
 #undef define_simdtype
 
     //}}}
+    //{{{ findzero
+
+    namespace internal {
+        static bool diffsign(double aa, double bb) {
+            return (bool)signbit(aa) != (bool)signbit(bb);
+        }
+    }
+
+    template<class callable>
+    double findzero(callable func, double xlo, double xhi, double tol=0) {
+        using namespace internal;
+        if (xhi < xlo) swap(xlo, xhi);
+        double ylo = func(xlo); if (ylo == 0) return xlo;
+        double yhi = func(xhi); if (yhi == 0) return xhi;
+        check(diffsign(yhi, ylo), "must have opposite signs");
+
+        while (xhi - xlo > tol) {
+            double half = .5*(xhi - xlo);
+            double xmid = xlo + half;
+            if (xmid == xlo || xmid == xhi) return xmid;
+            double ymid = func(xmid); if (ymid == 0) return xmid;
+
+            // We're using a variation of Ridder's method to find an
+            // interpolated point, slightly modified to avoid underflow.
+            double denom = ::hypot(ymid, ::sqrt(::fabs(ylo))*::sqrt(::fabs(yhi)));
+            double xexp = xmid + half*::copysign(1, ylo - yhi)*ymid/denom;
+            check(xlo <= xexp && xexp <= xhi, "in bounds");
+            double yexp = func(xexp); if (yexp == 0) return xexp;
+
+            double xx[4] = { xlo, xmid, xexp, xhi };
+            double yy[4] = { ylo, ymid, yexp, yhi };
+            if (xexp < xmid) { swap(xx[1], xx[2]); swap(yy[1], yy[2]); }
+
+            double best = xhi - xlo;
+            for (int ii = 0; ii<3; ii++) {
+                if (xx[ii+1] - xx[ii+0] < best && diffsign(yy[ii+0], yy[ii+1])) {
+                    xlo = xx[ii+0]; ylo = yy[ii+0];
+                    xhi = xx[ii+1]; yhi = yy[ii+1];
+                    best = xx[ii+1] - xx[ii+0];
+                }
+            }
+        }
+        return xhi + .5*(xhi - xlo);
+    }
+
+    //}}}
+
+}
+    
+#if 0
     //{{{ sum funcs 
     
     template<class type>
@@ -10570,56 +10912,6 @@ namespace xm {
 
 
     //}}}
-    //{{{ findzero
-
-    namespace internal {
-        static bool diffsign(double aa, double bb) {
-            return (bool)signbit(aa) != (bool)signbit(bb);
-        }
-    }
-
-    template<class callable>
-    double findzero(callable func, double xlo, double xhi, double tol=0) {
-        using namespace internal;
-        if (xhi < xlo) swap(xlo, xhi);
-        double ylo = func(xlo); if (ylo == 0) return xlo;
-        double yhi = func(xhi); if (yhi == 0) return xhi;
-        check(diffsign(yhi, ylo), "must have opposite signs");
-
-        while (xhi - xlo > tol) {
-            double half = .5*(xhi - xlo);
-            double xmid = xlo + half;
-            if (xmid == xlo || xmid == xhi) return xmid;
-            double ymid = func(xmid); if (ymid == 0) return xmid;
-
-            // We're using a variation of Ridder's method to find an
-            // interpolated point, slightly modified to avoid underflow.
-            double denom = ::hypot(ymid, ::sqrt(::fabs(ylo))*::sqrt(::fabs(yhi)));
-            double xexp = xmid + half*::copysign(1, ylo - yhi)*ymid/denom;
-            check(xlo <= xexp && xexp <= xhi, "in bounds");
-            double yexp = func(xexp); if (yexp == 0) return xexp;
-
-            double xx[4] = { xlo, xmid, xexp, xhi };
-            double yy[4] = { ylo, ymid, yexp, yhi };
-            if (xexp < xmid) { swap(xx[1], xx[2]); swap(yy[1], yy[2]); }
-
-            double best = xhi - xlo;
-            for (int ii = 0; ii<3; ii++) {
-                if (xx[ii+1] - xx[ii+0] < best && diffsign(yy[ii+0], yy[ii+1])) {
-                    xlo = xx[ii+0]; ylo = yy[ii+0];
-                    xhi = xx[ii+1]; yhi = yy[ii+1];
-                    best = xx[ii+1] - xx[ii+0];
-                }
-            }
-        }
-        return xhi + .5*(xhi - xlo);
-    }
-
-    //}}}
-
-}
-    
-#if 0
     //{{{ old mul operators
 #if 0
     template<class atype, class btype> // matrix multiply A*b

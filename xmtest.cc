@@ -104,7 +104,8 @@ template<class atype, class btype>
 void test0005_t1(const char* aname, const char* bname) {
     atype aval = 0;
     btype bval = 0;
-    typename xm::promotion<atype, btype>::type tt = 0;
+    typename xm::arithmetic<atype, btype>::type tt = 0;
+    typename xm::conditional<atype, btype>::type uu = 0;
     xm::check(
         strcmp(typeid(tt).name(), typeid(aval + bval).name()) == 0,
         "promotion of %s + %s to %s", aname, bname, typeid(tt).name()
@@ -112,6 +113,10 @@ void test0005_t1(const char* aname, const char* bname) {
     xm::check(
         strcmp(typeid(tt).name(), typeid(aval * bval).name()) == 0,
         "promotion of %s * %s to %s", aname, bname, typeid(tt).name()
+    );
+    xm::check(
+        strcmp(typeid(uu).name(), typeid(true ? aval : bval).name()) == 0,
+        "promotion of cond ? %s : %s to %s", aname, bname, typeid(uu).name()
     );
 }
 
