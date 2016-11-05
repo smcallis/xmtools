@@ -52,148 +52,229 @@ typedef long long int64;
 
 namespace xm {
     //{{{ promotions 
-    // Template type promotions (like common_type<...> in C++11)
     template<class t0, class t1> struct promotion;
 
+    //
     // These are the "usual arithmetic conversions" according to the standard,
     // but note some of them are not ideal for retaining precision, and there
     // are some ugly conversions with signed and unsigned of the same size.
-    // In general, it seems like the C/C++ standards really really like int,
-    // and if there's any excuse to convert them to int it will do so.
     //
-    // C++ 11 has decltype(...) for this, but we're C++ 98/03 compatible.
+    // C++ 11 has decltype(...) for this, but we're C++ 98/03 compatible.  Also
+    // similar to common_type<...> in C++ 11.
+    //
+    // These were tested with both gcc and clang, and are part of xmtest.cc
+    //
     
-    template<> struct promotion<   int8_t,    int8_t> { typedef    int8_t type; };
-    template<> struct promotion<   int8_t,   int16_t> { typedef   int32_t type; };
-    template<> struct promotion<   int8_t,   int32_t> { typedef   int32_t type; };
-    template<> struct promotion<   int8_t,   int64_t> { typedef   int64_t type; };
-    template<> struct promotion<   int8_t,   uint8_t> { typedef   int32_t type; };
-    template<> struct promotion<   int8_t,  uint16_t> { typedef   int32_t type; };
-    template<> struct promotion<   int8_t,  uint32_t> { typedef  uint32_t type; };
-    template<> struct promotion<   int8_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion<   int8_t,     float> { typedef     float type; };
-    template<> struct promotion<   int8_t,    double> { typedef    double type; };
-    template<> struct promotion<   int8_t, long long> { typedef long long type; };
-                                                                
-    template<> struct promotion<  int16_t,    int8_t> { typedef   int32_t type; };
-    template<> struct promotion<  int16_t,   int16_t> { typedef   int16_t type; };
-    template<> struct promotion<  int16_t,   int32_t> { typedef   int32_t type; };
-    template<> struct promotion<  int16_t,   int64_t> { typedef   int64_t type; };
-    template<> struct promotion<  int16_t,   uint8_t> { typedef   int32_t type; };
-    template<> struct promotion<  int16_t,  uint16_t> { typedef   int32_t type; };
-    template<> struct promotion<  int16_t,  uint32_t> { typedef  uint32_t type; };
-    template<> struct promotion<  int16_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion<  int16_t,     float> { typedef     float type; };
-    template<> struct promotion<  int16_t,    double> { typedef    double type; };
-    template<> struct promotion<  int16_t, long long> { typedef long long type; };
-                                                                
-    template<> struct promotion<  int32_t,    int8_t> { typedef   int32_t type; };
-    template<> struct promotion<  int32_t,   int16_t> { typedef   int32_t type; };
-    template<> struct promotion<  int32_t,   int32_t> { typedef   int32_t type; };
-    template<> struct promotion<  int32_t,   int64_t> { typedef   int64_t type; };
-    template<> struct promotion<  int32_t,   uint8_t> { typedef   int32_t type; };
-    template<> struct promotion<  int32_t,  uint16_t> { typedef   int32_t type; };
-    template<> struct promotion<  int32_t,  uint32_t> { typedef  uint32_t type; };
-    template<> struct promotion<  int32_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion<  int32_t,     float> { typedef     float type; };
-    template<> struct promotion<  int32_t,    double> { typedef    double type; };
-    template<> struct promotion<  int32_t, long long> { typedef long long type; };
-                                                                
-    template<> struct promotion<  int64_t,    int8_t> { typedef   int64_t type; };
-    template<> struct promotion<  int64_t,   int16_t> { typedef   int64_t type; };
-    template<> struct promotion<  int64_t,   int32_t> { typedef   int64_t type; };
-    template<> struct promotion<  int64_t,   int64_t> { typedef   int64_t type; };
-    template<> struct promotion<  int64_t,   uint8_t> { typedef   int64_t type; };
-    template<> struct promotion<  int64_t,  uint16_t> { typedef   int64_t type; };
-    template<> struct promotion<  int64_t,  uint32_t> { typedef   int64_t type; };
-    template<> struct promotion<  int64_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion<  int64_t,     float> { typedef     float type; };
-    template<> struct promotion<  int64_t,    double> { typedef    double type; };
-    template<> struct promotion<  int64_t, long long> { typedef long long type; };
-                                                                
-    template<> struct promotion<  uint8_t,    int8_t> { typedef   int32_t type; };
-    template<> struct promotion<  uint8_t,   int16_t> { typedef   int32_t type; };
-    template<> struct promotion<  uint8_t,   int32_t> { typedef   int32_t type; };
-    template<> struct promotion<  uint8_t,   int64_t> { typedef   int64_t type; };
-    template<> struct promotion<  uint8_t,   uint8_t> { typedef   uint8_t type; };
-    template<> struct promotion<  uint8_t,  uint16_t> { typedef   int32_t type; };
-    template<> struct promotion<  uint8_t,  uint32_t> { typedef  uint32_t type; };
-    template<> struct promotion<  uint8_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion<  uint8_t,     float> { typedef     float type; };
-    template<> struct promotion<  uint8_t,    double> { typedef    double type; };
-    template<> struct promotion<  uint8_t, long long> { typedef long long type; };
-                                                                
-    template<> struct promotion< uint16_t,    int8_t> { typedef   int32_t type; };
-    template<> struct promotion< uint16_t,   int16_t> { typedef   int32_t type; };
-    template<> struct promotion< uint16_t,   int32_t> { typedef   int32_t type; };
-    template<> struct promotion< uint16_t,   int64_t> { typedef   int64_t type; };
-    template<> struct promotion< uint16_t,   uint8_t> { typedef   int32_t type; };
-    template<> struct promotion< uint16_t,  uint16_t> { typedef  uint16_t type; };
-    template<> struct promotion< uint16_t,  uint32_t> { typedef  uint32_t type; };
-    template<> struct promotion< uint16_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint16_t,     float> { typedef     float type; };
-    template<> struct promotion< uint16_t,    double> { typedef    double type; };
-    template<> struct promotion< uint16_t, long long> { typedef long long type; };
-                                                                
-    template<> struct promotion< uint32_t,    int8_t> { typedef  uint32_t type; };
-    template<> struct promotion< uint32_t,   int16_t> { typedef  uint32_t type; };
-    template<> struct promotion< uint32_t,   int32_t> { typedef  uint32_t type; };
-    template<> struct promotion< uint32_t,   int64_t> { typedef   int64_t type; };
-    template<> struct promotion< uint32_t,   uint8_t> { typedef  uint32_t type; };
-    template<> struct promotion< uint32_t,  uint16_t> { typedef  uint32_t type; };
-    template<> struct promotion< uint32_t,  uint32_t> { typedef  uint32_t type; };
-    template<> struct promotion< uint32_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint32_t,     float> { typedef     float type; };
-    template<> struct promotion< uint32_t,    double> { typedef    double type; };
-    template<> struct promotion< uint32_t, long long> { typedef long long type; };
-                                                                
-    template<> struct promotion< uint64_t,    int8_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,   int16_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,   int32_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,   int64_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,   uint8_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,  uint16_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,  uint32_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion< uint64_t,     float> { typedef     float type; };
-    template<> struct promotion< uint64_t,    double> { typedef    double type; };
-    template<> struct promotion< uint64_t, long long> { typedef  uint64_t type; };
-                                                                
-    template<> struct promotion<    float,    int8_t> { typedef     float type; };
-    template<> struct promotion<    float,   int16_t> { typedef     float type; };
-    template<> struct promotion<    float,   int32_t> { typedef     float type; };
-    template<> struct promotion<    float,   int64_t> { typedef     float type; };
-    template<> struct promotion<    float,   uint8_t> { typedef     float type; };
-    template<> struct promotion<    float,  uint16_t> { typedef     float type; };
-    template<> struct promotion<    float,  uint32_t> { typedef     float type; };
-    template<> struct promotion<    float,  uint64_t> { typedef     float type; };
-    template<> struct promotion<    float,     float> { typedef     float type; };
-    template<> struct promotion<    float,    double> { typedef    double type; };
-    template<> struct promotion<    float, long long> { typedef     float type; };
-                                                                
-    template<> struct promotion<   double,    int8_t> { typedef    double type; };
-    template<> struct promotion<   double,   int16_t> { typedef    double type; };
-    template<> struct promotion<   double,   int32_t> { typedef    double type; };
-    template<> struct promotion<   double,   int64_t> { typedef    double type; };
-    template<> struct promotion<   double,   uint8_t> { typedef    double type; };
-    template<> struct promotion<   double,  uint16_t> { typedef    double type; };
-    template<> struct promotion<   double,  uint32_t> { typedef    double type; };
-    template<> struct promotion<   double,  uint64_t> { typedef    double type; };
-    template<> struct promotion<   double,     float> { typedef    double type; };
-    template<> struct promotion<   double,    double> { typedef    double type; };
-    template<> struct promotion<   double, long long> { typedef    double type; };
+    template<> struct promotion<              char,               char> { typedef         signed int type; };
+    template<> struct promotion<              char,        signed char> { typedef         signed int type; };
+    template<> struct promotion<              char,      unsigned char> { typedef         signed int type; };
+    template<> struct promotion<              char,       signed short> { typedef         signed int type; };
+    template<> struct promotion<              char,     unsigned short> { typedef         signed int type; };
+    template<> struct promotion<              char,         signed int> { typedef         signed int type; };
+    template<> struct promotion<              char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct promotion<              char,        signed long> { typedef        signed long type; };
+    template<> struct promotion<              char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<              char,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<              char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<              char,              float> { typedef              float type; };
+    template<> struct promotion<              char,             double> { typedef             double type; };
+    template<> struct promotion<              char,        long double> { typedef        long double type; };
 
-    template<> struct promotion<long long,    int8_t> { typedef long long type; };
-    template<> struct promotion<long long,   int16_t> { typedef long long type; };
-    template<> struct promotion<long long,   int32_t> { typedef long long type; };
-    template<> struct promotion<long long,   int64_t> { typedef long long type; };
-    template<> struct promotion<long long,   uint8_t> { typedef long long type; };
-    template<> struct promotion<long long,  uint16_t> { typedef long long type; };
-    template<> struct promotion<long long,  uint32_t> { typedef long long type; };
-    template<> struct promotion<long long,  uint64_t> { typedef  uint64_t type; };
-    template<> struct promotion<long long,     float> { typedef     float type; };
-    template<> struct promotion<long long,    double> { typedef    double type; };
-    template<> struct promotion<long long, long long> { typedef long long type; };
+    template<> struct promotion<       signed char,               char> { typedef         signed int type; };
+    template<> struct promotion<       signed char,        signed char> { typedef         signed int type; };
+    template<> struct promotion<       signed char,      unsigned char> { typedef         signed int type; };
+    template<> struct promotion<       signed char,       signed short> { typedef         signed int type; };
+    template<> struct promotion<       signed char,     unsigned short> { typedef         signed int type; };
+    template<> struct promotion<       signed char,         signed int> { typedef         signed int type; };
+    template<> struct promotion<       signed char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct promotion<       signed char,        signed long> { typedef        signed long type; };
+    template<> struct promotion<       signed char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<       signed char,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<       signed char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<       signed char,              float> { typedef              float type; };
+    template<> struct promotion<       signed char,             double> { typedef             double type; };
+    template<> struct promotion<       signed char,        long double> { typedef        long double type; };
+
+    template<> struct promotion<     unsigned char,               char> { typedef         signed int type; };
+    template<> struct promotion<     unsigned char,        signed char> { typedef         signed int type; };
+    template<> struct promotion<     unsigned char,      unsigned char> { typedef         signed int type; };
+    template<> struct promotion<     unsigned char,       signed short> { typedef         signed int type; };
+    template<> struct promotion<     unsigned char,     unsigned short> { typedef         signed int type; };
+    template<> struct promotion<     unsigned char,         signed int> { typedef         signed int type; };
+    template<> struct promotion<     unsigned char,       unsigned int> { typedef       unsigned int type; };
+    template<> struct promotion<     unsigned char,        signed long> { typedef        signed long type; };
+    template<> struct promotion<     unsigned char,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned char,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<     unsigned char, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<     unsigned char,              float> { typedef              float type; };
+    template<> struct promotion<     unsigned char,             double> { typedef             double type; };
+    template<> struct promotion<     unsigned char,        long double> { typedef        long double type; };
+
+    template<> struct promotion<      signed short,               char> { typedef         signed int type; };
+    template<> struct promotion<      signed short,        signed char> { typedef         signed int type; };
+    template<> struct promotion<      signed short,      unsigned char> { typedef         signed int type; };
+    template<> struct promotion<      signed short,       signed short> { typedef         signed int type; };
+    template<> struct promotion<      signed short,     unsigned short> { typedef         signed int type; };
+    template<> struct promotion<      signed short,         signed int> { typedef         signed int type; };
+    template<> struct promotion<      signed short,       unsigned int> { typedef       unsigned int type; };
+    template<> struct promotion<      signed short,        signed long> { typedef        signed long type; };
+    template<> struct promotion<      signed short,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<      signed short,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<      signed short, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<      signed short,              float> { typedef              float type; };
+    template<> struct promotion<      signed short,             double> { typedef             double type; };
+    template<> struct promotion<      signed short,        long double> { typedef        long double type; };
+
+    template<> struct promotion<    unsigned short,               char> { typedef         signed int type; };
+    template<> struct promotion<    unsigned short,        signed char> { typedef         signed int type; };
+    template<> struct promotion<    unsigned short,      unsigned char> { typedef         signed int type; };
+    template<> struct promotion<    unsigned short,       signed short> { typedef         signed int type; };
+    template<> struct promotion<    unsigned short,     unsigned short> { typedef         signed int type; };
+    template<> struct promotion<    unsigned short,         signed int> { typedef         signed int type; };
+    template<> struct promotion<    unsigned short,       unsigned int> { typedef       unsigned int type; };
+    template<> struct promotion<    unsigned short,        signed long> { typedef        signed long type; };
+    template<> struct promotion<    unsigned short,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<    unsigned short,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<    unsigned short, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<    unsigned short,              float> { typedef              float type; };
+    template<> struct promotion<    unsigned short,             double> { typedef             double type; };
+    template<> struct promotion<    unsigned short,        long double> { typedef        long double type; };
+
+    template<> struct promotion<        signed int,               char> { typedef         signed int type; };
+    template<> struct promotion<        signed int,        signed char> { typedef         signed int type; };
+    template<> struct promotion<        signed int,      unsigned char> { typedef         signed int type; };
+    template<> struct promotion<        signed int,       signed short> { typedef         signed int type; };
+    template<> struct promotion<        signed int,     unsigned short> { typedef         signed int type; };
+    template<> struct promotion<        signed int,         signed int> { typedef         signed int type; };
+    template<> struct promotion<        signed int,       unsigned int> { typedef       unsigned int type; };
+    template<> struct promotion<        signed int,        signed long> { typedef        signed long type; };
+    template<> struct promotion<        signed int,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<        signed int,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<        signed int, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<        signed int,              float> { typedef              float type; };
+    template<> struct promotion<        signed int,             double> { typedef             double type; };
+    template<> struct promotion<        signed int,        long double> { typedef        long double type; };
+
+    template<> struct promotion<      unsigned int,               char> { typedef       unsigned int type; };
+    template<> struct promotion<      unsigned int,        signed char> { typedef       unsigned int type; };
+    template<> struct promotion<      unsigned int,      unsigned char> { typedef       unsigned int type; };
+    template<> struct promotion<      unsigned int,       signed short> { typedef       unsigned int type; };
+    template<> struct promotion<      unsigned int,     unsigned short> { typedef       unsigned int type; };
+    template<> struct promotion<      unsigned int,         signed int> { typedef       unsigned int type; };
+    template<> struct promotion<      unsigned int,       unsigned int> { typedef       unsigned int type; };
+    template<> struct promotion<      unsigned int,        signed long> { typedef        signed long type; };
+    template<> struct promotion<      unsigned int,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<      unsigned int,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<      unsigned int, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<      unsigned int,              float> { typedef              float type; };
+    template<> struct promotion<      unsigned int,             double> { typedef             double type; };
+    template<> struct promotion<      unsigned int,        long double> { typedef        long double type; };
+
+    template<> struct promotion<       signed long,               char> { typedef        signed long type; };
+    template<> struct promotion<       signed long,        signed char> { typedef        signed long type; };
+    template<> struct promotion<       signed long,      unsigned char> { typedef        signed long type; };
+    template<> struct promotion<       signed long,       signed short> { typedef        signed long type; };
+    template<> struct promotion<       signed long,     unsigned short> { typedef        signed long type; };
+    template<> struct promotion<       signed long,         signed int> { typedef        signed long type; };
+    template<> struct promotion<       signed long,       unsigned int> { typedef        signed long type; };
+    template<> struct promotion<       signed long,        signed long> { typedef        signed long type; };
+    template<> struct promotion<       signed long,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<       signed long,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<       signed long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<       signed long,              float> { typedef              float type; };
+    template<> struct promotion<       signed long,             double> { typedef             double type; };
+    template<> struct promotion<       signed long,        long double> { typedef        long double type; };
+
+    template<> struct promotion<     unsigned long,               char> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,        signed char> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,      unsigned char> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,       signed short> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,     unsigned short> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,         signed int> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,       unsigned int> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,        signed long> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,      unsigned long> { typedef      unsigned long type; };
+    template<> struct promotion<     unsigned long,   signed long long> { typedef unsigned long long type; };
+    template<> struct promotion<     unsigned long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<     unsigned long,              float> { typedef              float type; };
+    template<> struct promotion<     unsigned long,             double> { typedef             double type; };
+    template<> struct promotion<     unsigned long,        long double> { typedef        long double type; };
+
+    template<> struct promotion<  signed long long,               char> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,        signed char> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,      unsigned char> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,       signed short> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,     unsigned short> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,         signed int> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,       unsigned int> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,        signed long> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long,      unsigned long> { typedef unsigned long long type; };
+    template<> struct promotion<  signed long long,   signed long long> { typedef   signed long long type; };
+    template<> struct promotion<  signed long long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<  signed long long,              float> { typedef              float type; };
+    template<> struct promotion<  signed long long,             double> { typedef             double type; };
+    template<> struct promotion<  signed long long,        long double> { typedef        long double type; };
+
+    template<> struct promotion<unsigned long long,               char> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,        signed char> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,      unsigned char> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,       signed short> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,     unsigned short> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,         signed int> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,       unsigned int> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,        signed long> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,      unsigned long> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,   signed long long> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long, unsigned long long> { typedef unsigned long long type; };
+    template<> struct promotion<unsigned long long,              float> { typedef              float type; };
+    template<> struct promotion<unsigned long long,             double> { typedef             double type; };
+    template<> struct promotion<unsigned long long,        long double> { typedef        long double type; };
+
+    template<> struct promotion<             float,               char> { typedef              float type; };
+    template<> struct promotion<             float,        signed char> { typedef              float type; };
+    template<> struct promotion<             float,      unsigned char> { typedef              float type; };
+    template<> struct promotion<             float,       signed short> { typedef              float type; };
+    template<> struct promotion<             float,     unsigned short> { typedef              float type; };
+    template<> struct promotion<             float,         signed int> { typedef              float type; };
+    template<> struct promotion<             float,       unsigned int> { typedef              float type; };
+    template<> struct promotion<             float,        signed long> { typedef              float type; };
+    template<> struct promotion<             float,      unsigned long> { typedef              float type; };
+    template<> struct promotion<             float,   signed long long> { typedef              float type; };
+    template<> struct promotion<             float, unsigned long long> { typedef              float type; };
+    template<> struct promotion<             float,              float> { typedef              float type; };
+    template<> struct promotion<             float,             double> { typedef             double type; };
+    template<> struct promotion<             float,        long double> { typedef        long double type; };
+
+    template<> struct promotion<            double,               char> { typedef             double type; };
+    template<> struct promotion<            double,        signed char> { typedef             double type; };
+    template<> struct promotion<            double,      unsigned char> { typedef             double type; };
+    template<> struct promotion<            double,       signed short> { typedef             double type; };
+    template<> struct promotion<            double,     unsigned short> { typedef             double type; };
+    template<> struct promotion<            double,         signed int> { typedef             double type; };
+    template<> struct promotion<            double,       unsigned int> { typedef             double type; };
+    template<> struct promotion<            double,        signed long> { typedef             double type; };
+    template<> struct promotion<            double,      unsigned long> { typedef             double type; };
+    template<> struct promotion<            double,   signed long long> { typedef             double type; };
+    template<> struct promotion<            double, unsigned long long> { typedef             double type; };
+    template<> struct promotion<            double,              float> { typedef             double type; };
+    template<> struct promotion<            double,             double> { typedef             double type; };
+    template<> struct promotion<            double,        long double> { typedef        long double type; };
+
+    template<> struct promotion<       long double,               char> { typedef        long double type; };
+    template<> struct promotion<       long double,        signed char> { typedef        long double type; };
+    template<> struct promotion<       long double,      unsigned char> { typedef        long double type; };
+    template<> struct promotion<       long double,       signed short> { typedef        long double type; };
+    template<> struct promotion<       long double,     unsigned short> { typedef        long double type; };
+    template<> struct promotion<       long double,         signed int> { typedef        long double type; };
+    template<> struct promotion<       long double,       unsigned int> { typedef        long double type; };
+    template<> struct promotion<       long double,        signed long> { typedef        long double type; };
+    template<> struct promotion<       long double,      unsigned long> { typedef        long double type; };
+    template<> struct promotion<       long double,   signed long long> { typedef        long double type; };
+    template<> struct promotion<       long double, unsigned long long> { typedef        long double type; };
+    template<> struct promotion<       long double,              float> { typedef        long double type; };
+    template<> struct promotion<       long double,             double> { typedef        long double type; };
+    template<> struct promotion<       long double,        long double> { typedef        long double type; };
+
     //}}}
     //{{{ basics 
 

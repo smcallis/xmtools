@@ -22,7 +22,6 @@ PROGRAMS = \
     xmgps \
     xmfirpm \
     covar \
-    arith \
 
 all: $(PROGRAMS)
 

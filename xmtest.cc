@@ -1,4 +1,5 @@
 #include "xmtools.h"
+#include <typeinfo>
 
 static void test0000() {
     xm::check(true, "check true works");
@@ -76,7 +77,7 @@ static void test0003() {
 }
 
 
-void test0004() {
+static void test0004() {
     static const int correct[38] = {
         // See ICD GPC 200, pages 8-9, First 10 C/A Chips in Octal
             0, 01440, 01620, 01710, 01744, 01133, 01455, 01131, 01454, 01626,
@@ -99,6 +100,57 @@ void test0004() {
 
 }
 
+template<class atype, class btype>
+void test0005_t1(const char* aname, const char* bname) {
+    atype aval = 0;
+    btype bval = 0;
+    typename xm::promotion<atype, btype>::type tt = 0;
+    xm::check(
+        strcmp(typeid(tt).name(), typeid(aval + bval).name()) == 0,
+        "promotion of %s + %s to %s", aname, bname, typeid(tt).name()
+    );
+    xm::check(
+        strcmp(typeid(tt).name(), typeid(aval * bval).name()) == 0,
+        "promotion of %s * %s to %s", aname, bname, typeid(tt).name()
+    );
+}
+
+template<class atype>
+void test0005_t0(const char* aname) {
+    test0005_t1<atype,               char>(aname, "              char");
+    test0005_t1<atype,        signed char>(aname, "       signed char");
+    test0005_t1<atype,      unsigned char>(aname, "     unsigned char");
+    test0005_t1<atype,       signed short>(aname, "      signed short");
+    test0005_t1<atype,     unsigned short>(aname, "    unsigned short");
+    test0005_t1<atype,         signed int>(aname, "        signed int");
+    test0005_t1<atype,       unsigned int>(aname, "      unsigned int");
+    test0005_t1<atype,        signed long>(aname, "       signed long");
+    test0005_t1<atype,      unsigned long>(aname, "     unsigned long");
+    test0005_t1<atype,   signed long long>(aname, "  signed long long");
+    test0005_t1<atype, unsigned long long>(aname, "unsigned long long");
+    test0005_t1<atype,              float>(aname, "             float");
+    test0005_t1<atype,             double>(aname, "            double");
+    test0005_t1<atype,        long double>(aname, "       long double");
+}
+
+
+static void test0005() {
+    test0005_t0<              char>("              char");
+    test0005_t0<       signed char>("       signed char");
+    test0005_t0<     unsigned char>("     unsigned char");
+    test0005_t0<      signed short>("      signed short");
+    test0005_t0<    unsigned short>("    unsigned short");
+    test0005_t0<        signed int>("        signed int");
+    test0005_t0<      unsigned int>("      unsigned int");
+    test0005_t0<       signed long>("       signed long");
+    test0005_t0<     unsigned long>("     unsigned long");
+    test0005_t0<  signed long long>("  signed long long");
+    test0005_t0<unsigned long long>("unsigned long long");
+    test0005_t0<             float>("             float");
+    test0005_t0<            double>("            double");
+    test0005_t0<       long double>("       long double");
+}
+
 
 
 int main() {
@@ -107,6 +159,7 @@ int main() {
     test0002();
     test0003();
     test0004();
+    test0005();
 
     return 0;
 }
