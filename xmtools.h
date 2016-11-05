@@ -2929,7 +2929,7 @@ namespace xm {
     //}}}
     //{{{ Arithmetic Operators:          operator + - * / % etc 
     //}}}
-    //{{{ Basic Complex Functions:       real, imag, conj, abs, magsqr
+    //{{{ Basic Complex Functions:       real, imag, conj, abs, magsqr 
     //}}}
     //{{{ Complex Trancendentals:        hypot, cos, sin, expj
     //}}}
@@ -2939,7 +2939,7 @@ namespace xm {
     //}}}
     //{{{ Linear Solvers:                gensolve, symsolve 
     //}}}
-    //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak
+    //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak, polyroots
     //}}}
     //{{{ Numerical Optimization:        adaptmin, covarmin, quasimin 
     //}}}
@@ -2951,7 +2951,7 @@ namespace xm {
     //}}}
     //{{{ Statistics Functions:          ricepdf, ricecdf 
     //}}}
-    //{{{ Fourier Transforms:            kissfft, kisssse, fftshift, ifftshift, shift2d
+    //{{{ Fourier Transforms:            kissfft, kisssse, fftshift, ifftshift, shift2d 
     //}}}
     //{{{ Window Functions:              firwin, kaiswin, chebwin
     //}}}
@@ -2973,21 +2973,22 @@ namespace xm {
     //}}}
     //{{{ State Vectors:                 statevec, timestate, ephemeris, ephcache
     //}}}
-    //{{{ Light Time:                    lighttime_forward, lighttime_reverse 
+    //{{{ Light Time:                    lightfwd, lightrev 
     //}}}
     //{{{ DTED Processing:               dtedtile, dtedcache 
     //}}}
-    //{{{ Graphical Windows:             graphics, message, runwin
+    //{{{ Graphical Windows:             graphics, pixel, message, runwin 
     //}}}
-    //{{{ Drawing Functions:             drawline, fillrect, drawtext
+    //{{{ Drawing Functions:             drawline, fillrect, drawtext 
     //}}}
-    //{{{ Plotting Functions:            plotframe, plotseries, plotpoints
+    //{{{ Plotting Functions:            plotframe, plotseries, plotpoints 
     //}}}
-    //{{{ Command Line Parsing:          cmdline
+    //{{{ Command Line Parsing:          cmdline 
     //}}}
 
 // TODO:
 //
+//  make sure arguments are (const) references when they should be
 //  check() with line numbers
 //  symeigens()
 //  adaptmin()
