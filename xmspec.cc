@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
 
 
     const int64 size = 16384;
-    vec<cfloat> data(size, 0);
+    vector<cfloat> data(size, 0);
     data[1] = 1;
 
     //kissfft<float> fft(size);

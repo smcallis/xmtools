@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     output->xdelta = 1.0/(1023*1000);
     output->xcount = count;
     
-    vec<cfloat> data(256);
+    vector<cfloat> data(256);
     gpsgold gold(prn);
     while (count > 0) {
         int64 amount = (count <= 256) ? count : 256;

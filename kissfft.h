@@ -49,24 +49,24 @@ namespace xm {
     struct kissfft {
         kissfft(int64 samples, bool inverse=false);
 
-        void exec(cx<type>* dst, const cx<type>* src) const;
+        void exec(complex<type>* dst, const complex<type>* src) const;
 
         private:
             void work(
-                cx<type>* dst, const cx<type>* src,
+                complex<type>* dst, const complex<type>* src,
                 int64 fstride, int64 istride, const int64* factptr
             ) const;
 
-            void bfly2(cx<type>* dst, int64 fstride, int64 mm) const;
-            void bfly3(cx<type>* dst, int64 fstride, int64 mm) const;
-            void bfly4(cx<type>* dst, int64 fstride, int64 mm) const;
-            void bfly5(cx<type>* dst, int64 fstride, int64 mm) const;
-            void bflyn(cx<type>* dst, int64 fstride, int64 mm, int64 pp) const;
+            void bfly2(complex<type>* dst, int64 fstride, int64 mm) const;
+            void bfly3(complex<type>* dst, int64 fstride, int64 mm) const;
+            void bfly4(complex<type>* dst, int64 fstride, int64 mm) const;
+            void bfly5(complex<type>* dst, int64 fstride, int64 mm) const;
+            void bflyn(complex<type>* dst, int64 fstride, int64 mm, int64 pp) const;
 
             bool inverse;
             list<int64> factors;
-            vec<cx<type> > twiddles;
-            mutable vec<cx<type> > scratch;
+            vector<complex<type> > twiddles;
+            mutable vector<complex<type> > scratch;
     };
 
     namespace internal {
@@ -121,21 +121,21 @@ namespace xm {
     //}}}
     //{{{ exec and work
     template<class type>
-    void kissfft<type>::exec(cx<type>* dst, const cx<type>* src) const {
+    void kissfft<type>::exec(complex<type>* dst, const complex<type>* src) const {
         work(dst, src, 1, 1, factors.data());
     }
 
 
     template<class type>
     void kissfft<type>::work(
-        cx<type>* dst, const cx<type>* src,
+        complex<type>* dst, const complex<type>* src,
         int64 fstride, int64 istride, const int64* factptr
     ) const {
 
-        cx<type> *dst_beg = dst;
+        complex<type> *dst_beg = dst;
         const int64 pp = *factptr++;
         const int64 mm = *factptr++;
-        const cx<type> *dst_end = dst + pp * mm;
+        const complex<type> *dst_end = dst + pp * mm;
 
         if (mm == 1) {
             do {
@@ -162,10 +162,10 @@ namespace xm {
     //}}}
     //{{{ bfly2
     template<class type>
-    void kissfft<type>::bfly2(cx<type>* dst, int64 fstride, int64 mm) const {
-        cx<type> *dst2 = dst + mm;
-        const cx<type> *tw1 = twiddles.data();
-        cx<type> tt;
+    void kissfft<type>::bfly2(complex<type>* dst, int64 fstride, int64 mm) const {
+        complex<type> *dst2 = dst + mm;
+        const complex<type> *tw1 = twiddles.data();
+        complex<type> tt;
         do {
             tt.re = dst2->re*tw1->re - dst2->im*tw1->im;
             tt.im = dst2->re*tw1->im + dst2->im*tw1->re;
@@ -181,12 +181,12 @@ namespace xm {
     //}}}
     //{{{ bfly3
     template<class type>
-    void kissfft<type>::bfly3(cx<type>* dst, int64 fstride, int64 mm) const {
+    void kissfft<type>::bfly3(complex<type>* dst, int64 fstride, int64 mm) const {
         int64 kk = mm;
         const int64 m2 = 2 * mm;
-        const cx<type> *tw1, *tw2;
-        cx<type> scratch[5];
-        cx<type> epi3 = twiddles[fstride * mm];
+        const complex<type> *tw1, *tw2;
+        complex<type> scratch[5];
+        complex<type> epi3 = twiddles[fstride * mm];
 
         tw1 = tw2 = twiddles.data();
 
@@ -224,10 +224,10 @@ namespace xm {
     //}}}
     //{{{ bfly4
     template<class type>
-    void kissfft<type>::bfly4(cx<type>* dst, int64 fstride, int64 mm) const {
+    void kissfft<type>::bfly4(complex<type>* dst, int64 fstride, int64 mm) const {
 
-        const cx<type> *tw1, *tw2, *tw3;
-        cx<type> scratch[6];
+        const complex<type> *tw1, *tw2, *tw3;
+        complex<type> scratch[6];
         int64 kk = mm;
         const int64 m2 = 2 * mm;
         const int64 m3 = 3 * mm;
@@ -275,13 +275,13 @@ namespace xm {
     //}}}
     //{{{ bfly5
     template<class type>
-    void kissfft<type>::bfly5(cx<type>* dst, int64 fstride, int64 mm) const {
-        cx<type> *dst0, *dst1, *dst2, *dst3, *dst4;
+    void kissfft<type>::bfly5(complex<type>* dst, int64 fstride, int64 mm) const {
+        complex<type> *dst0, *dst1, *dst2, *dst3, *dst4;
         int64 uu;
-        cx<type> scratch[13];
-        //const cx<type> *twiddles = twiddles.data();
-        const cx<type> *tw;
-        cx<type> ya, yb;
+        complex<type> scratch[13];
+        //const complex<type> *twiddles = twiddles.data();
+        const complex<type> *tw;
+        complex<type> ya, yb;
         ya = twiddles[fstride * mm];
         yb = twiddles[fstride * 2 * mm];
 
@@ -347,12 +347,12 @@ namespace xm {
     //}}}
     //{{{ bflyn
     template<class type>
-    void kissfft<type>::bflyn(cx<type>* dst, int64 fstride, int64 mm, int64 pp) const {
+    void kissfft<type>::bflyn(complex<type>* dst, int64 fstride, int64 mm, int64 pp) const {
         if (scratch.size() < pp) scratch.resize(pp);
 
         int64 uu, kk, q1, qq;
-        //const cx<type> *twiddles = st->twiddles;
-        cx<type> tt;
+        //const complex<type> *twiddles = st->twiddles;
+        complex<type> tt;
         int64 Norig = twiddles.size();
 
         for (uu = 0; uu < mm; ++uu) {
@@ -391,7 +391,7 @@ namespace xm {
 
         private:
             kissfft<f32x4> kiss;
-            vec<cfloat> scratch;
+            vector<cfloat> scratch;
     };
 
     kisssse::kisssse(int64 samples) : kiss(samples/4), scratch(samples) {
@@ -424,7 +424,7 @@ namespace xm {
         }
 
         float* tmp = (float*)scratch.data();
-        typedef cx<f32x4> cf32x4;
+        typedef complex<f32x4> cf32x4;
         kiss.exec((cf32x4*)tmp, (cf32x4*)ptr);
         
         //memcpy(ptr, tmp, size*sizeof(cfloat));

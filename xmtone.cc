@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
     output->xcount = samples;
 
     blocktuner bt(freq/rate, phase);
-    vec<cfloat> data(1024);
+    vector<cfloat> data(1024);
 
     int64 offset = 0;
     while (offset < samples) {

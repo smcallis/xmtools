@@ -54,8 +54,8 @@ int main(int argc, char* argv[]) {
         output->kwds = input->kwds;
     }
 
-    vec<cfloat> data(1024);
-    vec<cfloat> grab;
+    vector<cfloat> data(1024);
+    vector<cfloat> grab;
     int64 offset = 0;
     while (offset < samples) {
         int64 amount = min(1024, samples - offset);

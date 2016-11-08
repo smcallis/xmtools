@@ -19,7 +19,7 @@ static void halfpass(double* muls, int64 nmul, double lofreq) {
     for (;;) {
 
         const int64 nfreq = freqs.size();
-        mat<double> matrix(nfreq, nmul);
+        matrix<double> matrix(nfreq, nmul);
 
         for (int64 ii = 0; ii<nfreq; ii++) {
             for (int64 jj = 0; jj<nmul; jj++) {
@@ -36,8 +36,8 @@ static void halfpass(double* muls, int64 nmul, double lofreq) {
         }
 
         const int64 fftsize = 1024;
-        vec<cfloat> timedata(fftsize, 0);
-        vec<cfloat> freqdata(fftsize);
+        vector<cfloat> timedata(fftsize, 0);
+        vector<cfloat> freqdata(fftsize);
         kissfft<float> fft(fftsize); 
 
         for (int64 ii = 0; ii<nmul; ii++) {
@@ -97,7 +97,7 @@ static void halfpass(double* muls, int64 nmul, double lofreq) {
             }
             fprintf(specplot, "plot '-' with lines\n");
             for (int64 ii = 0; ii<fftsize; ii++) {
-                double db = 10*::log10(magsqr(.5*freqdata[ii] + .5) + 1e-20);
+                double db = 10*::log10(mag2(.5*freqdata[ii] + .5) + 1e-20);
                 fprintf(specplot, "%le %lf\n", 2.0*ii/fftsize, db);
             }
             fprintf(specplot, "e\n");

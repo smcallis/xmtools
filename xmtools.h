@@ -2339,7 +2339,7 @@ namespace xm {
 
     //}}}
     //}}}
-    //{{{ Sorting and Selection:         introsort, mergesort, quickselect 
+    //{{{ Sorting and Selection:         introsort, (mergesort), (quickselect) 
     //{{{ comparisons
     template<class type>
     bool compare_lt(const type& aa, const type& bb) { return aa <  bb; }
@@ -2508,14 +2508,14 @@ namespace xm {
         introsort(data, len, compare_lt<type>);
     }
 
-    /* XXX: do these for vec<> and list<> ?
+    /* XXX: do these for vector<> and list<> ?
     template<class type, int64 size, class compare>
-    void introsort(vec<type, size>& vv, compare& lessthan) {
+    void introsort(vector<type, size>& vv, compare& lessthan) {
         introsort(vv.data(), vv.size(), lessthan);
     }
 
     template<class type, int64 size>
-    void introsort(vec<type, size>& vv) {
+    void introsort(vector<type, size>& vv) {
         introsort(vv.data(), vv.size(), compare_lt<type>);
     }
     */
@@ -2551,7 +2551,7 @@ namespace xm {
             char* storage;
     };
 
-    //{{{ utf-8
+    //{{{ UTF-8 helpers
     namespace internal {
 
         static inline bool utf8trail(
@@ -2923,37 +2923,2147 @@ namespace xm {
     }
     //}}}
     //}}}
-    //{{{ Unique Identifier              uniqueid 
-    //}}}
     //{{{ Arithmetic Containers          complex, vector, matrix 
+    //{{{ complex  
+
+    //{{{ struct complex<T> 
+    template<class type>
+    struct complex {
+        ~complex();
+        complex();
+        template<class tt>
+        complex(const tt& other);
+        complex(const type& other);
+        complex(const type& re, const type& im);
+
+        template<class tt>
+        complex(const complex<tt>& other);
+        complex(const complex<type>& other);
+
+        template<class tt>
+        complex<type>& operator =(const tt& other);
+        complex<type>& operator =(const type& other);
+
+        template<class tt>
+        complex<type>& operator =(const complex<tt>& other);
+        complex<type>& operator =(const complex<type>& other);
+
+        // these are intentionally public and not
+        // initialized in the default constructor
+        type re, im;
+    };
+
+    template<class type>
+    complex<type>::~complex() {}
+
+    template<class type>
+    complex<type>::complex() {}
+
+    template<class type>
+    template<class tt>
+    complex<type>::complex(const tt& other) : re(other), im(0) {}
+
+    template<class type>
+    complex<type>::complex(const type& other) : re(other), im(0) {}
+
+    template<class type>
+    complex<type>::complex(const type& re, const type& im) : re(re), im(im) {}
+
+    template<class type>
+    template<class tt>
+    complex<type>::complex(const complex<tt>& other) : re(other.re), im(other.im) {}
+
+    template<class type>
+    complex<type>::complex(const complex<type>& other) : re(other.re), im(other.im) {}
+
+    template<class type>
+    template<class tt>
+    complex<type>& complex<type>::operator =(const tt& other) {
+        re = other;
+        im = 0;
+        return *this;
+    }
+
+    template<class type>
+    complex<type>& complex<type>::operator =(const type& other) {
+        re = other;
+        im = 0;
+        return *this;
+    }
+
+    template<class type>
+    template<class tt>
+    complex<type>& complex<type>::operator =(const complex<tt>& other) {
+        re = other.re;
+        im = other.im;
+        return *this;
+    }
+
+    template<class type>
+    complex<type>& complex<type>::operator =(const complex<type>& other) {
+        re = other.re;
+        im = other.im;
+        return *this;
+    }
+
     //}}}
-    //{{{ Arithmetic Operators:          operator + - * / % etc 
+    //{{{ complex promotions 
+
+    // Augment the type promotions for complex types
+    template<class t0, class t1> struct arithmetic<complex<t0>, complex<t1> > {
+        // promote complex and complex
+        typedef complex<typename arithmetic<t0, t1>::type> type; 
+    };
+    template<class t0, class t1> struct arithmetic<complex<t0>, t1> {
+        // promote complex and real
+        typedef complex<typename arithmetic<t0, t1>::type> type; 
+    };
+    template<class t0, class t1> struct arithmetic<t0, complex<t1> > {
+        // promote real and complex
+        typedef complex<typename arithmetic<t0, t1>::type> type; 
+    };
+
     //}}}
-    //{{{ Basic Complex Functions:       real, imag, conj, mag, mag2 
+    //{{{ complex typedefs 
+
+    // common complex types
+    typedef complex<int8_t>  cbyte;
+    typedef complex<int16_t> cshort;
+    typedef complex<float>   cfloat;
+    typedef complex<double>  cdouble;
+
     //}}}
-    //{{{ Complex Trancendentals:        hypot, cos, sin, exp, expj
+
+    //}}}
+    //{{{ vector 
+    //{{{ vector fixed size
+
+    // This is the fixed sized implementation.  The size of the vector is
+    // determined by the template arguments, and no dynamic allocation occurs
+    // at runtime.  The dynamically sized specialization is below.
+    template<class type, int64 ss=-1>
+    struct vector {
+        ~vector();
+        vector();
+        vector(int64 size);
+        vector(int64 size, const type& init);
+
+        template<class tt>
+        vector(const vector<tt, ss>& other);
+        template<class tt>
+        vector(const vector<tt, -1>& other);
+        vector(const vector<type, ss>& other);
+
+        template<class tt>
+        vector<type, ss>& operator =(const vector<tt, ss>& other);
+        template<class tt>
+        vector<type, ss>& operator =(const vector<tt, -1>& other);
+        vector<type, ss>& operator =(const vector<type, ss>& other);
+
+        type& operator [](int64 index);
+        const type& operator [](int64 index) const;
+
+        int64 size() const;
+
+        type* data();
+        const type* data() const;
+
+        private:
+            template<class t0, int64 s0> friend void swap(
+                vector<t0, s0>& flip, vector<t0, s0>& flop
+            );
+            template<class anyt, int64 anys> friend class vector;
+
+            type storage[ss];
+    };
+
+    template<class type, int64 ss> // XXX: do we need this one?
+    vector<type, ss>::~vector() {}
+
+    template<class type, int64 ss> // XXX: do we need this one?
+    vector<type, ss>::vector() {}
+
+    template<class type, int64 ss>
+    vector<type, ss>::vector(int64 size) {
+        check(size == ss, "matching size %lld for fixed size %lld", size, ss);
+    }
+
+    template<class type, int64 ss>
+    vector<type, ss>::vector(int64 size, const type& init) {
+        check(size == ss, "matching size %lld for fixed size %lld", size, ss);
+        for (int64 ii = 0; ii<ss; ii++) {
+            storage[ii] = init;
+        }
+    }
+
+    template<class type, int64 ss>
+    template<class tt>
+    vector<type, ss>::vector(const vector<tt, ss>& other) {
+        for (int64 ii = 0; ii<ss; ii++) {
+            storage[ii] = other.storage[ii];
+        }
+    }
+
+    template<class type, int64 ss>
+    template<class tt>
+    vector<type, ss>::vector(const vector<tt, -1>& other) {
+        const int64 size = other.size();
+        check(size == ss, "matching rows %lld for fixed size %lld", size, ss);
+        for (int64 ii = 0; ii<ss; ii++) {
+            storage[ii] = other[ii];
+        }
+    }
+
+    template<class type, int64 ss>
+    vector<type, ss>::vector(const vector<type, ss>& other) {
+        for (int64 ii = 0; ii<ss; ii++) {
+            storage[ii] = other.storage[ii];
+        }
+    }
+
+    template<class type, int64 ss>
+    template<class tt>
+    vector<type, ss>& vector<type, ss>::operator =(const vector<tt, ss>& other) {
+        for (int64 ii = 0; ii<ss; ii++) {
+            data[ii] = other.storage[ii];
+        }
+        return *this;
+    }
+
+    template<class type, int64 ss>
+    template<class tt>
+    vector<type, ss>& vector<type, ss>::operator =(const vector<tt, -1>& other) {
+        check(other.size() == ss, "matching size");
+        for (int64 ii = 0; ii<ss; ii++) {
+            data[ii] = other[ii];
+        }
+        return *this;
+    }
+
+    template<class type, int64 ss>
+    vector<type, ss>& vector<type, ss>::operator =(const vector<type, ss>& other) {
+        for (int64 ii = 0; ii<ss; ii++) {
+            data[ii] = other.storage[ii];
+        }
+        return *this;
+    }
+
+    template<class type, int64 ss>
+    type& vector<type, ss>::operator [](int64 index) {
+        return storage[index];
+    }
+
+    template<class type, int64 ss>
+    const type& vector<type, ss>::operator [](int64 index) const {
+        return storage[index];
+    }
+
+    template<class type, int64 ss>
+    int64 vector<type, ss>::size() const { return ss; }
+
+    template<class type, int64 ss>
+    type* vector<type, ss>::data() { return storage; }
+
+    template<class type, int64 ss>
+    const type* vector<type, ss>::data() const { return storage; }
+
+    template<class t0, int64 s0>
+    void swap(vector<t0, s0>& flip, vector<t0, s0>& flop) {
+        for (int64 ii = 0; ii<s0; ii++) {
+            swap(flip.data[ii], flop.data[ii]);
+        }
+    }
+    //}}}
+    //{{{ vector dynamic size
+
+    // Dynamically sized vector using the default arguments from the template
+    // above.  The interface is nearly identical, and operations should mix and
+    // match with either.
+    template<class type>
+    struct vector<type, -1> {
+        ~vector();
+        vector();
+
+        vector(int64 ss);
+        vector(int64 ss, const type& init);
+
+        template<class tt, int64 ss>
+        vector(const vector<tt, ss>& other);
+        vector(const vector<type, -1>& other);
+
+        template<class tt, int64 ss>
+        vector<type, -1>& operator =(const vector<tt, ss>& other);
+        vector<type, -1>& operator =(const vector<type, -1>& other);
+
+        type& operator [](int64 index);
+        const type& operator [](int64 index) const;
+
+        int64 size() const;
+
+        void resize(int64 ss);
+        void resize(int64 ss, const type& init);
+        void clear();
+
+        type* data();
+        const type* data() const;
+
+        private:
+            void realloc(int64 ss);
+
+            template<class tt, int64 ss>
+            void assign(const vector<tt, ss>& other);
+
+            template<class tt> friend void swap(
+                vector<tt, -1>& flip, vector<tt, -1>& flop
+            );
+            template<class anyt, int64 anys> friend class vector;
+
+            struct implementation {
+                int64 size, padding_;
+                type bucket[1];
+            } *storage;
+    };
+
+    template<class type>
+    vector<type, -1>::~vector() { clear(); }
+
+    template<class type>
+    vector<type, -1>::vector() : storage(0) {}
+
+    template<class type>
+    vector<type, -1>::vector(int64 ss) : storage(0) {
+        resize(ss);
+    }
+
+    template<class type>
+    vector<type, -1>::vector(int64 ss, const type& init) : storage(0) {
+        resize(ss, init);
+    }
+
+    template<class type>
+    template<class tt, int64 ss>
+    vector<type, -1>::vector(const vector<tt, ss>& other) : storage(0) {
+        assign(other);
+    }
+
+    template<class type>
+    vector<type, -1>::vector(const vector<type, -1>& other) : storage(0) {
+        assign(other);
+    }
+
+    template<class type>
+    template<class tt, int64 ss>
+    vector<type, -1>& vector<type, -1>::operator =(
+        const vector<tt, ss>& other
+    ) {
+        assign(other);
+        return *this;
+    }
+
+    template<class type>
+    vector<type, -1>& vector<type, -1>::operator =(
+            const vector<type, -1>& other
+    ) {
+        assign(other);
+        return *this;
+    }
+
+    template<class type>
+    int64 vector<type, -1>::size() const {
+        return storage ? storage->size : 0;
+    }
+
+    template<class type>
+    type& vector<type, -1>::operator [](int64 index) {
+        return storage->bucket[index];
+    }
+
+    template<class type>
+    const type& vector<type, -1>::operator [](int64 index) const {
+        return storage->bucket[index];
+    }
+
+    template<class type>
+    void vector<type, -1>::resize(int64 size) {
+        realloc(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            new(storage->bucket + ii) type;
+        }
+    }
+
+    template<class type>
+    void vector<type, -1>::resize(int64 size, const type& init) {
+        realloc(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            new(storage->bucket + ii) type(init);
+        }
+    }
+
+    template<class type>
+    void vector<type, -1>::clear() {
+        if (storage) {
+            const int64 size = storage->size;
+            for (int64 ii = 0; ii<size; ii++) {
+                storage->bucket[ii].~type();
+            }
+        }
+        free(storage);
+        storage = 0;
+    }
+
+    template<class type>
+    type* vector<type, -1>::data() {
+        return storage ? storage->bucket : 0;
+    }
+
+    template<class type>
+    const type* vector<type, -1>::data() const {
+        return storage ? storage->bucket : 0;
+    }
+
+    template<class type>
+    void vector<type, -1>::realloc(int64 size) {
+        check(size >= 0, "must have positive number of rows");
+        // In both branches of this if, we leave the objects unconstructed.
+        // The calling function will construct objects into the memory.
+        if (storage && storage->size == size) {
+            // re-use the same memory, but destruct the objects
+            for (int64 ii = 0; ii<size; ii++) {
+                storage->bucket[ii].~type();
+            }
+        } else {
+            // XXX: If size == 0, consider leaving as a null ptr
+            clear(); // create new unconstructed memory
+            storage = alloc<implementation>((size - 1)*sizeof(type));
+        }
+        storage->size = size;
+    }
+
+    template<class type>
+    template<class tt, int64 ss>
+    void vector<type, -1>::assign(const vector<tt, ss>& other) {
+        if ((void*)this == (void*)&other) return;
+        const int64 size = other.size();
+        realloc(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            new(storage->bucket + ii) type(other[ii]);
+        }
+    }
+
+    template<class tt>
+    void swap(vector<tt, -1>& flip, vector<tt, -1>& flop) {
+        swap(flip.storage, flop.storage);
+    }
+    //}}}
+    //}}}
+    //{{{ matrix 
+    //{{{ matrix fixed size
+
+    // This is the fixed sized implementation.  The size of the matrix is
+    // determined by the template arguments, and no dynamic allocation occurs
+    // at runtime.  The dynamically sized specialization is below.
+    template<class type, int64 rr=-1, int64 cc=-1>
+    struct matrix {
+        ~matrix();
+        matrix();
+        matrix(int64 rows, int64 cols);
+        // XXX: need an init version
+
+        template<class tt>
+        matrix(const matrix<tt, rr, cc>& other);
+        template<class tt>
+        matrix(const matrix<tt, -1, -1>& other);
+        matrix(const matrix<type, rr, cc>& other);
+
+        template<class tt>
+        matrix<type, rr, cc>& operator =(const matrix<tt, rr, cc>& other);
+        template<class tt>
+        matrix<type, rr, cc>& operator =(const matrix<tt, -1, -1>& other);
+        matrix<type, rr, cc>& operator =(const matrix<type, rr, cc>& other);
+
+        type& operator [](int64 index);
+        const type& operator [](int64 index) const;
+
+        type& operator ()(int64 row, int64 col);
+        const type& operator ()(int64 row, int64 col) const;
+
+        int64 rows() const;
+        int64 cols() const;
+        int64 size() const;
+
+        type* data();
+        const type* data() const;
+
+        private:
+            template<class t0, int64 r0, int64 c0> friend void swap(
+                matrix<t0, r0, c0>& flip, matrix<t0, r0, c0>& flop
+            );
+            template<class anyt, int64 anyr, int64 anyc> friend class matrix;
+
+            type storage[rr*cc];
+    };
+
+    template<class type, int64 rr, int64 cc>
+    matrix<type, rr, cc>::~matrix() {}
+
+    template<class type, int64 rr, int64 cc>
+    matrix<type, rr, cc>::matrix() {}
+
+    template<class type, int64 rr, int64 cc>
+    matrix<type, rr, cc>::matrix(int64 rows, int64 cols) {
+        check(rows == rr, "matching rows %lld for fixed size %lld", rows, rr);
+        check(cols == cc, "matching cols %lld for fixed size %lld", cols, cc);
+    }
+
+    template<class type, int64 rr, int64 cc>
+    template<class tt>
+    matrix<type, rr, cc>::matrix(const matrix<tt, rr, cc>& other) {
+        for (int64 ii = 0; ii<rr*cc; ii++) {
+            storage[ii] = other.storage[ii];
+        }
+    }
+
+    template<class type, int64 rr, int64 cc>
+    template<class tt>
+    matrix<type, rr, cc>::matrix(const matrix<tt, -1, -1>& other) {
+        const int64 rows = other.rows();
+        const int64 cols = other.cols();
+        check(rows == rr, "matching rows %lld for fixed size %lld", rows, rr);
+        check(cols == cc, "matching cols %lld for fixed size %lld", cols, cc);
+        for (int64 ii = 0; ii<rr*cc; ii++) {
+            storage[ii] = other[ii];
+        }
+    }
+
+    template<class type, int64 rr, int64 cc>
+    matrix<type, rr, cc>::matrix(const matrix<type, rr, cc>& other) {
+        for (int64 ii = 0; ii<rr*cc; ii++) {
+            storage[ii] = other.storage[ii];
+        }
+    }
+
+    template<class type, int64 rr, int64 cc>
+    template<class tt>
+    matrix<type, rr, cc>& matrix<type, rr, cc>::operator =(
+        const matrix<tt, rr, cc>& other
+    ) {
+        for (int64 ii = 0; ii<rr*cc; ii++) {
+            data[ii] = other.storage[ii];
+        }
+        return *this;
+    }
+
+    template<class type, int64 rr, int64 cc>
+    template<class tt>
+    matrix<type, rr, cc>& matrix<type, rr, cc>::operator =(
+        const matrix<tt, -1, -1>& other
+    ) {
+        check(other.rows() == rr, "matching rows");
+        check(other.cols() == cc, "matching cols");
+        for (int64 ii = 0; ii<rr*cc; ii++) {
+            data[ii] = other[ii];
+        }
+        return *this;
+    }
+
+    template<class type, int64 rr, int64 cc>
+    matrix<type, rr, cc>& matrix<type, rr, cc>::operator =(
+        const matrix<type, rr, cc>& other
+    ) {
+        for (int64 ii = 0; ii<rr*cc; ii++) {
+            data[ii] = other.storage[ii];
+        }
+        return *this;
+    }
+
+    template<class type, int64 rr, int64 cc>
+    type& matrix<type, rr, cc>::operator [](int64 index) {
+        return storage[index];
+    }
+
+    template<class type, int64 rr, int64 cc>
+    const type& matrix<type, rr, cc>::operator [](int64 index) const {
+        return storage[index];
+    }
+
+    template<class type, int64 rr, int64 cc>
+    type& matrix<type, rr, cc>::operator ()(int64 row, int64 col) {
+        return storage[row*cc + col];
+    }
+
+    template<class type, int64 rr, int64 cc>
+    const type& matrix<type, rr, cc>::operator ()(int64 row, int64 col) const {
+        return storage[row*cc + col];
+    }
+
+    template<class type, int64 rr, int64 cc>
+    int64 matrix<type, rr, cc>::rows() const { return rr; }
+
+    template<class type, int64 rr, int64 cc>
+    int64 matrix<type, rr, cc>::cols() const { return cc; }
+
+    template<class type, int64 rr, int64 cc>
+    int64 matrix<type, rr, cc>::size() const { return rr*cc; }
+
+    template<class type, int64 rr, int64 cc>
+    type* matrix<type, rr, cc>::data() { return storage; }
+
+    template<class type, int64 rr, int64 cc>
+    const type* matrix<type, rr, cc>::data() const { return data; }
+
+    template<class t0, int64 r0, int64 c0>
+    void swap(matrix<t0, r0, c0>& flip, matrix<t0, r0, c0>& flop) {
+        for (int64 ii = 0; ii<r0; ii++) {
+            for (int64 jj = 0; jj<c0; jj++) {
+                swap(flip.data[ii*c0 + jj], flop.data[ii*c0 + jj]);
+            }
+        }
+    }
+    //}}}
+    //{{{ matrix dynamic size
+
+    // Dynamically sized matrix using the default arguments from the template
+    // above.  The interface is nearly identical, and operations should mix and
+    // match with either.
+    template<class type>
+    struct matrix<type, -1, -1> {
+        ~matrix();
+        matrix();
+
+        matrix(int64 rr, int64 cc);
+        matrix(int64 rr, int64 cc, const type& init);
+
+        template<class tt, int64 rr, int64 cc>
+        matrix(const matrix<tt, rr, cc>& other);
+        matrix(const matrix<type, -1, -1>& other);
+
+        template<class tt, int64 rr, int64 cc>
+        matrix<type, -1, -1>& operator =(const matrix<tt, rr, cc>& other);
+        matrix<type, -1, -1>& operator =(const matrix<type, -1, -1>& other);
+
+        type& operator [](int64 index);
+        const type& operator [](int64 index) const;
+
+        type& operator ()(int64 row, int64 col);
+        const type& operator ()(int64 row, int64 col) const;
+
+        int64 rows() const;
+        int64 cols() const;
+        int64 size() const;
+
+        void resize(int64 rr, int64 cc);
+        void resize(int64 rr, int64 cc, const type& init);
+        void clear();
+
+        type* data();
+        const type* data() const;
+
+        private:
+            void realloc(int64 rr, int64 cc);
+
+            template<class tt, int64 rr, int64 cc>
+            void assign(const matrix<tt, rr, cc>& other);
+
+            template<class tt> friend void swap(
+                matrix<tt, -1, -1>& flip, matrix<tt, -1, -1>& flop
+            );
+            template<class anyt, int64 anyr, int64 anyc> friend class matrix;
+
+            struct implementation {
+                int64 rows, cols;
+                type bucket[1];
+            } *storage;
+    };
+
+    template<class type>
+    matrix<type, -1, -1>::~matrix() { clear(); }
+
+    template<class type>
+    matrix<type, -1, -1>::matrix() : storage(0) {}
+
+    template<class type>
+    matrix<type, -1, -1>::matrix(int64 rr, int64 cc) : storage(0) {
+        resize(rr, cc);
+    }
+
+    template<class type>
+    matrix<type, -1, -1>::matrix(int64 rr, int64 cc, const type& init) : storage(0) {
+        resize(rr, cc, init);
+    }
+
+    template<class type>
+    template<class tt, int64 rr, int64 cc>
+    matrix<type, -1, -1>::matrix(const matrix<tt, rr, cc>& other) : storage(0) {
+        assign(other);
+    }
+
+    template<class type>
+    matrix<type, -1, -1>::matrix(const matrix<type, -1, -1>& other) : storage(0) {
+        assign(other);
+    }
+
+    template<class type>
+    template<class tt, int64 rr, int64 cc>
+    matrix<type, -1, -1>& matrix<type, -1, -1>::operator =(
+        const matrix<tt, rr, cc>& other
+    ) {
+        assign(other);
+        return *this;
+    }
+
+    template<class type>
+    matrix<type, -1, -1>& matrix<type, -1, -1>::operator =(
+            const matrix<type, -1, -1>& other
+    ) {
+        assign(other);
+        return *this;
+    }
+
+    template<class type>
+    int64 matrix<type, -1, -1>::rows() const {
+        return storage ? storage->rows : 0;
+    }
+
+    template<class type>
+    int64 matrix<type, -1, -1>::cols() const {
+        return storage ? storage->cols : 0;
+    }
+
+    template<class type>
+    int64 matrix<type, -1, -1>::size() const {
+        return storage ? storage->rows*storage->cols : 0;
+    }
+
+    template<class type>
+    type& matrix<type, -1, -1>::operator [](int64 index) {
+        return storage->bucket[index];
+    }
+
+    template<class type>
+    const type& matrix<type, -1, -1>::operator [](int64 index) const {
+        return storage->bucket[index];
+    }
+
+    template<class type>
+    type& matrix<type, -1, -1>::operator ()(int64 row, int64 col) {
+        return storage->bucket[row*storage->cols + col];
+    }
+
+    template<class type>
+    const type& matrix<type, -1, -1>::operator ()(int64 row, int64 col) const {
+        return storage->bucket[row*storage->cols + col];
+    }
+
+    template<class type>
+    void matrix<type, -1, -1>::resize(int64 rows, int64 cols) {
+        realloc(rows, cols);
+        for (int64 ii = 0; ii<rows*cols; ii++) {
+            new(storage->bucket + ii) type;
+        }
+    }
+
+    template<class type>
+    void matrix<type, -1, -1>::resize(int64 rows, int64 cols, const type& init) {
+        realloc(rows, cols);
+        for (int64 ii = 0; ii<rows*cols; ii++) {
+            new(storage->bucket + ii) type(init);
+        }
+    }
+
+    template<class type>
+    void matrix<type, -1, -1>::clear() {
+        if (storage) {
+            const int64 rows = storage->rows;
+            const int64 cols = storage->cols;
+            for (int64 ii = 0; ii<rows*cols; ii++) {
+                storage->bucket[ii].~type();
+            }
+        }
+        free(storage);
+        storage = 0;
+    }
+
+    template<class type>
+    type* matrix<type, -1, -1>::data() {
+        return storage ? storage->bucket : 0;
+    }
+
+    template<class type>
+    const type* matrix<type, -1, -1>::data() const {
+        return storage ? storage->bucket : 0;
+    }
+
+    template<class type>
+    void matrix<type, -1, -1>::realloc(int64 rows, int64 cols) {
+        check(rows >= 0, "must have positive number of rows");
+        check(cols >= 0, "must have positive number of cols");
+        // In both branches of this if, we leave the objects unconstructed.
+        // The calling function will construct objects into the memory.
+        if (storage && storage->rows*storage->cols == rows*cols) {
+            // re-use the same memory, but destruct the objects
+            for (int64 ii = 0; ii<rows*cols; ii++) {
+                storage->bucket[ii].~type();
+            }
+        } else {
+            clear(); // create new unconstructed memory
+            storage = alloc<implementation>((rows*cols - 1)*sizeof(type));
+        }
+        storage->rows = rows;
+        storage->cols = cols;
+    }
+
+    template<class type>
+    template<class tt, int64 rr, int64 cc>
+    void matrix<type, -1, -1>::assign(const matrix<tt, rr, cc>& other) {
+        if ((void*)this == (void*)&other) return;
+        const int64 rows = other.rows();
+        const int64 cols = other.cols();
+        realloc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                new(storage->bucket + ii*cols + jj) type(other(ii, jj));
+            }
+        }
+    }
+
+    template<class tt>
+    void swap(
+        matrix<tt, -1, -1>& flip, matrix<tt, -1, -1>& flop
+    ) {
+        swap(flip.storage, flop.storage);
+    }
+    //}}}
+    //}}}
+    //}}}
+    //{{{ Complex Operators:             operator + - * / etc
+    //{{{ unary complex ops 
+    
+    //{{{ prefix - 
+    template<class type>
+    complex<type> operator -(const complex<type>& zz) {
+        return complex<type>(-zz.re, -zz.im);
+    }
+    //}}}
+    //{{{ prefix + 
+    template<class type>
+    complex<type> operator +(const complex<type>& zz) {
+        return zz;
+    }
+    //}}}
+
+    //}}}
+    //{{{ scalar scalar ops 
+
+    //{{{ binary == 
+    template<class atype, class btype>
+    bool operator ==(const complex<atype>& aa, const complex<btype>& bb) {
+        return (aa.re == bb.re) && (aa.im == bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator ==(const atype& aa, const complex<btype>& bb) {
+        return (aa == bb.re) && (0 == bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator ==(const complex<atype>& aa, const btype& bb) {
+        return (aa.re == bb) && (aa.im == 0);
+    }
+    //}}}
+    //{{{ binary != 
+    template<class atype, class btype>
+    bool operator !=(const complex<atype>& aa, const complex<btype>& bb) {
+        return (aa.re != bb.re) || (aa.im != bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator !=(const atype& aa, const complex<btype>& bb) {
+        return (aa != bb.re) || (0 != bb.im);
+    }
+
+    template<class atype, class btype>
+    bool operator !=(const complex<atype>& aa, const btype& bb) {
+        return (aa.re != bb) || (aa.im != 0);
+    }
+    //}}}
+    //{{{ binary + 
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator +(
+        complex<atype> aa, complex<btype> bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa.re + bb.re, aa.im + bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator +(
+        atype aa, complex<btype> bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa + bb.re, bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator +(
+        complex<atype> aa, btype bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa.re + bb, aa.im
+        );
+    }
+    //}}}
+    //{{{ binary - 
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator -(
+        complex<atype> aa, complex<btype> bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa.re - bb.re, aa.im - bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator -(
+        atype aa, complex<btype> bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa - bb.re, -bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator -(
+        complex<atype> aa, btype bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa.re - bb, aa.im
+        );
+    }
+    //}}}
+    //{{{ binary * 
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator *(
+        complex<atype> aa, complex<btype> bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa.re*bb.re - aa.im*bb.im,
+            aa.re*bb.im + aa.im*bb.re
+        );
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator *(
+        atype aa, complex<btype> bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa*bb.re, aa*bb.im
+        );
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator *(
+        complex<atype> aa, btype bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa.re*bb, aa.im*bb
+        );
+    }
+    //}}}
+    //{{{ binary / 
+    namespace internal {
+        static inline void smith_division(
+            double aa, double bb, double cc, double dd, double& ee, double& ff
+        ) {
+            if (fabs(cc) < fabs(dd)) {
+                double rr = cc/dd;
+                double ll = cc*rr + dd;
+                ee = (aa*rr + bb)/ll;
+                ff = (bb*rr - aa)/ll;
+            } else {
+                double rr = dd/cc;
+                double ll = cc + dd*rr;
+                ee = (aa + bb*rr)/ll;
+                ff = (bb - aa*rr)/ll;
+            }
+        }
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator /(
+        complex<atype> aa, complex<btype> bb
+    ) {
+        using namespace internal;
+        double ee, ff;
+        smith_division(aa.re, aa.im, bb.re, bb.im, ee, ff);
+        return complex<typename arithmetic<atype, btype>::type>(ee, ff);
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator /(
+        atype aa, complex<btype> bb
+    ) {
+        using namespace internal;
+        double ee, ff;
+        smith_division(aa, 0, bb.re, bb.im, ee, ff);
+        return complex<typename arithmetic<atype, btype>::type>(ee, ff);
+    }
+
+    template<class atype, class btype>
+    complex<typename arithmetic<atype, btype>::type> operator /(
+        complex<atype> aa, btype bb
+    ) {
+        return complex<typename arithmetic<atype, btype>::type>(
+            aa.re/bb, aa.im/bb
+        );
+    }
+    //}}}
+    //{{{ operator += 
+    template<class atype, class btype>
+    complex<atype>& operator += (complex<atype>& aa, const complex<btype>& bb) {
+        return aa = aa + bb;
+    }
+
+    template<class atype, class btype>
+    complex<atype>& operator += (complex<atype>& aa, const btype& bb) {
+        return aa = aa + bb;
+    }
+    //}}}
+    //{{{ operator -= 
+    template<class atype, class btype>
+    complex<atype>& operator -= (complex<atype>& aa, const complex<btype>& bb) {
+        return aa = aa - bb;
+    }
+
+    template<class atype, class btype>
+    complex<atype>& operator -= (complex<atype>& aa, const btype& bb) {
+        return aa = aa - bb;
+    }
+    //}}}
+    //{{{ operator *= 
+    template<class atype, class btype>
+    complex<atype>& operator *= (complex<atype>& aa, const complex<btype>& bb) {
+        return aa = aa * bb;
+    }
+
+    template<class atype, class btype>
+    complex<atype>& operator *= (complex<atype>& aa, const btype& bb) {
+        return aa = aa * bb;
+    }
+    //}}}
+    //{{{ operator /= 
+    template<class atype, class btype>
+    complex<atype>& operator /= (complex<atype>& aa, const complex<btype>& bb) {
+        return aa = aa / bb;
+    }
+
+    template<class atype, class btype>
+    complex<atype>& operator /= (complex<atype>& aa, const btype& bb) {
+        return aa = aa / bb;
+    }
+    //}}}
+
+    //}}}
+    //}}}
+    //{{{ Scalar, Vector, Matrix Ops:    operator + - * / % etc 
+    //{{{ prefix vector ops 
+
+    //{{{ prefix - 
+    template<class tt, int64 ss>
+    vector<tt, ss> operator -(const vector<tt, ss>& aa) {
+        const int64 size = aa.size();
+        vector<tt, ss> bb(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            bb[ii] = -aa[ii];
+        }
+        return bb;
+    }
+    //}}}
+    //{{{ prefix + 
+    template<class tt, int64 ss>
+    vector<tt, ss> operator +(const vector<tt, ss>& aa) {
+        const int64 size = aa.size();
+        vector<tt, ss> bb(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            bb[ii] = +aa[ii];
+        }
+        return bb;
+    }
+    //}}}
+
+    //}}}
+    //{{{ scalar vector ops 
+
+    //{{{ internal 
+    namespace internal {
+
+        template<class tt, class t0, class t1, int64 ss>
+        vector<tt, ss> scalar_vector_mul(
+            const t0& aa, const vector<t1, ss>& bb
+        ) {
+            const int64 size = bb.size();
+            vector<tt, ss> cc(size);
+            for (int64 ii = 0; ii<size; ii++) {
+                cc[ii] = aa*bb[ii];
+            }
+            return cc;
+        }
+
+        template<class tt, class t0, int64 ss, class t1>
+        vector<tt, ss> vector_scalar_mul(
+            const vector<t0, ss>& aa, const t1& bb
+        ) {
+            const int64 size = aa.size();
+            vector<tt, ss> cc(size);
+            for (int64 ii = 0; ii<size; ii++) {
+                cc[ii] = aa[ii]*bb;
+            }
+            return cc;
+        }
+
+    }
+    //}}}
+    //{{{ binary * 
+
+    //{{{ complex * vector<complex> 
+    template<class t0, class t1, int64 ss>
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
+        const complex<t0>& aa, const vector<complex<t1>, ss>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::scalar_vector_mul<tt, complex<t0>, complex<t1>, ss>(aa, bb);
+    }
+    //}}}
+    //{{{ complex * vector<real>    
+    template<class t0, class t1, int64 ss>
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
+        const complex<t0>& aa, const vector<t1, ss>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::scalar_vector_mul<tt, complex<t0>, t1, ss>(aa, bb);
+    }
+    //}}}
+    //{{{ real    * vector<complex> 
+    template<class t0, class t1, int64 ss>
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
+        const t0& aa, const vector<complex<t1>, ss>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::scalar_vector_mul<tt, t0, complex<t1>, ss>(aa, bb);
+    }
+    //}}}
+    //{{{ real    * vector<real>    
+    template<class t0, class t1, int64 ss>
+    vector<typename arithmetic<t0, t1>::type, ss> operator *(
+        const t0& aa, const vector<t1, ss>& bb
+    ) {
+        typedef typename arithmetic<t0, t1>::type tt;
+        return internal::scalar_vector_mul<tt, t0, t1, ss>(aa, bb);
+    }
+    //}}}
+
+    //{{{ vector<complex> * complex 
+    template<class t0, int64 ss, class t1> 
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
+        const vector<complex<t0>, ss>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::vector_scalar_mul<tt, complex<t0>, ss, complex<t1> >(aa, bb);
+    }
+    //}}}
+    //{{{ vector<complex> * real    
+    template<class t0, int64 ss, class t1>
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
+        const vector<complex<t0>, ss>& aa, const t1& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::vector_scalar_mul<tt, complex<t0>, ss, t1>(aa, bb);
+    }
+    //}}}
+    //{{{ vector<real>    * complex 
+    template<class t0, int64 ss, class t1>
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
+        const vector<t0, ss>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::vector_scalar_mul<tt, t0, ss, complex<t1> >(aa, bb);
+    }
+    //}}}
+    //{{{ vector<real>    * real    
+    template<class t0, int64 ss, class t1>
+    vector<typename arithmetic<t0, t1>::type, ss> operator *(
+        const vector<t0, ss>& aa, const t1& bb
+    ) {
+        typedef typename arithmetic<t0, t1>::type tt;
+        return internal::vector_scalar_mul<tt, t0, ss, t1>(aa, bb);
+    }
+    //}}}
+    
+    //}}}
+    //{{{ binary / 
+
+    //{{{ vector<complex> / complex 
+    template<class t0, int64 ss, class t1> 
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator /(
+        const vector<complex<t0>, ss>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::vector_scalar_mul<tt, complex<t0>, ss, complex<t1> >(aa, 1/bb);
+    }
+    //}}}
+    //{{{ vector<complex> / real    
+    template<class t0, int64 ss, class t1>
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator /(
+        const vector<complex<t0>, ss>& aa, const t1& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::vector_scalar_mul<tt, complex<t0>, ss, t1>(aa, 1/bb);
+    }
+    //}}}
+    //{{{ vector<real>    / complex 
+    template<class t0, int64 ss, class t1>
+    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator /(
+        const vector<t0, ss>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::vector_scalar_mul<tt, t0, ss, complex<t1> >(aa, 1/bb);
+    }
+    //}}}
+    //{{{ vector<real>    / real    
+    template<class t0, int64 ss, class t1>
+    vector<typename arithmetic<t0, t1>::type, ss> operator /(
+        const vector<t0, ss>& aa, const t1& bb
+    ) {
+        typedef typename arithmetic<t0, t1>::type tt;
+        return internal::vector_scalar_mul<tt, t0, ss, t1>(aa, 1/bb);
+    }
+    //}}}
+    
+    //}}}
+    //{{{ binary *= 
+    template<class t0, int64 s0, class t1>
+    vector<t0, s0>& operator *=(vector<t0, s0>& aa, const t1& bb) {
+        const int64 size = aa.size();
+        for (int64 ii = 0; ii<size; ii++) {
+            aa[ii] *= bb;
+        }
+        return aa;
+    }
+    //}}}
+    //{{{ binary /= 
+    template<class t0, int64 s0, class t1>
+    vector<t0, s0>& operator /=(vector<t0, s0>& aa, const t1& bb) {
+        return aa *= 1/bb;
+    }
+    //}}}
+
+    //}}}
+    //{{{ vector vector ops 
+
+    //{{{ internal
+    namespace internal {
+        // Returns the compile time size, preferring dynamic over fixed.
+        template<int64 s0, int64 s1> struct vecdynsize {};
+        template<int64 ss> struct vecdynsize<ss, ss> { enum { size=ss }; };
+        template<int64 s0> struct vecdynsize<s0, -1> { enum { size=-1 }; };
+        template<int64 s1> struct vecdynsize<-1, s1> { enum { size=-1 }; };
+        template<>         struct vecdynsize<-1, -1> { enum { size=-1 }; };
+
+        // Returns the compile time type appropriate for elementwise ops
+        template<class t0, int64 s0, class t1, int64 s1>
+        struct vecaddtype {
+            typedef vector<
+                typename arithmetic<t0, t1>::type,
+                vecdynsize<s0, s1>::size
+            > type;
+        };
+    }
+    //}}}
+    //{{{ binary == 
+    template<class t0, int64 s0, class t1, int64 s1>
+    bool operator ==(const vector<t0, s0>& aa, const vector<t1, s1>& bb) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size");
+        for (int64 ii = 0; ii<size; ii++) {
+            if (aa[ii] != bb[ii]) return false;
+        }
+        return true;
+    }
+    //}}}
+    //{{{ binary != 
+    template<class t0, int64 s0, class t1, int64 s1>
+    bool operator !=(const vector<t0, s0>& aa, const vector<t1, s1>& bb) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size");
+        for (int64 ii = 0; ii<size; ii++) {
+            if (aa[ii] == bb[ii]) return false;
+        }
+        return true;
+    }
+    //}}}
+    //{{{ binary + 
+    template<class t0, int64 s0, class t1, int64 s1>
+    typename internal::vecaddtype<t0, s0, t1, s1>::type operator +(
+        const vector<t0, s0>& aa, const vector<t1, s1>& bb
+    ) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
+        typename internal::vecaddtype<t0, s0, t1, s1>::type cc(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            cc[ii] = aa[ii] + bb[ii];
+        }
+        return cc;
+    }
+    //}}}
+    //{{{ binary - 
+    template<class t0, int64 s0, class t1, int64 s1>
+    typename internal::vecaddtype<t0, s0, t1, s1>::type operator -(
+        const vector<t0, s0>& aa, const vector<t1, s1>& bb
+    ) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
+        typename internal::vecaddtype<t0, s0, t1, s1>::type cc(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            cc[ii] = aa[ii] - bb[ii];
+        }
+        return cc;
+    }
+    //}}}
+    //{{{ binary % 
+    // NOTE: We're abusing the % operator for elementwise multiplication.
+    // We never need element-wise modulo, and it's the right precedence.
+    template<class t0, int64 s0, class t1, int64 s1>
+    typename internal::vecaddtype<t0, s0, t1, s1>::type operator %(
+        const vector<t0, s0>& aa, const vector<t1, s1>& bb
+    ) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
+        typename internal::vecaddtype<t0, s0, t1, s1>::type cc(size);
+        for (int64 ii = 0; ii<size; ii++) {
+            cc[ii] = aa[ii] * bb[ii];
+        }
+        return cc;
+    }
+    //}}}
+    //{{{ binary += 
+    template<class t0, int64 s0, class t1, int64 s1>
+    vector<t0, s0>& operator +=(vector<t0, s0>& aa, const vector<t1, s1>& bb) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
+        for (int64 ii = 0; ii<size; ii++) {
+            aa[ii] += bb[ii];
+        }
+        return aa;
+    }
+    //}}}
+    //{{{ binary -= 
+    template<class t0, int64 s0, class t1, int64 s1>
+    vector<t0, s0>& operator -=(vector<t0, s0>& aa, const vector<t1, s1>& bb) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
+        for (int64 ii = 0; ii<size; ii++) {
+            aa[ii] -= bb[ii];
+        }
+        return aa;
+    }
+    //}}}
+    //{{{ binary %= 
+    template<class t0, int64 s0, class t1, int64 s1>
+    vector<t0, s0>& operator %=(vector<t0, s0>& aa, const vector<t1, s1>& bb) {
+        const int64 size = aa.size();
+        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
+        for (int64 ii = 0; ii<size; ii++) {
+            aa[ii] += bb[ii];
+        }
+        return aa;
+    }
+    //}}}
+
+    //}}}
+    //{{{ prefix matrix ops 
+
+    //{{{ prefix - 
+    template<class tt, int64 rr, int64 cc>
+    matrix<tt, rr, cc> operator -(const matrix<tt, rr, cc>& aa) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        matrix<tt, rr, cc> bb(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                bb(ii, jj) = -aa(ii, jj);
+            }
+        }
+        return bb;
+    }
+    //}}}
+    //{{{ prefix + 
+    template<class tt, int64 rr, int64 cc>
+    matrix<tt, rr, cc> operator +(const matrix<tt, rr, cc>& aa) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        matrix<tt, rr, cc> bb(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                bb(ii, jj) = +aa(ii, jj);
+            }
+        }
+        return bb;
+    }
+    //}}}
+
+    //}}}
+    //{{{ scalar matrix ops 
+
+    //{{{ internal 
+    namespace internal {
+
+        template<class tt, class t0, class t1, int64 rr, int64 cc>
+        matrix<tt, rr, cc> scalar_matrix_mul(
+            const t0& aa, const matrix<t1, rr, cc>& bb
+        ) {
+            const int64 rows = bb.rows();
+            const int64 cols = bb.cols();
+            matrix<tt, rr, cc> uu(rows, cols);
+            for (int64 ii = 0; ii<rows; ii++) {
+                for (int64 jj = 0; jj<cols; jj++) {
+                    uu(ii, jj) = aa*bb(ii, jj);
+                }
+            }
+            return uu;
+        }
+
+        template<class tt, class t0, int64 rr, int64 cc, class t1>
+        matrix<tt, rr, cc> matrix_scalar_mul(
+            const matrix<t0, rr, cc>& aa, const t1& bb
+        ) {
+            const int64 rows = aa.rows();
+            const int64 cols = aa.cols();
+            matrix<tt, rr, cc> uu(rows, cols);
+            for (int64 ii = 0; ii<rows; ii++) {
+                for (int64 jj = 0; jj<cols; jj++) {
+                    uu(ii, jj) = aa(ii, jj)*bb;
+                }
+            }
+            return uu;
+        }
+
+    }
+    //}}}
+    //{{{ binary * 
+
+    //{{{ complex * matrix<complex> 
+    template<class t0, class t1, int64 rr, int64 cc>
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
+        const complex<t0>& aa, const matrix<complex<t1>, rr, cc>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::scalar_matrix_mul<tt, complex<t0>, complex<t1>, rr, cc>(aa, bb);
+    }
+    //}}}
+    //{{{ complex * matrix<real>    
+    template<class t0, class t1, int64 rr, int64 cc>
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
+        const complex<t0>& aa, const matrix<t1, rr, cc>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::scalar_matrix_mul<tt, complex<t0>, t1, rr, cc>(aa, bb);
+    }
+    //}}}
+    //{{{ real    * matrix<complex> 
+    template<class t0, class t1, int64 rr, int64 cc>
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
+        const t0& aa, const matrix<complex<t1>, rr, cc>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::scalar_matrix_mul<tt, t0, complex<t1>, rr, cc>(aa, bb);
+    }
+    //}}}
+    //{{{ real    * matrix<real>    
+    template<class t0, class t1, int64 rr, int64 cc>
+    matrix<typename arithmetic<t0, t1>::type, rr, cc> operator *(
+        const t0& aa, const matrix<t1, rr, cc>& bb
+    ) {
+        typedef typename arithmetic<t0, t1>::type tt;
+        return internal::scalar_matrix_mul<tt, t0, t1, rr, cc>(aa, bb);
+    }
+    //}}}
+
+    //{{{ matrix<complex> * complex 
+    template<class t0, int64 rr, int64 cc, class t1> 
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
+        const matrix<complex<t0>, rr, cc>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, complex<t1> >(aa, bb);
+    }
+    //}}}
+    //{{{ matrix<complex> * real    
+    template<class t0, int64 rr, int64 cc, class t1>
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
+        const matrix<complex<t0>, rr, cc>& aa, const t1& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, t1>(aa, bb);
+    }
+    //}}}
+    //{{{ matrix<real>    * complex 
+    template<class t0, int64 rr, int64 cc, class t1>
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
+        const matrix<t0, rr, cc>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::matrix_scalar_mul<tt, t0, rr, cc, complex<t1> >(aa, bb);
+    }
+    //}}}
+    //{{{ matrix<real>    * real    
+    template<class t0, int64 rr, int64 cc, class t1>
+    matrix<typename arithmetic<t0, t1>::type, rr, cc> operator *(
+        const matrix<t0, rr, cc>& aa, const t1& bb
+    ) {
+        typedef typename arithmetic<t0, t1>::type tt;
+        return internal::matrix_scalar_mul<tt, t0, rr, cc, t1>(aa, bb);
+    }
+    //}}}
+    
+    //}}}
+    //{{{ binary / 
+
+    //{{{ matrix<complex> / complex 
+    template<class t0, int64 rr, int64 cc, class t1> 
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator /(
+        const matrix<complex<t0>, rr, cc>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, complex<t1> >(aa, 1/bb);
+    }
+    //}}}
+    //{{{ matrix<complex> / real    
+    template<class t0, int64 rr, int64 cc, class t1>
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator /(
+        const matrix<complex<t0>, rr, cc>& aa, const t1& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, t1>(aa, 1/bb);
+    }
+    //}}}
+    //{{{ matrix<real>    / complex 
+    template<class t0, int64 rr, int64 cc, class t1>
+    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator /(
+        const matrix<t0, rr, cc>& aa, const complex<t1>& bb
+    ) {
+        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        return internal::matrix_scalar_mul<tt, t0, rr, cc, complex<t1> >(aa, 1/bb);
+    }
+    //}}}
+    //{{{ matrix<real>    / real    
+    template<class t0, int64 rr, int64 cc, class t1>
+    matrix<typename arithmetic<t0, t1>::type, rr, cc> operator /(
+        const matrix<t0, rr, cc>& aa, const t1& bb
+    ) {
+        typedef typename arithmetic<t0, t1>::type tt;
+        return internal::matrix_scalar_mul<tt, t0, rr, cc, t1>(aa, 1/bb);
+    }
+    //}}}
+    
+    //}}}
+    //{{{ binary *=  
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<t0, r0, c0>& operator *=(matrix<t0, r0, c0>& aa, const t1& bb) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                aa(ii, jj) *= bb;
+            }
+        }
+        return aa;
+    }
+    //}}}
+    //{{{ binary /=  
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<t0, r0, c0>& operator /=(matrix<t0, r0, c0>& aa, const t1& bb) {
+        return aa *= 1/bb;
+    }
+    //}}}
+
+    //}}}
+    //{{{ vector matrix ops 
+
+    //{{{ internal 
+    namespace internal {
+
+        //{{{ matvectype
+        template<class t0, int64 r0, int64 c0, class t1, int64 s1>
+        struct matvectype {};
+
+        template<class t0, class t1>
+        struct matvectype<t0, -1, -1, t1, -1> {
+            // dynamic*dynamic => dynamic
+            typedef vector<typename arithmetic<t0, t1>::type, -1> type;
+        };
+
+        template<class t0, int64 r0, int64 c0, class t1>
+        struct matvectype<t0, r0, c0, t1, -1> {
+            // fixed*dynamic => dynamic
+            typedef vector<typename arithmetic<t0, t1>::type, -1> type;
+        };
+
+        template<class t0, class t1, int64 s1>
+        struct matvectype<t0, -1, -1, t1, s1> {
+            // dynamic*fixed => dynamic
+            typedef vector<typename arithmetic<t0, t1>::type, -1> type;
+        };
+
+        template<class t0, int64 r0, int64 c0, class t1>
+        struct matvectype<t0, r0, c0, t1, c0> {
+            // fixed*fixed => fixed, if matching size
+            typedef vector<typename arithmetic<t0, t1>::type, r0> type;
+        };
+        //}}}
+        //{{{ vecmattype
+        template<class t0, int64 s0, class t1, int64 r1, int64 c1>
+        struct vecmattype {};
+
+        template<class t0, class t1>
+        struct vecmattype<t0, -1, t1, -1, -1> {
+            // dynamic*dynamic => dynamic
+            typedef vector<typename arithmetic<t0, t1>::type, -1> type;
+        };
+
+        template<class t0, int64 s0, class t1>
+        struct vecmattype<t0, s0, t1, -1, -1> {
+            // fixed*dynamic => dynamic
+            typedef vector<typename arithmetic<t0, t1>::type, -1> type;
+        };
+
+        template<class t0, class t1, int64 r1, int64 c1>
+        struct vecmattype<t0, -1, t1, r1, c1> {
+            // dynamic*fixed => dynamic
+            typedef vector<typename arithmetic<t0, t1>::type, -1> type;
+        };
+
+        template<class t0, class t1, int64 r1, int64 c1>
+        struct vecmattype<t0, r1, t1, r1, c1> {
+            // fixed*fixed => fixed, if matching sizes
+            typedef vector<typename arithmetic<t0, t1>::type, c1> type;
+        };
+
+        //}}}
+
+    }
+    //}}}
+    //{{{ binary * 
+
+    // matrix*vector
+    template<class t0, int64 r0, int64 c0, class t1, int64 s1>
+    typename internal::matvectype<t0, r0, c0, t1, s1>::type operator *(
+        const matrix<t0, r0, c0>& aa, const vector<t1, s1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        const int64 size = bb.size();
+        check(cols == size, "compatible size %lld == %lld", cols, size);
+        typename internal::matvectype<t0, r0, c0, t1, s1>::type cc(rows, 0);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc[ii] += aa(ii, jj)*bb[jj];
+            }
+        }
+        return cc;
+    }
+
+    // vector*matrix
+    template<class t0, int64 s0, class t1, int64 r1, int64 c1>
+    typename internal::vecmattype<t0, s0, t1, r1, c1>::type operator *(
+        const vector<t0, s0>& aa, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 size = aa.size();
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        check(size == rows, "compatible size %lld == %lld", size, rows);
+        typename internal::vecmattype<t0, s0, t1, r1, c1>::type cc(cols, 0);
+        for (int64 jj = 0; jj<cols; jj++) {
+            for (int64 ii = 0; ii<rows; ii++) {
+                cc[ii] += aa[ii]*bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+
+    //}}}
+
+    //}}}
+    //{{{ matrix matrix ops 
+
+    //{{{ internal 
+    namespace internal {
+        // Returns the compile time size, preferring dynamic over fixed.
+        template<int64 s0, int64 s1> struct matrixsize {};
+        template<int64 ss> struct matrixsize<ss, ss> { enum { size=ss }; };
+        template<int64 s0> struct matrixsize<s0, -1> { enum { size=-1 }; };
+        template<int64 s1> struct matrixsize<-1, s1> { enum { size=-1 }; };
+        template<>         struct matrixsize<-1, -1> { enum { size=-1 }; };
+
+        // Returns the compile time type appropriate for addition and subtraction
+        template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+        struct mataddtype {
+            typedef matrix<
+                typename arithmetic<t0, t1>::type,
+                matrixsize<r0, r1>::size,
+                matrixsize<c0, c1>::size
+            > type;
+        };
+
+        // Multiplication, we prefer the first argument unless the second is dynamic
+        template<int64 s0, int64 s1> struct matmulsize { enum { size=s0 }; };
+        template<int64 s0> struct matmulsize<s0, -1>   { enum { size=-1 }; };
+
+        // Returns the compile time type appropriate for multiplication
+        template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+        struct matmultype {};
+
+        template<class t0, class t1>
+        struct matmultype<t0, -1, -1, t1, -1, -1> {
+            // dynamic*dynamic => dynamic
+            typedef matrix<typename arithmetic<t0, t1>::type, -1, -1> type;
+        };
+
+        template<class t0, int64 r0, int64 c0, class t1>
+        struct matmultype<t0, r0, c0, t1, -1, -1> {
+            // fixed*dynamic => dynamic
+            typedef matrix<typename arithmetic<t0, t1>::type, -1, -1> type;
+        };
+
+        template<class t0, class t1, int64 r1, int64 c1>
+        struct matmultype<t0, -1, -1, t1, r1, c1> {
+            // dynamic*fixed => dynamic
+            typedef matrix<typename arithmetic<t0, t1>::type, -1, -1> type;
+        };
+
+        template<class t0, int64 r0, int64 ss, class t1, int64 c1>
+        struct matmultype<t0, r0, ss, t1, ss, c1> {
+            // fixed*fixed => fixed, if correct size
+            typedef matrix<typename arithmetic<t0, t1>::type, r0, c1> type;
+        };
+
+    }
+    //}}}
+    //{{{ binary == 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    bool operator ==(const matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows");
+        check(bb.cols() == cols, "matching cols");
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                if (aa(ii, jj) != bb(ii, jj)) return false;
+            }
+        }
+        return true;
+    }
+    //}}}
+    //{{{ binary != 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    bool operator !=(const matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows");
+        check(bb.cols() == cols, "matching cols");
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                if (aa(ii, jj) == bb(ii, jj)) return false;
+            }
+        }
+        return true;
+    }
+    //}}}
+    //{{{ binary + 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename internal::mataddtype<t0, r0, c0, t1, r1, c1>::type operator +(
+        const matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
+        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
+        typename internal::mataddtype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = aa(ii, jj) + bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+    //}}}
+    //{{{ binary - 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename internal::mataddtype<t0, r0, c0, t1, r1, c1>::type operator -(
+        const matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
+        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
+        typename internal::mataddtype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = aa(ii, jj) - bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+    //}}}
+    //{{{ binary * 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename internal::matmultype<t0, r0, c0, t1, r1, c1>::type operator *(
+        const matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = bb.cols();
+        const int64 size = aa.cols();
+        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
+        typename internal::matmultype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                typename arithmetic<t0, t1>::type sum = 0;
+                for (int64 kk = 0; kk<size; kk++) {
+                    sum += aa(ii, kk)*bb(kk, jj);
+                }
+                cc(ii, jj) = sum;
+            }
+        }
+        return cc;
+    }
+    //}}}
+    //{{{ binary % 
+    // NOTE: We're abusing the % operator for elementwise multiplication.
+    // We never need element-wise modulo, and it's the right precedence.
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename internal::mataddtype<t0, r0, c0, t1, r1, c1>::type operator %(
+        const matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
+        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
+        typename internal::mataddtype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = aa(ii, jj) * bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+    //}}}
+    //{{{ binary += 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    matrix<t0, r0, c0>& operator +=(matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
+        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                aa(ii, jj) += bb(ii, jj);
+            }
+        }
+        return aa;
+    }
+    //}}}
+    //{{{ binary -= 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    matrix<t0, r0, c0>& operator -=(matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
+        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                aa(ii, jj) -= bb(ii, jj);
+            }
+        }
+        return aa;
+    }
+    //}}}
+    //{{{ binary *= 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    matrix<t0, r0, c0>& operator *=(matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb) {
+        return aa = aa*bb;
+    }
+    //}}}
+    //{{{ binary %= 
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    matrix<t0, r0, c0>& operator %=(matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
+        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                aa(ii, jj) *= bb(ii, jj);
+            }
+        }
+        return aa;
+    }
+    //}}}
+
+    //}}}
+    //}}}
+    //{{{ Complex Functions:             real, imag, conj, mag, mag2, exp, log, sqr 
+
+    template<class type>
+    type real(const complex<type>& aa) {
+        return aa.re;
+    }
+
+    template<class type>
+    type real(const type& aa) {
+        return aa;
+    }
+
+    template<class type>
+    type imag(const complex<type>& aa) {
+        return aa.im;
+    }
+
+    template<class type>
+    type imag(const type& aa) {
+        return 0;
+    }
+
+    template<class type>
+    complex<type> conj(const complex<type>& aa) {
+        return complex<type>(aa.re, -aa.im);
+    }
+
+    template<class type>
+    type conj(const type& aa) {
+        return aa;
+    }
+
+    template<class type>
+    type mag2(const complex<type>& aa) {
+        return aa.re*aa.re + aa.im*aa.im;
+    }
+
+    template<class type>
+    type mag2(const type& aa) {
+        return aa*aa;
+    }
+
+    template<class atype, class btype>
+    double hypot(const complex<atype>& aa, const complex<btype>& bb) {
+        return ::hypot(::hypot(aa.re, aa.im), ::hypot(bb.re, bb.im));
+    }
+
+    template<class atype, class btype>
+    double hypot(const atype& aa, const complex<btype>& bb) {
+        return ::hypot(aa, ::hypot(bb.re, bb.im));
+    }
+
+    template<class atype, class btype>
+    double hypot(const complex<atype>& aa, const btype& bb) {
+        return ::hypot(::hypot(aa.re, aa.im), bb);
+    }
+
+    template<class atype, class btype>
+    double hypot(const atype& aa, const btype& bb) {
+        return ::hypot(aa, bb);
+    }
+
+    template<class type>
+    type mag(const complex<type>& aa) {
+        return ::hypot(aa.re, aa.im);
+    }
+
+    template<class type>
+    type mag(const type& aa) {
+        return aa < 0 ? -aa : aa;
+    }
+
+    template<class type>
+    type phase(const complex<type>& aa) {
+        return ::atan2(aa.im, aa.re);
+    }
+
+    template<class type>
+    type phase(const type& aa) {
+        return aa < 0 ? M_PI : 0;
+    }
+
+    template<class type>
+    complex<type> expj(type aa) {
+        return complex<type>(::cos(aa), ::sin(aa));
+    }
+
+    template<class type>
+    complex<type> exp(complex<type> zz) {
+        double ee = ::exp(zz.re);
+        return complex<type>(
+            ee*::cos(zz.im),
+            ee*::sin(zz.im)
+        );
+    }
+
+    template<class type>
+    type exp(type aa) {
+        return ::exp(aa);
+    }
+
+    template<class type>
+    complex<type> log(const complex<type>& zz) {
+        return complex<type>(
+            ::log(::hypot(zz.re, zz.im)),
+            ::atan2(zz.im, zz.re)
+        );
+    }
+
+    template<class type>
+    type log(type aa) {
+        return ::log(aa);
+    }
+
+    template<class type>
+    static type sqr(type xx) { return xx*xx; }
+
+    //}}}
+    //{{{ Vector Functions:              (inner), (outer) 
+    // XXX: inner(a, b)
+    // XXX: outer(a, b)
+    
+    /* XXX: rename to setzero?
+    template<class type>
+    void zero(vector<type>& aa) {
+        const int64 size = aa.size();
+        for (int64 ii = 0; ii<size; ii++) {
+            aa[ii] = 0;
+        }
+    }
+    */
+
+    /* XXX
+    template<class type>
+    std::ostream& operator <<(std::ostream& os, const vector<type>& vv) {
+        for (int64 ii = 0; ii<vv.size(); ii++) {
+            os << " " << vv[ii] << std::endl;
+        }
+
+        return os;
+    }
+    */
+    //}}}
+    //{{{ Matrix Functions:              diag, conj, trans, herm
+    
+    template<class tt, int64 ss> // build a diagonal matrix from a vector
+    matrix<tt, ss, ss> diag(const vector<tt, ss>& dd) {
+        const int64 size = dd.size();
+        matrix<tt, ss, ss> result(size, size);
+        for (int64 ii = 0; ii<size; ii++) {
+            for (int64 jj = 0; jj<size; jj++) {
+                result(ii, jj) = (ii == jj) ? dd[ii] : 0;
+            }
+        }
+        return result;
+    }
+
+    template<class tt, int64 rr, int64 cc> // build a conjugate (not transpose) of the matrix
+    matrix<tt, rr, cc> conj(const matrix<tt, rr, cc>& aa) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        matrix<tt, rr, cc> result(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                result(ii, jj) = conj(aa(ii, jj));
+            }
+        }
+        return result;
+    }
+
+    template<class tt, int64 rr, int64 cc> // build a transpose (not conjugate) of the matrix
+    matrix<tt, cc, rr> trans(const matrix<tt, rr, cc>& aa) {
+        // these are swapped on purpose
+        const int64 rows = aa.cols();
+        const int64 cols = aa.rows();
+        matrix<tt, cc, rr> result(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                result(ii, jj) = aa(jj, ii);
+            }
+        }
+        return result;
+    }
+
+    template<class tt, int64 rr, int64 cc> // build the conjugate transpose of the matrix
+    matrix<tt, cc, rr> herm(const matrix<tt, rr, cc>& aa) {
+        // these are swapped on purpose
+        const int64 rows = aa.cols();
+        const int64 cols = aa.rows();
+        matrix<tt, cc, rr> result(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                result(ii, jj) = conj(aa(jj, ii));
+            }
+        }
+        return result;
+    }
+
+    /* XXX: how to handle the template sizes?
+    template<class tt, int64 rr, int64 cc> // build a (maybe rectangular) identity matrix
+    matrix<tt, rr, cc> zeros(int64 rows, int64 cols) {
+        return matrix<tt, rr, cc>(rows, cols, 0);
+    }
+    */
+
+    /* XXX: how to handle the template sizes?
+    template<class tt, int64 rr, int64 cc> // build a (maybe rectangular) identity matrix
+    matrix<tt, rr, cc> ident(int64 rows, int64 cols) {
+        matrix<tt, rr, cc> result(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                result(ii, jj) = (ii == jj) ? 1 : 0;
+            }
+        }
+        return result;
+    }
+    */
+
+    /* XXX: rename to setzero() ?
+    template<class type>
+    void zero(matrix<type>& aa) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                aa(ii, jj) = 0;
+            }
+        }
+    }
+    */
+
     //}}}
     //{{{ Matrix Decompositions:         qrdecomp, lqdecomp, lddecomp, cholesky 
     //}}}
     //{{{ Eigen and SV Decomps:          svdecomp, symeigens, geneigens 
     //}}}
-    //{{{ Linear Solvers:                gensolve, symsolve 
-    //}}}
-    //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak, polyroots
-    //}}}
-    //{{{ Numerical Optimization:        adaptmin, covarmin, quasimin 
-    //}}}
     //{{{ Automatic Differentiation:     autodiff 
     //}}}
-    //{{{ Random Number Generation:      random 
+    //{{{ Linear Solvers:                gensolve, symsolve 
     //}}}
-    //{{{ Pseudo Random Sequences:       shiftreg, gpsgold 
+    //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak, (polyroots) 
+    //}}}
+    //{{{ Numerical Optimization:        (adaptmin), covarmin, (quasimin) 
+    //}}}
+    //{{{ Automatic Differentiation:     (autodiff) 
+    //}}}
+    //{{{ Random Number Generation:      prng, shiftreg, gpsgold 
     //}}}
     //{{{ Statistics Functions:          ricepdf, ricecdf 
     //}}}
     //{{{ Fourier Transforms:            kissfft, kisssse, fftshift, ifftshift, shift2d 
     //}}}
-    //{{{ Window Functions:              firwin, kaiswin, chebwin
+    //{{{ Window Functions:              sinc, firwin, kaiswin, chebwin
     //}}}
     //{{{ IIR and FIR Filters:           firparks, halfpass 
     //}}}
@@ -2964,6 +5074,240 @@ namespace xm {
     //{{{ Precision Time:                timecode, datetime 
     //}}}
     //{{{ Raw Files and Memory Mapping:  rawfile 
+    //{{{ rawfile
+    namespace internal {
+
+        // C++ doesn't provide a good way to work directly with file descriptors.
+        // This class implements a container for the descriptor and a mmap ptr.
+        //
+        // This class returns errors rather than throwing exceptions, and we're
+        // hiding it in an internal namespace for now.  Don't rely on it staying.
+        //
+        struct rawfile;
+        static inline void swap(rawfile& flip, rawfile& flop);
+
+        struct rawfile {
+            ~rawfile() { clear(); }
+
+            // default constructor or with file descriptor
+            rawfile(int fd=-1) : fd(fd), ptr(0), len(0) {}
+
+            /* XXX:
+            // move constructor steals from the other object
+            rawfile(rawfile&& other) : fd(other.fd), ptr(other.ptr), len(other.len) {
+                other.fd = -1;
+                other.ptr = 0;
+                other.len = 0;
+            }
+            */
+
+            /* XXX:
+            rawfile& operator =(rawfile&& other) {
+                clear();
+                fd  = other.fd; other.fd  = -1;
+                ptr = other.ptr; other.ptr = 0;
+                len = other.len; other.len = 0;
+                return *this;
+            }
+            */
+
+
+            inline bool read(void* data, int64 bytes);
+            inline bool write(const void* data, int64 bytes);
+            inline bool seek(int64 offset);
+            inline bool skip(int64 bytes);
+            inline int64 size() const;
+            inline const void* mmap();
+
+            inline bool isfile() const;
+
+            private:
+                // no copies or defaults
+                void operator =(rawfile& other);// = delete;
+                rawfile(const rawfile&);// = delete;
+
+                void clear() {
+                    if (ptr) {
+                        msync(ptr, len, MS_SYNC);
+                        munmap(ptr, len);
+                    }
+                    if (fd >= 0) close(fd);
+                }
+                friend void swap(rawfile& flip, rawfile& flop);
+
+                // file descriptor
+                int fd;
+                // mmap fields
+                void* ptr;
+                int64 len;
+        };
+
+        bool rawfile::read(void* ptr, int64 len) {
+            char* buf = (char*)ptr;
+            int64 want = len;
+            while (want) {
+                int64 got = ::read(fd, buf, want);
+                if (got <= 0) {
+                    break;
+                }
+                want -= got;
+                buf += got;
+            }
+            return want == 0;
+        }
+
+        bool rawfile::write(const void* ptr, int64 len) {
+            const char* buf = (const char*)ptr;
+            while (len) {
+                int64 put = ::write(fd, buf, len);
+                if (put < 0) {
+                    break;
+                }
+                len -= put;
+                buf += put;
+            }
+            return len == 0;
+        }
+
+        bool rawfile::seek(int64 offset) {
+            off_t result = ::lseek(fd, offset, SEEK_SET);
+            return result != (off_t)-1;
+        }
+
+        bool rawfile::skip(int64 bytes) {
+            if (bytes == 0) {
+                return true;
+            }
+            off_t result = ::lseek(fd, bytes, SEEK_CUR);
+            if (result == (off_t)-1) {
+                if (errno != ESPIPE) {
+                    return false;
+                }
+                // Can't quickly seek, so we'll manually dump data
+                static char ignored[8192];
+                while (bytes) {
+                    int64 amt = bytes;
+                    if (amt > 8192) {
+                        amt = 8192;
+                    }
+                    int64 got = ::read(fd, ignored, amt);
+                    if (got != amt) {
+                        return false;
+                    }
+                    bytes -= got;
+                }
+            }
+            return true;
+        }
+
+        int64 rawfile::size() const {
+            struct stat st;
+            check(fstat(fd, &st) == 0, "fstat");
+            return st.st_size;
+        }
+
+        const void* rawfile::mmap() {
+            if (ptr) return ptr;
+            len = size();
+            return ptr = (char*)::mmap(0, len, PROT_READ, MAP_SHARED, fd, 0);
+        }
+
+        bool rawfile::isfile() const {
+            struct stat st;
+            check(fstat(fd, &st) == 0, "fstat");
+            return st.st_mode & S_IFREG;
+        }
+
+        static inline void swap(rawfile& flip, rawfile& flop) {
+            xm::swap(flip.fd, flop.fd);
+            xm::swap(flip.ptr, flop.ptr);
+            xm::swap(flip.len, flop.len);
+        }
+    }
+
+    //}}}
+    //}}}
+    //{{{ Unique Identifier              uniqueid 
+    //{{{ uniqueid
+    struct uniqueid {
+        uint8_t bytes[16];
+
+        static inline uniqueid parse(const string& text);
+    };
+
+    static inline size_t hash(const uniqueid& uuid) {
+        return hash(uuid.bytes, 16, 0);
+    }
+
+    static inline bool operator == (const uniqueid& aa, const uniqueid& bb) {
+        return memcmp(aa.bytes, bb.bytes, 16) == 0;
+    }
+
+    static inline bool operator != (const uniqueid& aa, const uniqueid& bb) {
+        return memcmp(aa.bytes, bb.bytes, 16) != 0;
+    }
+
+    static inline uniqueid genuuid() {
+        using namespace internal;
+        int fd = open("/dev/urandom", O_RDONLY);
+        check(fd >= 0, "opening '/dev/urandom' for reading");
+        rawfile file(fd);
+
+        uniqueid result;
+        check(file.read(result.bytes, 16), "reading /dev/urandom");
+        // this is the mask for randomly generated uuids
+        // ffffffff-ffff-4fff-bfff-ffffffffffff
+        result.bytes[6] &= 0x0f;
+        result.bytes[6] |= 0x40;
+        result.bytes[8] &= 0x0f;
+        result.bytes[8] |= 0xb0;
+        return result;
+    }
+
+    static inline string format(const uniqueid& uuid) {
+        return format(
+            "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+            uuid.bytes[ 0], uuid.bytes[ 1], uuid.bytes[ 2], uuid.bytes[ 3],
+            uuid.bytes[ 4], uuid.bytes[ 5], uuid.bytes[ 6], uuid.bytes[ 7],
+            uuid.bytes[ 8], uuid.bytes[ 9], uuid.bytes[10], uuid.bytes[11],
+            uuid.bytes[12], uuid.bytes[13], uuid.bytes[14], uuid.bytes[15]
+        );
+    }
+
+    inline uniqueid uniqueid::parse(const string &text) {
+        uniqueid uuid;
+        if(text.size() == 32) {
+            check(sscanf(
+                text.data(), "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx"
+                "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
+                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
+                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
+                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
+                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
+            ) == 16, "expected 16 pairs of hex chars with no hyphens");
+        }
+        else {
+            check(text.size() == 36, "expecting a 36 byte string");
+            check(sscanf(
+                text.data(), "%2hhx%2hhx%2hhx%2hhx-%2hhx%2hhx-"
+                "%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
+                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
+                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
+                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
+                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
+            ) == 16, "expected 16 pairs of hex chars with hyphens in the right places");
+        }
+        return uuid;
+    }
+
+    /* XXX
+    static inline std::ostream& operator <<(std::ostream& os, const uniqueid& uuid) {
+        os << format(uuid);
+        return os;
+    }
+    */
+
+    //}}}
     //}}}
     //{{{ Blue File Metadata:            bluekeyword, bluefield
     //}}}
@@ -3004,1775 +5348,6 @@ namespace xm {
 //  struct autodiff<>
 //
 
-    //{{{ cx  
-
-    //{{{ struct cx<T> 
-    template<class type>
-    struct cx {
-        ~cx();
-        cx();
-        template<class tt>
-        cx(const tt& other);
-        cx(const type& other);
-        cx(const type& re, const type& im);
-
-        template<class tt>
-        cx(const cx<tt>& other);
-        cx(const cx<type>& other);
-
-        template<class tt>
-        cx<type>& operator =(const tt& other);
-        cx<type>& operator =(const type& other);
-
-        template<class tt>
-        cx<type>& operator =(const cx<tt>& other);
-        cx<type>& operator =(const cx<type>& other);
-
-        // these are intentionally public and not
-        // initialized in the default constructor
-        type re, im;
-    };
-
-    template<class type>
-    cx<type>::~cx() {}
-
-    template<class type>
-    cx<type>::cx() {}
-
-    template<class type>
-    template<class tt>
-    cx<type>::cx(const tt& other) : re(other), im(0) {}
-
-    template<class type>
-    cx<type>::cx(const type& other) : re(other), im(0) {}
-
-    template<class type>
-    cx<type>::cx(const type& re, const type& im) : re(re), im(im) {}
-
-    template<class type>
-    template<class tt>
-    cx<type>::cx(const cx<tt>& other) : re(other.re), im(other.im) {}
-
-    template<class type>
-    cx<type>::cx(const cx<type>& other) : re(other.re), im(other.im) {}
-
-    template<class type>
-    template<class tt>
-    cx<type>& cx<type>::operator =(const tt& other) {
-        re = other;
-        im = 0;
-        return *this;
-    }
-
-    template<class type>
-    cx<type>& cx<type>::operator =(const type& other) {
-        re = other;
-        im = 0;
-        return *this;
-    }
-
-    template<class type>
-    template<class tt>
-    cx<type>& cx<type>::operator =(const cx<tt>& other) {
-        re = other.re;
-        im = other.im;
-        return *this;
-    }
-
-    template<class type>
-    cx<type>& cx<type>::operator =(const cx<type>& other) {
-        re = other.re;
-        im = other.im;
-        return *this;
-    }
-
-    //}}}
-    //{{{ cx arithmetic 
-
-    // Augment the type promotions for complex types
-    template<class t0, class t1> struct arithmetic<cx<t0>, cx<t1> > {
-        // promote complex and complex
-        typedef cx<typename arithmetic<t0, t1>::type> type; 
-    };
-    template<class t0, class t1> struct arithmetic<cx<t0>, t1> {
-        // promote complex and real
-        typedef cx<typename arithmetic<t0, t1>::type> type; 
-    };
-    template<class t0, class t1> struct arithmetic<t0, cx<t1> > {
-        // promote real and complex
-        typedef cx<typename arithmetic<t0, t1>::type> type; 
-    };
-
-    //}}}
-    //{{{ cx typedefs 
-
-    // common complex types
-    typedef cx<int8_t>  cbyte;
-    typedef cx<int16_t> cshort;
-    typedef cx<float>   cfloat;
-    typedef cx<double>  cdouble;
-
-    //}}}
-    //{{{ complex operators 
-    
-    //{{{ prefix -
-    template<class type>
-    cx<type> operator -(const cx<type>& zz) {
-        return cx<type>(-zz.re, -zz.im);
-    }
-    //}}}
-    //{{{ prefix +
-    template<class type>
-    cx<type> operator +(const cx<type>& zz) {
-        return zz;
-    }
-    //}}}
-    //{{{ binary == 
-    template<class atype, class btype>
-    bool operator ==(const cx<atype>& aa, const cx<btype>& bb) {
-        return (aa.re == bb.re) && (aa.im == bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator ==(const atype& aa, const cx<btype>& bb) {
-        return (aa == bb.re) && (0 == bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator ==(const cx<atype>& aa, const btype& bb) {
-        return (aa.re == bb) && (aa.im == 0);
-    }
-    //}}}
-    //{{{ binary != 
-    template<class atype, class btype>
-    bool operator !=(const cx<atype>& aa, const cx<btype>& bb) {
-        return (aa.re != bb.re) || (aa.im != bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator !=(const atype& aa, const cx<btype>& bb) {
-        return (aa != bb.re) || (0 != bb.im);
-    }
-
-    template<class atype, class btype>
-    bool operator !=(const cx<atype>& aa, const btype& bb) {
-        return (aa.re != bb) || (aa.im != 0);
-    }
-    //}}}
-    //{{{ binary + 
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator +(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa.re + bb.re, aa.im + bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator +(
-        atype aa, cx<btype> bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa + bb.re, bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator +(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa.re + bb, aa.im
-        );
-    }
-    //}}}
-    //{{{ binary - 
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator -(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa.re - bb.re, aa.im - bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator -(
-        atype aa, cx<btype> bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa - bb.re, -bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator -(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa.re - bb, aa.im
-        );
-    }
-    //}}}
-    //{{{ binary * 
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator *(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa.re*bb.re - aa.im*bb.im,
-            aa.re*bb.im + aa.im*bb.re
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator *(
-        atype aa, cx<btype> bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa*bb.re, aa*bb.im
-        );
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator *(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa.re*bb, aa.im*bb
-        );
-    }
-    //}}}
-    //{{{ binary / 
-    namespace internal {
-        static inline void smith_division(
-            double aa, double bb, double cc, double dd, double& ee, double& ff
-        ) {
-            if (fabs(cc) < fabs(dd)) {
-                double rr = cc/dd;
-                double ll = cc*rr + dd;
-                ee = (aa*rr + bb)/ll;
-                ff = (bb*rr - aa)/ll;
-            } else {
-                double rr = dd/cc;
-                double ll = cc + dd*rr;
-                ee = (aa + bb*rr)/ll;
-                ff = (bb - aa*rr)/ll;
-            }
-        }
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator /(
-        cx<atype> aa, cx<btype> bb
-    ) {
-        using namespace internal;
-        double ee, ff;
-        smith_division(aa.re, aa.im, bb.re, bb.im, ee, ff);
-        return cx<typename arithmetic<atype, btype>::type>(ee, ff);
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator /(
-        atype aa, cx<btype> bb
-    ) {
-        using namespace internal;
-        double ee, ff;
-        smith_division(aa, 0, bb.re, bb.im, ee, ff);
-        return cx<typename arithmetic<atype, btype>::type>(ee, ff);
-    }
-
-    template<class atype, class btype>
-    cx<typename arithmetic<atype, btype>::type> operator /(
-        cx<atype> aa, btype bb
-    ) {
-        return cx<typename arithmetic<atype, btype>::type>(
-            aa.re/bb, aa.im/bb
-        );
-    }
-    //}}}
-    //{{{ operator += 
-    template<class atype, class btype>
-    cx<atype>& operator += (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa + bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator += (cx<atype>& aa, const btype& bb) {
-        return aa = aa + bb;
-    }
-    //}}}
-    //{{{ operator -= 
-    template<class atype, class btype>
-    cx<atype>& operator -= (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa - bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator -= (cx<atype>& aa, const btype& bb) {
-        return aa = aa - bb;
-    }
-    //}}}
-    //{{{ operator *= 
-    template<class atype, class btype>
-    cx<atype>& operator *= (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa * bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator *= (cx<atype>& aa, const btype& bb) {
-        return aa = aa * bb;
-    }
-    //}}}
-    //{{{ operator /= 
-    template<class atype, class btype>
-    cx<atype>& operator /= (cx<atype>& aa, const cx<btype>& bb) {
-        return aa = aa / bb;
-    }
-
-    template<class atype, class btype>
-    cx<atype>& operator /= (cx<atype>& aa, const btype& bb) {
-        return aa = aa / bb;
-    }
-    //}}}
-
-    //}}}
-    //{{{ complex functions 
-
-    template<class type>
-    type real(const cx<type>& aa) {
-        return aa.re;
-    }
-
-    template<class type>
-    type real(const type& aa) {
-        return aa;
-    }
-
-    template<class type>
-    type imag(const cx<type>& aa) {
-        return aa.im;
-    }
-
-    template<class type>
-    type imag(const type& aa) {
-        return 0;
-    }
-
-    template<class type>
-    cx<type> conj(const cx<type>& aa) {
-        return cx<type>(aa.re, -aa.im);
-    }
-
-    template<class type>
-    type conj(const type& aa) {
-        return aa;
-    }
-
-    template<class type>
-    type magsqr(const cx<type>& aa) {
-        return aa.re*aa.re + aa.im*aa.im;
-    }
-
-    template<class type>
-    type magsqr(const type& aa) {
-        return aa*aa;
-    }
-
-    template<class atype, class btype>
-    double hypot(const cx<atype>& aa, const cx<btype>& bb) {
-        return ::hypot(::hypot(aa.re, aa.im), ::hypot(bb.re, bb.im));
-    }
-
-    template<class atype, class btype>
-    double hypot(const atype& aa, const cx<btype>& bb) {
-        return ::hypot(aa, ::hypot(bb.re, bb.im));
-    }
-
-    template<class atype, class btype>
-    double hypot(const cx<atype>& aa, const btype& bb) {
-        return ::hypot(::hypot(aa.re, aa.im), bb);
-    }
-
-    template<class atype, class btype>
-    double hypot(const atype& aa, const btype& bb) {
-        return ::hypot(aa, bb);
-    }
-
-    template<class type>
-    type abs(const cx<type>& aa) {
-        return ::hypot(aa.re, aa.im);
-    }
-
-    template<class type>
-    type angle(const cx<type>& aa) {
-        return ::atan2(aa.im, aa.re);
-    }
-
-    template<class type>
-    static cx<type> expj(type aa) {
-        return cx<type>(cos(aa), sin(aa));
-    }
-
-    template<class type>
-    cx<type> log(const cx<type>& zz) {
-        return cx<type>(::log(::hypot(zz.re, zz.im)), ::atan2(zz.im, zz.re));
-    }
-
-    template<class type>
-    static type sqr(type xx) { return xx*xx; }
-
-    /*
-    template<class type>
-    static inline std::ostream& operator <<(std::ostream& os, const cmplx<type>& zz) {
-        os << zz.re << " " << std::showpos << zz.im << "j" << std::noshowpos;
-        return os;
-    }
-    */
-
-    //}}}
-
-    //}}}
-    //{{{ vec 
-    //{{{ fixed Size
-
-    // This is the fixed sized implementation.  The size of the vec is
-    // determined by the template arguments, and no dynamic allocation occurs
-    // at runtime.  The dynamically sized specialization is below.
-    template<class type, int64 ss=-1>
-    struct vec {
-        ~vec();
-        vec();
-        vec(int64 size);
-        vec(int64 size, const type& init);
-
-        template<class tt>
-        vec(const vec<tt, ss>& other);
-        template<class tt>
-        vec(const vec<tt, -1>& other);
-        vec(const vec<type, ss>& other);
-
-        template<class tt>
-        vec<type, ss>& operator =(const vec<tt, ss>& other);
-        template<class tt>
-        vec<type, ss>& operator =(const vec<tt, -1>& other);
-        vec<type, ss>& operator =(const vec<type, ss>& other);
-
-        type& operator [](int64 index);
-        const type& operator [](int64 index) const;
-
-        int64 size() const;
-
-        type* data();
-        const type* data() const;
-
-        private:
-            template<class t0, int64 s0> friend void swap(
-                vec<t0, s0>& flip, vec<t0, s0>& flop
-            );
-            template<class anyt, int64 anys> friend class vec;
-
-            type storage[ss];
-    };
-
-    template<class type, int64 ss> // XXX: do we need this one?
-    vec<type, ss>::~vec() {}
-
-    template<class type, int64 ss> // XXX: do we need this one?
-    vec<type, ss>::vec() {}
-
-    template<class type, int64 ss>
-    vec<type, ss>::vec(int64 size) {
-        check(size == ss, "matching size %lld for fixed size %lld", size, ss);
-    }
-
-    template<class type, int64 ss>
-    vec<type, ss>::vec(int64 size, const type& init) {
-        check(size == ss, "matching size %lld for fixed size %lld", size, ss);
-        for (int64 ii = 0; ii<ss; ii++) {
-            storage[ii] = init;
-        }
-    }
-
-    template<class type, int64 ss>
-    template<class tt>
-    vec<type, ss>::vec(const vec<tt, ss>& other) {
-        for (int64 ii = 0; ii<ss; ii++) {
-            storage[ii] = other.storage[ii];
-        }
-    }
-
-    template<class type, int64 ss>
-    template<class tt>
-    vec<type, ss>::vec(const vec<tt, -1>& other) {
-        const int64 size = other.size();
-        check(size == ss, "matching rows %lld for fixed size %lld", size, ss);
-        for (int64 ii = 0; ii<ss; ii++) {
-            storage[ii] = other[ii];
-        }
-    }
-
-    template<class type, int64 ss>
-    vec<type, ss>::vec(const vec<type, ss>& other) {
-        for (int64 ii = 0; ii<ss; ii++) {
-            storage[ii] = other.storage[ii];
-        }
-    }
-
-    template<class type, int64 ss>
-    template<class tt>
-    vec<type, ss>& vec<type, ss>::operator =(const vec<tt, ss>& other) {
-        for (int64 ii = 0; ii<ss; ii++) {
-            data[ii] = other.storage[ii];
-        }
-        return *this;
-    }
-
-    template<class type, int64 ss>
-    template<class tt>
-    vec<type, ss>& vec<type, ss>::operator =(const vec<tt, -1>& other) {
-        check(other.size() == ss, "matching size");
-        for (int64 ii = 0; ii<ss; ii++) {
-            data[ii] = other[ii];
-        }
-        return *this;
-    }
-
-    template<class type, int64 ss>
-    vec<type, ss>& vec<type, ss>::operator =(const vec<type, ss>& other) {
-        for (int64 ii = 0; ii<ss; ii++) {
-            data[ii] = other.storage[ii];
-        }
-        return *this;
-    }
-
-    template<class type, int64 ss>
-    type& vec<type, ss>::operator [](int64 index) {
-        return storage[index];
-    }
-
-    template<class type, int64 ss>
-    const type& vec<type, ss>::operator [](int64 index) const {
-        return storage[index];
-    }
-
-    template<class type, int64 ss>
-    int64 vec<type, ss>::size() const { return ss; }
-
-    template<class type, int64 ss>
-    type* vec<type, ss>::data() { return storage; }
-
-    template<class type, int64 ss>
-    const type* vec<type, ss>::data() const { return storage; }
-
-    template<class t0, int64 s0>
-    void swap(vec<t0, s0>& flip, vec<t0, s0>& flop) {
-        for (int64 ii = 0; ii<s0; ii++) {
-            swap(flip.data[ii], flop.data[ii]);
-        }
-    }
-    //}}}
-    //{{{ dynamic Size
-
-    // Dynamically sized vec using the default arguments from the template
-    // above.  The interface is nearly identical, and operations should mix and
-    // match with either.
-    template<class type>
-    struct vec<type, -1> {
-        ~vec();
-        vec();
-
-        vec(int64 ss);
-        vec(int64 ss, const type& init);
-
-        template<class tt, int64 ss>
-        vec(const vec<tt, ss>& other);
-        vec(const vec<type, -1>& other);
-
-        template<class tt, int64 ss>
-        vec<type, -1>& operator =(const vec<tt, ss>& other);
-        vec<type, -1>& operator =(const vec<type, -1>& other);
-
-        type& operator [](int64 index);
-        const type& operator [](int64 index) const;
-
-        int64 size() const;
-
-        void resize(int64 ss);
-        void resize(int64 ss, const type& init);
-        void clear();
-
-        type* data();
-        const type* data() const;
-
-        private:
-            void realloc(int64 ss);
-
-            template<class tt, int64 ss>
-            void assign(const vec<tt, ss>& other);
-
-            template<class tt> friend void swap(
-                vec<tt, -1>& flip, vec<tt, -1>& flop
-            );
-            template<class anyt, int64 anys> friend class vec;
-
-            struct implementation {
-                int64 size, padding_;
-                type bucket[1];
-            } *storage;
-    };
-
-    template<class type>
-    vec<type, -1>::~vec() { clear(); }
-
-    template<class type>
-    vec<type, -1>::vec() : storage(0) {}
-
-    template<class type>
-    vec<type, -1>::vec(int64 ss) : storage(0) {
-        resize(ss);
-    }
-
-    template<class type>
-    vec<type, -1>::vec(int64 ss, const type& init) : storage(0) {
-        resize(ss, init);
-    }
-
-    template<class type>
-    template<class tt, int64 ss>
-    vec<type, -1>::vec(const vec<tt, ss>& other) : storage(0) {
-        assign(other);
-    }
-
-    template<class type>
-    vec<type, -1>::vec(const vec<type, -1>& other) : storage(0) {
-        assign(other);
-    }
-
-    template<class type>
-    template<class tt, int64 ss>
-    vec<type, -1>& vec<type, -1>::operator =(
-        const vec<tt, ss>& other
-    ) {
-        assign(other);
-        return *this;
-    }
-
-    template<class type>
-    vec<type, -1>& vec<type, -1>::operator =(
-            const vec<type, -1>& other
-    ) {
-        assign(other);
-        return *this;
-    }
-
-    template<class type>
-    int64 vec<type, -1>::size() const {
-        return storage ? storage->size : 0;
-    }
-
-    template<class type>
-    type& vec<type, -1>::operator [](int64 index) {
-        return storage->bucket[index];
-    }
-
-    template<class type>
-    const type& vec<type, -1>::operator [](int64 index) const {
-        return storage->bucket[index];
-    }
-
-    template<class type>
-    void vec<type, -1>::resize(int64 size) {
-        realloc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            new(storage->bucket + ii) type;
-        }
-    }
-
-    template<class type>
-    void vec<type, -1>::resize(int64 size, const type& init) {
-        realloc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            new(storage->bucket + ii) type(init);
-        }
-    }
-
-    template<class type>
-    void vec<type, -1>::clear() {
-        if (storage) {
-            const int64 size = storage->size;
-            for (int64 ii = 0; ii<size; ii++) {
-                storage->bucket[ii].~type();
-            }
-        }
-        free(storage);
-        storage = 0;
-    }
-
-    template<class type>
-    type* vec<type, -1>::data() {
-        return storage ? storage->bucket : 0;
-    }
-
-    template<class type>
-    const type* vec<type, -1>::data() const {
-        return storage ? storage->bucket : 0;
-    }
-
-    template<class type>
-    void vec<type, -1>::realloc(int64 size) {
-        check(size >= 0, "must have positive number of rows");
-        // In both branches of this if, we leave the objects unconstructed.
-        // The calling function will construct objects into the memory.
-        if (storage && storage->size == size) {
-            // re-use the same memory, but destruct the objects
-            for (int64 ii = 0; ii<size; ii++) {
-                storage->bucket[ii].~type();
-            }
-        } else {
-            // XXX: If size == 0, consider leaving as a null ptr
-            clear(); // create new unconstructed memory
-            storage = alloc<implementation>((size - 1)*sizeof(type));
-        }
-        storage->size = size;
-    }
-
-    template<class type>
-    template<class tt, int64 ss>
-    void vec<type, -1>::assign(const vec<tt, ss>& other) {
-        if ((void*)this == (void*)&other) return;
-        const int64 size = other.size();
-        realloc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            new(storage->bucket + ii) type(other[ii]);
-        }
-    }
-
-    template<class tt>
-    void swap(vec<tt, -1>& flip, vec<tt, -1>& flop) {
-        swap(flip.storage, flop.storage);
-    }
-    //}}}
-    //{{{ vector operators
-    template<class t0, int64 s0, class t1, int64 s1>
-    bool operator ==(const vec<t0, s0>& aa, const vec<t1, s1>& bb) {
-        const int64 size = aa.size();
-        check(bb.size() == size, "matching size");
-        for (int64 ii = 0; ii<size; ii++) {
-            if (aa[ii] != bb[ii]) return false;
-        }
-        return true;
-    }
-
-    template<class t0, int64 s0, class t1, int64 s1>
-    bool operator !=(const vec<t0, s0>& aa, const vec<t1, s1>& bb) {
-        const int64 size = aa.size();
-        check(bb.size() == size, "matching size");
-        for (int64 ii = 0; ii<size; ii++) {
-            if (aa[ii] == bb[ii]) return false;
-        }
-        return true;
-    }
-
-    // Returns the compile time size, preferring dynamic over fixed.
-    template<int64 s0, int64 s1> struct vecdynsize {};
-    template<int64 ss> struct vecdynsize<ss, ss> { enum { size=ss }; };
-    template<int64 s0> struct vecdynsize<s0, -1> { enum { size=-1 }; };
-    template<int64 s1> struct vecdynsize<-1, s1> { enum { size=-1 }; };
-    template<>         struct vecdynsize<-1, -1> { enum { size=-1 }; };
-
-    // Returns the compile time type appropriate for elementwise ops
-    template<class t0, int64 s0, class t1, int64 s1>
-    struct vecaddtype {
-        typedef vec<
-            typename arithmetic<t0, t1>::type,
-            vecdynsize<s0, s1>::size
-        > type;
-    };
-
-    template<class t0, int64 s0, class t1, int64 s1>
-    typename vecaddtype<t0, s0, t1, s1>::type operator +(
-        const vec<t0, s0>& aa, const vec<t1, s1>& bb
-    ) {
-        const int64 size = aa.size();
-        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
-        typename vecaddtype<t0, s0, t1, s1>::type cc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            cc[ii] = aa[ii] + bb[ii];
-        }
-        return cc;
-    }
-
-    template<class t0, int64 s0, class t1, int64 s1>
-    typename vecaddtype<t0, s0, t1, s1>::type operator -(
-        const vec<t0, s0>& aa, const vec<t1, s1>& bb
-    ) {
-        const int64 size = aa.size();
-        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
-        typename vecaddtype<t0, s0, t1, s1>::type cc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            cc[ii] = aa[ii] - bb[ii];
-        }
-        return cc;
-    }
-
-    // NOTE: We're abusing the % operator for elementwise multiplication.
-    // We never need element-wise modulo, and it's the right precedence.
-    template<class t0, int64 s0, class t1, int64 s1>
-    typename vecaddtype<t0, s0, t1, s1>::type operator %(
-        const vec<t0, s0>& aa, const vec<t1, s1>& bb
-    ) {
-        const int64 size = aa.size();
-        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
-        typename vecaddtype<t0, s0, t1, s1>::type cc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            cc[ii] = aa[ii] * bb[ii];
-        }
-        return cc;
-    }
-
-    template<class t0, class t1, int64 s1>
-    vec<typename arithmetic<t0, t1>::type, s1> operator *(
-        const t0& scalar, const vec<t1, s1>& bb
-    ) {
-        const int64 size = bb.size();
-        vec<typename arithmetic<t0, t1>::type, s1> cc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            cc[ii] = scalar*bb[ii];
-        }
-        return cc;
-    }
-
-    template<class t0, int64 s0, class t1>
-    vec<typename arithmetic<t0, t1>::type, s0> operator *(
-        const vec<t0, s0>& bb, const t1& scalar
-    ) {
-        const int64 size = bb.size();
-        vec<typename arithmetic<t0, t1>::type, s0> cc(size);
-        for (int64 ii = 0; ii<size; ii++) {
-            cc[ii] = bb[ii]*scalar;
-        }
-        return cc;
-    }
-
-    template<class t0, int64 s0, class t1, int64 s1>
-    vec<t0, s0>& operator +=(vec<t0, s0>& aa, const vec<t1, s1>& bb) {
-        const int64 size = aa.size();
-        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
-        for (int64 ii = 0; ii<size; ii++) {
-            aa[ii] += bb[ii];
-        }
-        return aa;
-    }
-
-    template<class t0, int64 s0, class t1, int64 s1>
-    vec<t0, s0>& operator -=(vec<t0, s0>& aa, const vec<t1, s1>& bb) {
-        const int64 size = aa.size();
-        check(bb.size() == size, "matching size %lld == %lld", size, bb.size());
-        for (int64 ii = 0; ii<size; ii++) {
-            aa[ii] -= bb[ii];
-        }
-        return aa;
-    }
-
-    // XXX: operator %= for in-place elementwise multiplication?
-    
-    template<class t0, int64 s0, class t1>
-    vec<t0, s0>& operator *=(vec<t0, s0>& aa, const t1& scalar) {
-        const int64 size = aa.size();
-        for (int64 ii = 0; ii<size; ii++) {
-            aa[ii] *= scalar;
-        }
-        return aa;
-    }
-    
-    template<class t0, int64 s0, class t1>
-    vec<t0, s0>& operator /=(vec<t0, s0>& aa, const t1& scalar) {
-        const int64 size = aa.size();
-        for (int64 ii = 0; ii<size; ii++) {
-            aa[ii] /= scalar;
-        }
-        return aa;
-    }
-    
-    //}}}
-    //{{{ vector functions
-    
-    // XXX: inner(a, b)
-    // XXX: outer(a, b)
-    
-    template<class type>
-    void zero(vec<type>& aa) {
-        const int64 size = aa.size();
-        for (int64 ii = 0; ii<size; ii++) {
-            aa[ii] = 0;
-        }
-    }
-
-    /* XXX
-    template<class type>
-    std::ostream& operator <<(std::ostream& os, const vector<type>& vv) {
-        for (int64 ii = 0; ii<vv.size(); ii++) {
-            os << " " << vv[ii] << std::endl;
-        }
-
-        return os;
-    }
-    */
-
-    //}}}
-    //}}}
-    //{{{ mat 
-    //{{{ Fixed Size
-
-    // This is the fixed sized implementation.  The size of the mat is
-    // determined by the template arguments, and no dynamic allocation occurs
-    // at runtime.  The dynamically sized specialization is below.
-    template<class type, int64 rr=-1, int64 cc=-1>
-    struct mat {
-        ~mat();
-        mat();
-        mat(int64 rows, int64 cols);
-        // XXX: need an init version
-
-        template<class tt>
-        mat(const mat<tt, rr, cc>& other);
-        template<class tt>
-        mat(const mat<tt, -1, -1>& other);
-        mat(const mat<type, rr, cc>& other);
-
-        template<class tt>
-        mat<type, rr, cc>& operator =(const mat<tt, rr, cc>& other);
-        template<class tt>
-        mat<type, rr, cc>& operator =(const mat<tt, -1, -1>& other);
-        mat<type, rr, cc>& operator =(const mat<type, rr, cc>& other);
-
-        type& operator [](int64 index);
-        const type& operator [](int64 index) const;
-
-        type& operator ()(int64 row, int64 col);
-        const type& operator ()(int64 row, int64 col) const;
-
-        int64 rows() const;
-        int64 cols() const;
-        int64 size() const;
-
-        type* data();
-        const type* data() const;
-
-        private:
-            template<class t0, int64 r0, int64 c0> friend void swap(
-                mat<t0, r0, c0>& flip, mat<t0, r0, c0>& flop
-            );
-            template<class anyt, int64 anyr, int64 anyc> friend class mat;
-
-            type storage[rr*cc];
-    };
-
-    template<class type, int64 rr, int64 cc>
-    mat<type, rr, cc>::~mat() {}
-
-    template<class type, int64 rr, int64 cc>
-    mat<type, rr, cc>::mat() {}
-
-    template<class type, int64 rr, int64 cc>
-    mat<type, rr, cc>::mat(int64 rows, int64 cols) {
-        check(rows == rr, "matching rows %lld for fixed size %lld", rows, rr);
-        check(cols == cc, "matching cols %lld for fixed size %lld", cols, cc);
-    }
-
-    template<class type, int64 rr, int64 cc>
-    template<class tt>
-    mat<type, rr, cc>::mat(const mat<tt, rr, cc>& other) {
-        for (int64 ii = 0; ii<rr*cc; ii++) {
-            storage[ii] = other.storage[ii];
-        }
-    }
-
-    template<class type, int64 rr, int64 cc>
-    template<class tt>
-    mat<type, rr, cc>::mat(const mat<tt, -1, -1>& other) {
-        const int64 rows = other.rows();
-        const int64 cols = other.cols();
-        check(rows == rr, "matching rows %lld for fixed size %lld", rows, rr);
-        check(cols == cc, "matching cols %lld for fixed size %lld", cols, cc);
-        for (int64 ii = 0; ii<rr*cc; ii++) {
-            storage[ii] = other[ii];
-        }
-    }
-
-    template<class type, int64 rr, int64 cc>
-    mat<type, rr, cc>::mat(const mat<type, rr, cc>& other) {
-        for (int64 ii = 0; ii<rr*cc; ii++) {
-            storage[ii] = other.storage[ii];
-        }
-    }
-
-    template<class type, int64 rr, int64 cc>
-    template<class tt>
-    mat<type, rr, cc>& mat<type, rr, cc>::operator =(
-        const mat<tt, rr, cc>& other
-    ) {
-        for (int64 ii = 0; ii<rr*cc; ii++) {
-            data[ii] = other.storage[ii];
-        }
-        return *this;
-    }
-
-    template<class type, int64 rr, int64 cc>
-    template<class tt>
-    mat<type, rr, cc>& mat<type, rr, cc>::operator =(
-        const mat<tt, -1, -1>& other
-    ) {
-        check(other.rows() == rr, "matching rows");
-        check(other.cols() == cc, "matching cols");
-        for (int64 ii = 0; ii<rr*cc; ii++) {
-            data[ii] = other[ii];
-        }
-        return *this;
-    }
-
-    template<class type, int64 rr, int64 cc>
-    mat<type, rr, cc>& mat<type, rr, cc>::operator =(
-        const mat<type, rr, cc>& other
-    ) {
-        for (int64 ii = 0; ii<rr*cc; ii++) {
-            data[ii] = other.storage[ii];
-        }
-        return *this;
-    }
-
-    template<class type, int64 rr, int64 cc>
-    type& mat<type, rr, cc>::operator [](int64 index) {
-        return storage[index];
-    }
-
-    template<class type, int64 rr, int64 cc>
-    const type& mat<type, rr, cc>::operator [](int64 index) const {
-        return storage[index];
-    }
-
-    template<class type, int64 rr, int64 cc>
-    type& mat<type, rr, cc>::operator ()(int64 row, int64 col) {
-        return storage[row*cc + col];
-    }
-
-    template<class type, int64 rr, int64 cc>
-    const type& mat<type, rr, cc>::operator ()(int64 row, int64 col) const {
-        return storage[row*cc + col];
-    }
-
-    template<class type, int64 rr, int64 cc>
-    int64 mat<type, rr, cc>::rows() const { return rr; }
-
-    template<class type, int64 rr, int64 cc>
-    int64 mat<type, rr, cc>::cols() const { return cc; }
-
-    template<class type, int64 rr, int64 cc>
-    int64 mat<type, rr, cc>::size() const { return rr*cc; }
-
-    template<class type, int64 rr, int64 cc>
-    type* mat<type, rr, cc>::data() { return storage; }
-
-    template<class type, int64 rr, int64 cc>
-    const type* mat<type, rr, cc>::data() const { return data; }
-
-    template<class t0, int64 r0, int64 c0>
-    void swap(mat<t0, r0, c0>& flip, mat<t0, r0, c0>& flop) {
-        for (int64 ii = 0; ii<r0; ii++) {
-            for (int64 jj = 0; jj<c0; jj++) {
-                swap(flip.data[ii*c0 + jj], flop.data[ii*c0 + jj]);
-            }
-        }
-    }
-    //}}}
-    //{{{ Dynamic Size
-
-    // Dynamically sized mat using the default arguments from the template
-    // above.  The interface is nearly identical, and operations should mix and
-    // match with either.
-    template<class type>
-    struct mat<type, -1, -1> {
-        ~mat();
-        mat();
-
-        mat(int64 rr, int64 cc);
-        mat(int64 rr, int64 cc, const type& init);
-
-        template<class tt, int64 rr, int64 cc>
-        mat(const mat<tt, rr, cc>& other);
-        mat(const mat<type, -1, -1>& other);
-
-        template<class tt, int64 rr, int64 cc>
-        mat<type, -1, -1>& operator =(const mat<tt, rr, cc>& other);
-        mat<type, -1, -1>& operator =(const mat<type, -1, -1>& other);
-
-        type& operator [](int64 index);
-        const type& operator [](int64 index) const;
-
-        type& operator ()(int64 row, int64 col);
-        const type& operator ()(int64 row, int64 col) const;
-
-        int64 rows() const;
-        int64 cols() const;
-        int64 size() const;
-
-        void resize(int64 rr, int64 cc);
-        void resize(int64 rr, int64 cc, const type& init);
-        void clear();
-
-        type* data();
-        const type* data() const;
-
-        private:
-            void realloc(int64 rr, int64 cc);
-
-            template<class tt, int64 rr, int64 cc>
-            void assign(const mat<tt, rr, cc>& other);
-
-            template<class tt> friend void swap(
-                mat<tt, -1, -1>& flip, mat<tt, -1, -1>& flop
-            );
-            template<class anyt, int64 anyr, int64 anyc> friend class mat;
-
-            struct implementation {
-                int64 rows, cols;
-                type bucket[1];
-            } *storage;
-    };
-
-    template<class type>
-    mat<type, -1, -1>::~mat() { clear(); }
-
-    template<class type>
-    mat<type, -1, -1>::mat() : storage(0) {}
-
-    template<class type>
-    mat<type, -1, -1>::mat(int64 rr, int64 cc) : storage(0) {
-        resize(rr, cc);
-    }
-
-    template<class type>
-    mat<type, -1, -1>::mat(int64 rr, int64 cc, const type& init) : storage(0) {
-        resize(rr, cc, init);
-    }
-
-    template<class type>
-    template<class tt, int64 rr, int64 cc>
-    mat<type, -1, -1>::mat(const mat<tt, rr, cc>& other) : storage(0) {
-        assign(other);
-    }
-
-    template<class type>
-    mat<type, -1, -1>::mat(const mat<type, -1, -1>& other) : storage(0) {
-        assign(other);
-    }
-
-    template<class type>
-    template<class tt, int64 rr, int64 cc>
-    mat<type, -1, -1>& mat<type, -1, -1>::operator =(
-        const mat<tt, rr, cc>& other
-    ) {
-        assign(other);
-        return *this;
-    }
-
-    template<class type>
-    mat<type, -1, -1>& mat<type, -1, -1>::operator =(
-            const mat<type, -1, -1>& other
-    ) {
-        assign(other);
-        return *this;
-    }
-
-    template<class type>
-    int64 mat<type, -1, -1>::rows() const {
-        return storage ? storage->rows : 0;
-    }
-
-    template<class type>
-    int64 mat<type, -1, -1>::cols() const {
-        return storage ? storage->cols : 0;
-    }
-
-    template<class type>
-    int64 mat<type, -1, -1>::size() const {
-        return storage ? storage->rows*storage->cols : 0;
-    }
-
-    template<class type>
-    type& mat<type, -1, -1>::operator [](int64 index) {
-        return storage->bucket[index];
-    }
-
-    template<class type>
-    const type& mat<type, -1, -1>::operator [](int64 index) const {
-        return storage->bucket[index];
-    }
-
-    template<class type>
-    type& mat<type, -1, -1>::operator ()(int64 row, int64 col) {
-        return storage->bucket[row*storage->cols + col];
-    }
-
-    template<class type>
-    const type& mat<type, -1, -1>::operator ()(int64 row, int64 col) const {
-        return storage->bucket[row*storage->cols + col];
-    }
-
-    template<class type>
-    void mat<type, -1, -1>::resize(int64 rows, int64 cols) {
-        realloc(rows, cols);
-        for (int64 ii = 0; ii<rows*cols; ii++) {
-            new(storage->bucket + ii) type;
-        }
-    }
-
-    template<class type>
-    void mat<type, -1, -1>::resize(int64 rows, int64 cols, const type& init) {
-        realloc(rows, cols);
-        for (int64 ii = 0; ii<rows*cols; ii++) {
-            new(storage->bucket + ii) type(init);
-        }
-    }
-
-    template<class type>
-    void mat<type, -1, -1>::clear() {
-        if (storage) {
-            const int64 rows = storage->rows;
-            const int64 cols = storage->cols;
-            for (int64 ii = 0; ii<rows*cols; ii++) {
-                storage->bucket[ii].~type();
-            }
-        }
-        free(storage);
-        storage = 0;
-    }
-
-    template<class type>
-    type* mat<type, -1, -1>::data() {
-        return storage ? storage->bucket : 0;
-    }
-
-    template<class type>
-    const type* mat<type, -1, -1>::data() const {
-        return storage ? storage->bucket : 0;
-    }
-
-    template<class type>
-    void mat<type, -1, -1>::realloc(int64 rows, int64 cols) {
-        check(rows >= 0, "must have positive number of rows");
-        check(cols >= 0, "must have positive number of cols");
-        // In both branches of this if, we leave the objects unconstructed.
-        // The calling function will construct objects into the memory.
-        if (storage && storage->rows*storage->cols == rows*cols) {
-            // re-use the same memory, but destruct the objects
-            for (int64 ii = 0; ii<rows*cols; ii++) {
-                storage->bucket[ii].~type();
-            }
-        } else {
-            clear(); // create new unconstructed memory
-            storage = alloc<implementation>((rows*cols - 1)*sizeof(type));
-        }
-        storage->rows = rows;
-        storage->cols = cols;
-    }
-
-    template<class type>
-    template<class tt, int64 rr, int64 cc>
-    void mat<type, -1, -1>::assign(const mat<tt, rr, cc>& other) {
-        if ((void*)this == (void*)&other) return;
-        const int64 rows = other.rows();
-        const int64 cols = other.cols();
-        realloc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                new(storage->bucket + ii*cols + jj) type(other(ii, jj));
-            }
-        }
-    }
-
-    template<class tt>
-    void swap(
-        mat<tt, -1, -1>& flip, mat<tt, -1, -1>& flop
-    ) {
-        swap(flip.storage, flop.storage);
-    }
-    //}}}
-    //{{{ mat operators
-
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    bool operator ==(const mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        check(bb.rows() == rows, "matching rows");
-        check(bb.cols() == cols, "matching cols");
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                if (aa(ii, jj) != bb(ii, jj)) return false;
-            }
-        }
-        return true;
-    }
-
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    bool operator !=(const mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        check(bb.rows() == rows, "matching rows");
-        check(bb.cols() == cols, "matching cols");
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                if (aa(ii, jj) == bb(ii, jj)) return false;
-            }
-        }
-        return true;
-    }
-
-    // Returns the compile time size, preferring dynamic over fixed.
-    template<int64 s0, int64 s1> struct matdynsize {};
-    template<int64 ss> struct matdynsize<ss, ss> { enum { size=ss }; };
-    template<int64 s0> struct matdynsize<s0, -1> { enum { size=-1 }; };
-    template<int64 s1> struct matdynsize<-1, s1> { enum { size=-1 }; };
-    template<>         struct matdynsize<-1, -1> { enum { size=-1 }; };
-
-    // Returns the compile time type appropriate for addition and subtraction
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    struct mataddtype {
-        typedef mat<
-            typename arithmetic<t0, t1>::type,
-            matdynsize<r0, r1>::size,
-            matdynsize<c0, c1>::size
-        > type;
-    };
-
-    // Multiplication, we prefer the first argument unless the second is dynamic
-    template<int64 s0, int64 s1> struct matmulsize { enum { size=s0 }; };
-    template<int64 s0> struct matmulsize<s0, -1>   { enum { size=-1 }; };
-
-    // Returns the compile time type appropriate for multiplication
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    struct matmultype {
-        typedef mat<
-            typename arithmetic<t0, t1>::type,
-            matmulsize<r0, c1>::size,
-            matmulsize<c1, r0>::size
-        > type;
-    };
-
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename mataddtype<t0, r0, c0, t1, r1, c1>::type operator +(
-        const mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
-        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
-        typename mataddtype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = aa(ii, jj) + bb(ii, jj);
-            }
-        }
-        return cc;
-    }
-
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename mataddtype<t0, r0, c0, t1, r1, c1>::type operator -(
-        const mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
-        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
-        typename mataddtype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = aa(ii, jj) - bb(ii, jj);
-            }
-        }
-        return cc;
-    }
-
-    // NOTE: We're abusing the % operator for elementwise multiplication.
-    // We never need element-wise modulo, and it's the right precedence.
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename mataddtype<t0, r0, c0, t1, r1, c1>::type operator %(
-        const mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
-        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
-        typename mataddtype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = aa(ii, jj) * bb(ii, jj);
-            }
-        }
-        return cc;
-    }
-
-// XXX: Something is really wrong with all of the operator* functions....
-
-    // matrix multiplication, specialized for complex*complex
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename matmultype<cx<t0>, r0, c0, cx<t1>, r1, c1>::type operator *(
-        const mat<cx<t0>, r0, c0>& aa, const mat<cx<t1>, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = bb.cols();
-        const int64 size = aa.cols();
-        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
-        typename matmultype<cx<t0>, r0, c0, cx<t1>, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                typename arithmetic<cx<t0>, cx<t1> >::type sum = 0;
-                for (int64 kk = 0; kk<size; kk++) {
-                    sum += aa(ii, kk)*bb(kk, jj);
-                }
-                cc(ii, jj) = sum;
-            }
-        }
-        return cc;
-    }
-
-    // matrix multiplication, specialized for complex*real
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename matmultype<cx<t0>, r0, c0, t1, r1, c1>::type operator *(
-        const mat<cx<t0>, r0, c0>& aa, const mat<t1, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = bb.cols();
-        const int64 size = aa.cols();
-        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
-        typename matmultype<cx<t0>, r0, c0, t1, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                typename arithmetic<cx<t0>, t1>::type sum = 0;
-                for (int64 kk = 0; kk<size; kk++) {
-                    sum += aa(ii, kk)*bb(kk, jj);
-                }
-                cc(ii, jj) = sum;
-            }
-        }
-        return cc;
-    }
-
-    // matrix multiplication, specialized for real*complex
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename matmultype<t0, r0, c0, cx<t1>, r1, c1>::type operator *(
-        const mat<t0, r0, c0>& aa, const mat<cx<t1>, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = bb.cols();
-        const int64 size = aa.cols();
-        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
-        typename matmultype<t0, r0, c0, cx<t1>, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                typename arithmetic<t0, cx<t1> >::type sum = 0;
-                for (int64 kk = 0; kk<size; kk++) {
-                    sum += aa(ii, kk)*bb(kk, jj);
-                }
-                cc(ii, jj) = sum;
-            }
-        }
-        return cc;
-    }
-
-    // This is matrix multiplication, generalized without complex
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename matmultype<t0, r0, c0, t1, r1, c1>::type operator *(
-        const mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = bb.cols();
-        const int64 size = aa.cols();
-        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
-        typename matmultype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                typename arithmetic<t0, t1>::type sum = 0;
-                for (int64 kk = 0; kk<size; kk++) {
-                    sum += aa(ii, kk)*bb(kk, jj);
-                }
-                cc(ii, jj) = sum;
-            }
-        }
-        return cc;
-    }
-
-    // specialized for complex*complex
-    template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename arithmetic<cx<t0>, cx<t1> >::type, r1, c1> operator *(
-        const cx<t0>& scalar, const mat<cx<t1>, r1, c1>& bb
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<cx<t0>, cx<t1> >::type, r1, c1> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = scalar*bb(ii, jj);
-            }
-        }
-        return cc;
-    }
-
-    // specialized for complex*real
-    template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename arithmetic<cx<t0>, t1>::type, r1, c1> operator *(
-        const cx<t0>& scalar, const mat<t1, r1, c1>& bb
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<cx<t0>, t1>::type, r1, c1> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = scalar*bb(ii, jj);
-            }
-        }
-        return cc;
-    }
-
-    // specialized for real*complex
-    template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename arithmetic<t0, cx<t1> >::type, r1, c1> operator *(
-        const t0& scalar, const mat<cx<t1>, r1, c1>& bb
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<t0, cx<t1> >::type, r1, c1> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = scalar*bb(ii, jj);
-            }
-        }
-        return cc;
-    }
-
-    // generalized without complex
-    template<class t0, class t1, int64 r1, int64 c1>
-    mat<typename arithmetic<t0, t1>::type, r1, c1> operator *(
-        const t0& scalar, const mat<t1, r1, c1>& bb
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<t0, t1>::type, r1, c1> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = scalar*bb(ii, jj);
-            }
-        }
-        return cc;
-    }
-
-    // specialized for complex*complex
-    template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename arithmetic<cx<t0>, cx<t1> >::type, r0, c0> operator *(
-        const mat<cx<t0>, r0, c0>& bb, const cx<t1>& scalar
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<cx<t0>, cx<t1> >::type, r0, c0> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = bb(ii, jj)*scalar;
-            }
-        }
-        return cc;
-    }
-
-    // specialized for complex*real
-    template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename arithmetic<cx<t0>, t1>::type, r0, c0> operator *(
-        const mat<cx<t0>, r0, c0>& bb, const t1& scalar
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<cx<t0>, t1>::type, r0, c0> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = bb(ii, jj)*scalar;
-            }
-        }
-        return cc;
-    }
-
-    // specialized for real*complex
-    template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename arithmetic<t0, cx<t1> >::type, r0, c0> operator *(
-        const mat<t0, r0, c0>& bb, const cx<t1>& scalar
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<t0, cx<t1> >::type, r0, c0> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = bb(ii, jj)*scalar;
-            }
-        }
-        return cc;
-    }
-
-    // generalized without complex
-    template<class t0, int64 r0, int64 c0, class t1>
-    mat<typename arithmetic<t0, t1>::type, r0, c0> operator *(
-        const mat<t0, r0, c0>& bb, const t1& scalar
-    ) {
-        const int64 rows = bb.rows();
-        const int64 cols = bb.cols();
-        mat<typename arithmetic<t0, t1>::type, r0, c0> cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                cc(ii, jj) = bb(ii, jj)*scalar;
-            }
-        }
-        return cc;
-    }
-
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    mat<t0, r0, c0>& operator +=(mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
-        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                aa(ii, jj) += bb(ii, jj);
-            }
-        }
-        return aa;
-    }
-
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    mat<t0, r0, c0>& operator -=(mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        check(bb.rows() == rows, "matching rows %lld == %lld", rows, bb.rows());
-        check(bb.cols() == cols, "matching cols %lld == %lld", cols, bb.cols());
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                aa(ii, jj) -= bb(ii, jj);
-            }
-        }
-        return aa;
-    }
-    
-    // XXX: operator %= for in-place elementwise multiplication?
-
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    mat<t0, r0, c0>& operator *=(mat<t0, r0, c0>& aa, const mat<t1, r1, c1>& bb) {
-        return aa = aa*bb;
-    }
-    
-    template<class t0, int64 r0, int64 c0, class t1>
-    mat<t0, r0, c0>& operator *=(mat<t0, r0, c0>& aa, const t1& scalar) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                aa(ii, jj) *= scalar;
-            }
-        }
-        return aa;
-    }
-    
-    template<class t0, int64 r0, int64 c0, class t1>
-    mat<t0, r0, c0>& operator /=(mat<t0, r0, c0>& aa, const t1& scalar) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                aa(ii, jj) /= scalar;
-            }
-        }
-        return aa;
-    }
-    //}}}
-    //{{{ matrix functions
-    
-    template<class type> // build a diagonal mat from a vec
-    mat<type> diag(const vec<type>& dd) {
-        const int64 size = dd.size();
-        mat<type> result(size, size);
-        for (int64 ii = 0; ii<size; ii++) {
-            for (int64 jj = 0; jj<size; jj++) {
-                result(ii, jj) = (ii == jj) ? dd[ii] : 0;
-            }
-        }
-        return result;
-    }
-
-    template<class type> // build a (maybe rectangular) identity mat
-    mat<type> zeros(int64 rows, int64 cols) {
-        return mat<type>(rows, cols, 0);
-    }
-
-    template<class type> // build a (maybe rectangular) identity mat
-    mat<type> ident(int64 rows, int64 cols) {
-        mat<type> result(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                result(ii, jj) = (ii == jj) ? 1 : 0;
-            }
-        }
-        return result;
-    }
-
-    template<class type> // build a conjugate (not transpose) of the mat
-    mat<type> conj(mat<type> aa) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                aa(ii, jj) = conj(aa(ii, jj));
-            }
-        }
-        return aa;
-    }
-
-    template<class type> // build a transpose (not conjugate) of the mat
-    mat<type> trans(const mat<type>& aa) {
-        // these are swapped on purpose
-        const int64 rows = aa.cols();
-        const int64 cols = aa.rows();
-        mat<type> result(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                result(ii, jj) = aa(jj, ii);
-            }
-        }
-        return result;
-    }
-
-    template<class type> // build the conjugate transpose of the mat
-    mat<type> herm(const mat<type>& aa) {
-        const int64 rows = aa.cols();
-        const int64 cols = aa.rows();
-        mat<type> result(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                result(ii, jj) = conj(aa(jj, ii));
-            }
-        }
-        return result;
-    }
-
-    template<class type>
-    void zero(mat<type>& aa) {
-        const int64 rows = aa.rows();
-        const int64 cols = aa.cols();
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                aa(ii, jj) = 0;
-            }
-        }
-    }
-
-    //}}}
-    //}}}
     //{{{ gensolve
 
     namespace internal {
@@ -4968,7 +5543,7 @@ namespace xm {
     ) {
         using namespace internal;
         int64 rank = min(rows, cols);
-        vec<int64> temp;
+        vector<int64> temp;
         int64* perm = P ? P : (temp.resize(rank), temp.data());
 
         // zero out the extra part of B, only if rows < cols
@@ -5427,9 +6002,9 @@ namespace xm {
         double* F=0, int64* T=0
     ) {
         using namespace internal;
-        mat<double> utmp, vtmp;
-        vec<double> dtmp, ftmp;
-        vec<int64> ttmp;
+        matrix<double> utmp, vtmp;
+        vector<double> dtmp, ftmp;
+        vector<int64> ttmp;
 
         const int64 size = min(rows, cols);
         double* uu = (L && !U) ? (utmp.resize(size, size), utmp.data()) : U;
@@ -5538,15 +6113,15 @@ namespace xm {
         
     template<class type>
     void svdecomp(
-        const mat<type>& A, mat<type>* L,
-        vec<double>* D, mat<type>* R
+        const matrix<type>& A, matrix<type>* L,
+        vector<double>* D, matrix<type>* R
     ) {
         const int64 size = min(A.rows(), A.cols());
         if (L) L->resize(A.rows(), size);
         if (D) D->resize(size);
         if (R) R->resize(size, A.cols());
 
-        mat<type> copy = A;
+        matrix<type> copy = A;
         svdecomp(
             copy.data(), A.rows(), A.cols(),
             L ? L->data() : 0,
@@ -5645,14 +6220,14 @@ namespace xm {
 
     // Note for the next several wrappers: we intentionally take A and B by value
     // so that copies will be made.  The worker routines will modify these copies.
-    static inline mat<double> qrsolve(mat<double> A, mat<double> B) {
+    static inline matrix<double> qrsolve(matrix<double> A, matrix<double> B) {
         check(A.rows() >= A.cols(), "can't be underdetermined");
         check(A.rows() == B.rows(), "need compatible sizes");
         check(
             qrsolve(A.data(), A.rows(), A.cols(), B.data(), B.cols()),
             "matrix must not be singular"
         );
-        mat<double> X(A.cols(), B.cols());
+        matrix<double> X(A.cols(), B.cols());
         for (int64 ii = 0; ii<X.rows(); ii++) {
             for (int64 jj = 0; jj<X.cols(); jj++) {
                 X(ii, jj) = B(ii, jj);
@@ -5661,14 +6236,14 @@ namespace xm {
         return X;
     }
 
-    static inline vec<double> qrsolve(mat<double> A, vec<double> b) {
+    static inline vector<double> qrsolve(matrix<double> A, vector<double> b) {
         check(A.rows() >= A.cols(), "can't be underdetermined");
         check(A.rows() == b.size(), "need compatible sizes");
         check(
             qrsolve(A.data(), A.rows(), A.cols(), b.data(), 1),
             "matrix must not be singular"
         );
-        vec<double> x(A.cols());
+        vector<double> x(A.cols());
         for (int64 ii = 0; ii<x.size(); ii++) {
             x[ii] = b[ii];
         }
@@ -5771,14 +6346,14 @@ namespace xm {
         return lddivide(A, size, B, count);
     }
 
-    static inline mat<double> ldsolve(mat<double> A, mat<double> B) {
+    static inline matrix<double> ldsolve(matrix<double> A, matrix<double> B) {
         check(A.rows() == A.cols(), "must be a square matrix");
         check(A.rows() == B.rows(), "need compatible sizes");
         check(
             ldsolve(A.data(), A.rows(), B.data(), B.cols()),
             "matrix must not be singular"
         );
-        mat<double> X(A.cols(), B.cols());
+        matrix<double> X(A.cols(), B.cols());
         for (int64 ii = 0; ii<X.rows(); ii++) {
             for (int64 jj = 0; jj<X.cols(); jj++) {
                 X(ii, jj) = B(ii, jj);
@@ -5787,14 +6362,14 @@ namespace xm {
         return X;
     }
 
-    static inline vec<double> ldsolve(mat<double> A, vec<double> b) {
+    static inline vector<double> ldsolve(matrix<double> A, vector<double> b) {
         check(A.rows() == A.cols(), "must be a square matrix");
         check(A.rows() == b.size(), "need compatible sizes");
         check(
             ldsolve(A.data(), A.rows(), b.data(), 1),
             "matrix must not be singular"
         );
-        vec<double> x(A.cols());
+        vector<double> x(A.cols());
         for (int64 ii = 0; ii<x.size(); ii++) {
             x[ii] = b[ii];
         }
@@ -5864,15 +6439,15 @@ namespace xm {
         }
     }
 
-    static inline mat<double> cholesky(const mat<double>& A) {
+    static inline matrix<double> cholesky(const matrix<double>& A) {
         check(A.rows() == A.cols(), "must be a square matrix");
-        mat<double> L(A.rows(), A.cols());
+        matrix<double> L(A.rows(), A.cols());
         cholesky(L.data(), A.data(), A.rows());
         return L;
     }
 
-    static inline mat<double> cholupdate(
-        mat<double> L, int sign, vec<double> x
+    static inline matrix<double> cholupdate(
+        matrix<double> L, int sign, vector<double> x
     ) {
         check(L.rows() == L.cols(), "must be a square matrix");
         check(L.rows() == x.size(), "must be a matching size");
@@ -6647,7 +7222,6 @@ namespace xm {
         inline timecode       gettimecode(  string name, timecode        def, string doc);
         inline cartesian      getcartesian( string name, cartesian       def, string doc);
         inline geodetic       getgeodetic(  string name, geodetic        def, string doc);
-        //inline matrix<double> getmatrix(    string name, matrix<double>& def, string doc); XXX
 
         inline string            getstring(    string name, string doc);
         inline double         getdouble(    string name, string doc);
@@ -6655,7 +7229,6 @@ namespace xm {
         inline timecode       gettimecode(  string name, string doc);
         inline cartesian      getcartesian( string name, string doc);
         inline geodetic       getgeodetic(  string name, string doc);
-        //inline matrix<double> getmatrix(    str name, str doc); XXX
 
         inline bool           getswitch(    string name, string doc);
 
@@ -6677,8 +7250,6 @@ namespace xm {
                 string name, bool required, const char* type,
                 const string& doc, int count, const char* format, ...
             );
-
-            //inline matrix<double> parse_matrix(str name, const char* val); XXX
 
             list<const char*> args;
             bool switches_done;
@@ -7021,158 +7592,6 @@ namespace xm {
     }
 
     //}}}
-    //{{{ rawfile
-    namespace internal {
-
-        // C++ doesn't provide a good way to work directly with file descriptors.
-        // This class implements a container for the descriptor and a mmap ptr.
-        //
-        // This class returns errors rather than throwing exceptions, and we're
-        // hiding it in an internal namespace for now.  Don't rely on it staying.
-        //
-        struct rawfile;
-        static inline void swap(rawfile& flip, rawfile& flop);
-
-        struct rawfile {
-            ~rawfile() { clear(); }
-
-            // default constructor or with file descriptor
-            rawfile(int fd=-1) : fd(fd), ptr(0), len(0) {}
-
-            /* XXX:
-            // move constructor steals from the other object
-            rawfile(rawfile&& other) : fd(other.fd), ptr(other.ptr), len(other.len) {
-                other.fd = -1;
-                other.ptr = 0;
-                other.len = 0;
-            }
-            */
-
-            /* XXX:
-            rawfile& operator =(rawfile&& other) {
-                clear();
-                fd  = other.fd; other.fd  = -1;
-                ptr = other.ptr; other.ptr = 0;
-                len = other.len; other.len = 0;
-                return *this;
-            }
-            */
-
-
-            inline bool read(void* data, int64 bytes);
-            inline bool write(const void* data, int64 bytes);
-            inline bool seek(int64 offset);
-            inline bool skip(int64 bytes);
-            inline int64 size() const;
-            inline const void* mmap();
-
-            inline bool isfile() const;
-
-            private:
-                // no copies or defaults
-                void operator =(rawfile& other);// = delete;
-                rawfile(const rawfile&);// = delete;
-
-                void clear() {
-                    if (ptr) {
-                        msync(ptr, len, MS_SYNC);
-                        munmap(ptr, len);
-                    }
-                    if (fd >= 0) close(fd);
-                }
-                friend void swap(rawfile& flip, rawfile& flop);
-
-                // file descriptor
-                int fd;
-                // mmap fields
-                void* ptr;
-                int64 len;
-        };
-
-        bool rawfile::read(void* ptr, int64 len) {
-            char* buf = (char*)ptr;
-            int64 want = len;
-            while (want) {
-                int64 got = ::read(fd, buf, want);
-                if (got <= 0) {
-                    break;
-                }
-                want -= got;
-                buf += got;
-            }
-            return want == 0;
-        }
-
-        bool rawfile::write(const void* ptr, int64 len) {
-            const char* buf = (const char*)ptr;
-            while (len) {
-                int64 put = ::write(fd, buf, len);
-                if (put < 0) {
-                    break;
-                }
-                len -= put;
-                buf += put;
-            }
-            return len == 0;
-        }
-
-        bool rawfile::seek(int64 offset) {
-            off_t result = ::lseek(fd, offset, SEEK_SET);
-            return result != (off_t)-1;
-        }
-
-        bool rawfile::skip(int64 bytes) {
-            if (bytes == 0) {
-                return true;
-            }
-            off_t result = ::lseek(fd, bytes, SEEK_CUR);
-            if (result == (off_t)-1) {
-                if (errno != ESPIPE) {
-                    return false;
-                }
-                // Can't quickly seek, so we'll manually dump data
-                static char ignored[8192];
-                while (bytes) {
-                    int64 amt = bytes;
-                    if (amt > 8192) {
-                        amt = 8192;
-                    }
-                    int64 got = ::read(fd, ignored, amt);
-                    if (got != amt) {
-                        return false;
-                    }
-                    bytes -= got;
-                }
-            }
-            return true;
-        }
-
-        int64 rawfile::size() const {
-            struct stat st;
-            check(fstat(fd, &st) == 0, "fstat");
-            return st.st_size;
-        }
-
-        const void* rawfile::mmap() {
-            if (ptr) return ptr;
-            len = size();
-            return ptr = (char*)::mmap(0, len, PROT_READ, MAP_SHARED, fd, 0);
-        }
-
-        bool rawfile::isfile() const {
-            struct stat st;
-            check(fstat(fd, &st) == 0, "fstat");
-            return st.st_mode & S_IFREG;
-        }
-
-        static inline void swap(rawfile& flip, rawfile& flop) {
-            xm::swap(flip.fd, flop.fd);
-            xm::swap(flip.ptr, flop.ptr);
-            xm::swap(flip.len, flop.len);
-        }
-    }
-
-    //}}}
     //{{{ xmheader
     namespace internal {
         // We put all of this stuff in an internal namespace just
@@ -7451,7 +7870,7 @@ namespace xm {
         }
 
         static string terminated(const char* ptr, int64 len) {
-            vec<char> temp(len + 1);
+            vector<char> temp(len + 1);
             memcpy(temp.data(), ptr, len);
             temp[len] = 0;
             return string(temp.data());
@@ -7460,7 +7879,7 @@ namespace xm {
         // Field names are fixed length, but a space or a null means
         // that the string is shorter than the total length.
         static string fortranstr(const char* ptr, int64 len) {
-            vec<char> temp(len + 1);
+            vector<char> temp(len + 1);
             memcpy(temp.data(), ptr, len);
             temp[len] = 0;
             for (int64 ii = 0; ii<len; ii++) {
@@ -7504,11 +7923,11 @@ namespace xm {
     struct bluekeyword {
         string name;
         char code;
-        vec<char> bytes;
+        vector<char> bytes;
 
         inline string       getstr() const;
-        inline vec<double>  getflt() const;
-        inline vec<int64>   getint() const;
+        inline vector<double>  getflt() const;
+        inline vector<int64>   getint() const;
     };
 
     namespace internal {
@@ -7567,9 +7986,9 @@ namespace xm {
         }
 
         template<class type>
-        vec<double> kwdtoflt(const bluekeyword& kwd) {
+        vector<double> kwdtoflt(const bluekeyword& kwd) {
             int64 len = kwd.bytes.size() / sizeof(type);
-            vec<double> result(len);
+            vector<double> result(len);
 
             for (int64 ii = 0; ii<len; ++ii) {
                 type value = *(type*)&kwd.bytes[ii*sizeof(type)];
@@ -7579,9 +7998,9 @@ namespace xm {
         }
 
         template<class type>
-        vec<int64> intkwdtoint(const bluekeyword& kwd) {
+        vector<int64> intkwdtoint(const bluekeyword& kwd) {
             int64 len = kwd.bytes.size() / sizeof(type);
-            vec<int64_t> result(len);
+            vector<int64_t> result(len);
 
             for (int64 ii = 0; ii<len; ++ii) {
                 type value = *(type*)&kwd.bytes[ii*sizeof(type)];
@@ -7591,9 +8010,9 @@ namespace xm {
         }
 
         template<class type>
-        vec<int64> fltkwdtoint(const bluekeyword& kwd) {
+        vector<int64> fltkwdtoint(const bluekeyword& kwd) {
             int64 len = kwd.bytes.size() / sizeof(type);
-            vec<int64_t> result(len);
+            vector<int64_t> result(len);
 
             for (int64 ii = 0; ii<len; ++ii) {
                 type value = *(type*)&kwd.bytes[ii*sizeof(type)];
@@ -7625,7 +8044,7 @@ namespace xm {
         return string();
     }
 
-    vec<double> bluekeyword::getflt() const {
+    vector<double> bluekeyword::getflt() const {
         using namespace internal;
         switch (code) {
             case 'S': case 's':
@@ -7634,7 +8053,7 @@ namespace xm {
                 char* end = 0;
                 double val = ::strtod(str.data(), &end);
                 check(end != 0 && (end == str.data() + str.size()), "convert '%s' to double", str.data());
-                vec<double> result(1);
+                vector<double> result(1);
                 result[0] = val;
                 return result;
             }
@@ -7648,10 +8067,10 @@ namespace xm {
             case 'F': case 'f': return kwdtoflt<float>(*this);
             case 'D': case 'd': return kwdtoflt<double>(*this);
         }
-        return vec<double>();
+        return vector<double>();
     }
 
-    vec<int64> bluekeyword::getint() const {
+    vector<int64> bluekeyword::getint() const {
         using namespace internal;
         switch (code) {
             case 'S': case 's':
@@ -7664,7 +8083,7 @@ namespace xm {
                     check(end != 0 && end == str.data() + str.size(), "convert '%s' to double", str.data());
                     val = llrint(flt);
                 }
-                vec<int64_t> result(1);
+                vector<int64_t> result(1);
                 result[0] = val;
                 return result;
             }
@@ -7678,7 +8097,7 @@ namespace xm {
             case 'F': case 'f': return fltkwdtoint<float>(*this);
             case 'D': case 'd': return fltkwdtoint<double>(*this);
         }
-        return vec<int64>();
+        return vector<int64>();
     }
     //}}}
     //{{{ bluekeywords
@@ -7690,26 +8109,26 @@ namespace xm {
 
         inline bluekeyword  getkwd(const string& name, int64 which=0) const;
         inline string       getstr(const string& name, int64 which=0) const;
-        inline vec<double>  getflt(const string& name, int64 which=0) const;
-        inline vec<int64>   getint(const string& name, int64 which=0) const;
+        inline vector<double>  getflt(const string& name, int64 which=0) const;
+        inline vector<int64>   getint(const string& name, int64 which=0) const;
 
         inline void update(const string& name, char code, const void* data, int64 len, int64 which);
         inline void update(const string& name, const string&   value,  int64 which=0);
         inline void update(const string& name, double       value,  int64 which=0);
-        inline void update(const string& name, vec<double>  values, int64 which=0);
+        inline void update(const string& name, vector<double>  values, int64 which=0);
         inline void update(const string& name, int32_t      value,  int64 which=0);
-        inline void update(const string& name, vec<int32_t> values, int64 which=0);
+        inline void update(const string& name, vector<int32_t> values, int64 which=0);
         inline void update(const string& name, int64_t      value,  int64 which=0);
-        inline void update(const string& name, vec<int64_t> values, int64 which=0);
+        inline void update(const string& name, vector<int64_t> values, int64 which=0);
 
         inline void insert(const string& name, char code, const void* data, int64 len, int64 where);
         inline void insert(const string& name, const string&   value,  int64 where=-1);
         inline void insert(const string& name, double       value,  int64 where=-1);
-        inline void insert(const string& name, vec<double>  values, int64 where=-1);
+        inline void insert(const string& name, vector<double>  values, int64 where=-1);
         inline void insert(const string& name, int32_t      value,  int64 where=-1);
-        inline void insert(const string& name, vec<int32_t> values, int64 where=-1);
+        inline void insert(const string& name, vector<int32_t> values, int64 where=-1);
         inline void insert(const string& name, int64_t      value,  int64 where=-1);
-        inline void insert(const string& name, vec<int64_t> values, int64 where=-1);
+        inline void insert(const string& name, vector<int64_t> values, int64 where=-1);
 
         inline void remove(const string& name, int64 which=0);
 
@@ -7764,7 +8183,7 @@ namespace xm {
         }
 
         static bluekeywords readkwds(rawfile& file, int64 len, bool byteswap) {
-            vec<char> block(len);
+            vector<char> block(len);
             check(file.read(block.data(), len), "reading keywords");
 
             bluekeywords result;
@@ -7778,7 +8197,7 @@ namespace xm {
                 if (byteswap) byteswap2(&kwd->non_value);
                 int64 data_len = kwd->next_offset - kwd->non_value;
                 string name = terminated(kwd->buffer + data_len, kwd->key_length);
-                vec<char> bytes(data_len);
+                vector<char> bytes(data_len);
                 memcpy(bytes.data(), kwd->buffer, data_len);
                 result.storage.append((bluekeyword){ name, kwd->format_code, bytes});
                 ptr += kwd->next_offset;
@@ -7832,18 +8251,18 @@ namespace xm {
             }
         }
         check(false, "requested non-existent keyword '%s'", name.data());
-        return (bluekeyword){ "", 0, vec<char>() };
+        return (bluekeyword){ "", 0, vector<char>() };
     }
 
     string bluekeywords::getstr(const string& name, int64 which) const {
         return getkwd(name, which).getstr();
     }
 
-    vec<int64> bluekeywords::getint(const string& name, int64 which) const {
+    vector<int64> bluekeywords::getint(const string& name, int64 which) const {
         return getkwd(name, which).getint();
     }
 
-    vec<double> bluekeywords::getflt(const string& name, int64 which) const {
+    vector<double> bluekeywords::getflt(const string& name, int64 which) const {
         return getkwd(name, which).getflt();
     }
 
@@ -7853,7 +8272,7 @@ namespace xm {
             bluekeyword& kwd = storage[ii];
             if (kwd.name == name) {
                 if (which == 0) {
-                    vec<char> bytes(len);
+                    vector<char> bytes(len);
                     memcpy(&bytes[0], data, len);
                     kwd.code = code;
                     swap(kwd.bytes, bytes);
@@ -7874,7 +8293,7 @@ namespace xm {
         update(name, 'D', &value, sizeof(double), which);
     }
 
-    void bluekeywords::update(const string& name, vec<double> values, int64 which) {
+    void bluekeywords::update(const string& name, vector<double> values, int64 which) {
         update(name, 'D', values.data(), values.size()*sizeof(double), which);
     }
 
@@ -7882,7 +8301,7 @@ namespace xm {
         update(name, 'L', &value, sizeof(int32_t), which);
     }
 
-    void bluekeywords::update(const string& name, vec<int32_t> values, int64 which) {
+    void bluekeywords::update(const string& name, vector<int32_t> values, int64 which) {
         update(name, 'L', values.data(), values.size()*sizeof(int32_t), which);
     }
 
@@ -7890,14 +8309,14 @@ namespace xm {
         update(name, 'X', &value, sizeof(int64), which);
     }
 
-    void bluekeywords::update(const string& name, vec<int64_t> values, int64 which) {
+    void bluekeywords::update(const string& name, vector<int64_t> values, int64 which) {
         update(name, 'X', values.data(), values.size()*sizeof(int64), which);
     }
 
     void bluekeywords::insert(const string& name, char code, const void* data, int64 len, int64 where) {
         if (where < 0) where = storage.size();
         check(where <= storage.size(), "index in bounds %lld [0, %lld]", where, storage.size());
-        vec<char> bytes(len);
+        vector<char> bytes(len);
         memcpy(&bytes[0], data, len);
         storage.insert(where, (bluekeyword){ name, code, bytes });
     }
@@ -7910,7 +8329,7 @@ namespace xm {
         insert(name, 'D', &value, sizeof(double), where);
     }
 
-    void bluekeywords::insert(const string& name, vec<double>  values, int64 where) {
+    void bluekeywords::insert(const string& name, vector<double>  values, int64 where) {
         insert(name, 'D', values.data(), values.size()*sizeof(double), where);
     }
 
@@ -7918,7 +8337,7 @@ namespace xm {
         insert(name, 'X', &value, sizeof(int64), where);
     }
 
-    void bluekeywords::insert(const string& name, vec<int64_t> values, int64 where) {
+    void bluekeywords::insert(const string& name, vector<int64_t> values, int64 where) {
         insert(name, 'X', values.data(), values.size()*sizeof(int64), where);
     }
 
@@ -7926,7 +8345,7 @@ namespace xm {
         insert(name, 'L', &value, sizeof(int32_t), where);
     }
 
-    void bluekeywords::insert(const string& name, vec<int32_t> values, int64 where) {
+    void bluekeywords::insert(const string& name, vector<int32_t> values, int64 where) {
         insert(name, 'L', values.data(), values.size()*sizeof(int32_t), where);
     }
 
@@ -8175,8 +8594,8 @@ namespace xm {
                 int64 error_offset;
                 int64 cache_offset;
                 int64 cache_length;
-                list<vec<char> > cache;
-                vec<char> scratch;
+                list<vector<char> > cache;
+                vector<char> scratch;
                 bool is_swapped;
                 bool kwds_ready;
             };
@@ -8402,7 +8821,7 @@ namespace xm {
 
         // discard blocks before our request
         while (pimpl->cache.size() != 0) {
-            vec<char>& block = pimpl->cache[0];
+            vector<char>& block = pimpl->cache[0];
             if (offset < pimpl->cache_offset + (int64)block.size()) break;
             pimpl->cache_offset += block.size();
             pimpl->cache_length -= block.size();
@@ -8431,9 +8850,9 @@ namespace xm {
             int64 wanted = needed + (extra ? PAGE_SIZE - extra : 0);
             int64 remaining = pimpl->data_length - cache_ending;
             int64 amount = min(wanted, remaining);
-            vec<char> block(amount);
+            vector<char> block(amount);
             check(pimpl->file.read(block.data(), amount), "read %lld", amount);
-            pimpl->cache.append(vec<char>());
+            pimpl->cache.append(vector<char>());
             swap(pimpl->cache[pimpl->cache.size() - 1], block);
             pimpl->cache_length += amount;
             // XXX: Here is where we could check to see if we should read
@@ -8444,7 +8863,7 @@ namespace xm {
         // copy from the cache to the output
         int64_t block_offset = pimpl->cache_offset;
         for (int64 ii = 0; ii<pimpl->cache.size(); ii++) {
-            vec<char>& block = pimpl->cache[ii];
+            vector<char>& block = pimpl->cache[ii];
             int64 start = offset - block_offset;
             int64 amount = min(length, (int64)block.size() - start);
             memcpy(pointer, block.data() + start, amount);
@@ -8963,7 +9382,7 @@ namespace xm {
         inline statevec lookup(timecode tc) const;
 
         // timestates must be sorted
-        vec<timestate> storage;
+        vector<timestate> storage;
     };
 
     ephemeris::ephemeris(const statevec& sv) {
@@ -9238,7 +9657,7 @@ namespace xm {
             // data is stored column major, starting from the lower
             // left through each latitude, then increasing longitude.
             int64 lats, lons;
-            vec<int16_t> data;
+            vector<int16_t> data;
     };
 
     dtedtile::dtedtile(const string& path) {
@@ -9410,7 +9829,7 @@ namespace xm {
             // MSL data is stored row-major starting from
             // 0-lon at the north pole, moving southward per row
             enum { MSL_LATS = 180*4 + 1, MSL_LONS = 360*4 + 1 };
-            vec<float> msl;
+            vector<float> msl;
     };
 
     dtedcache::dtedcache(int64 maxtiles) : maxsize(maxtiles), counter(0) {
@@ -9770,7 +10189,7 @@ namespace xm {
 
     template<class atype, class btype>
     static inline void singleton(
-        cx<atype>* dst, const cx<btype>* src, int64 len,
+        complex<atype>* dst, const complex<btype>* src, int64 len,
         double cycles_lo, double cycles_hi
     ) {
         // We're going through a lot of pains here to avoid making
@@ -9881,7 +10300,7 @@ namespace xm {
         private:
             enum { COUNT = 1024 };
             int64 taps;
-            vec<float> bank;
+            vector<float> bank;
 
             inline void makefir(float* ptr, double fract, int window, double dwidth);
             inline cfloat interp(const cfloat* src, double where) const;
@@ -9933,86 +10352,6 @@ namespace xm {
             dst_ptr[ii] = interp(src_ptr, (1.0 - ff)*src_lo + ff*src_hi);
         }
     }
-
-    //}}}
-    //{{{ uniqueid
-    struct uniqueid {
-        uint8_t bytes[16];
-
-        static inline uniqueid parse(const string& text);
-    };
-
-    static inline size_t hash(const uniqueid& uuid) {
-        return hash(uuid.bytes, 16, 0);
-    }
-
-    static inline bool operator == (const uniqueid& aa, const uniqueid& bb) {
-        return memcmp(aa.bytes, bb.bytes, 16) == 0;
-    }
-
-    static inline bool operator != (const uniqueid& aa, const uniqueid& bb) {
-        return memcmp(aa.bytes, bb.bytes, 16) != 0;
-    }
-
-    static inline uniqueid genuuid() {
-        using namespace internal;
-        int fd = open("/dev/urandom", O_RDONLY);
-        check(fd >= 0, "opening '/dev/urandom' for reading");
-        rawfile file(fd);
-
-        uniqueid result;
-        check(file.read(result.bytes, 16), "reading /dev/urandom");
-        // this is the mask for randomly generated uuids
-        // ffffffff-ffff-4fff-bfff-ffffffffffff
-        result.bytes[6] &= 0x0f;
-        result.bytes[6] |= 0x40;
-        result.bytes[8] &= 0x0f;
-        result.bytes[8] |= 0xb0;
-        return result;
-    }
-
-    static inline string format(const uniqueid& uuid) {
-        return format(
-            "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-            uuid.bytes[ 0], uuid.bytes[ 1], uuid.bytes[ 2], uuid.bytes[ 3],
-            uuid.bytes[ 4], uuid.bytes[ 5], uuid.bytes[ 6], uuid.bytes[ 7],
-            uuid.bytes[ 8], uuid.bytes[ 9], uuid.bytes[10], uuid.bytes[11],
-            uuid.bytes[12], uuid.bytes[13], uuid.bytes[14], uuid.bytes[15]
-        );
-    }
-
-    inline uniqueid uniqueid::parse(const string &text) {
-        uniqueid uuid;
-        if(text.size() == 32) {
-            check(sscanf(
-                text.data(), "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx"
-                "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
-                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
-                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
-                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
-                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
-            ) == 16, "expected 16 pairs of hex chars with no hyphens");
-        }
-        else {
-            check(text.size() == 36, "expecting a 36 byte string");
-            check(sscanf(
-                text.data(), "%2hhx%2hhx%2hhx%2hhx-%2hhx%2hhx-"
-                "%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
-                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
-                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
-                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
-                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
-            ) == 16, "expected 16 pairs of hex chars with hyphens in the right places");
-        }
-        return uuid;
-    }
-
-    /* XXX
-    static inline std::ostream& operator <<(std::ostream& os, const uniqueid& uuid) {
-        os << format(uuid);
-        return os;
-    }
-    */
 
     //}}}
     //{{{ quadroots
@@ -10378,8 +10717,8 @@ namespace xm {
         ssize_t ii;
 
         for (ii = 0; ii<len; ii++) {
-            double mag2 = magsqr(ptr[ii]);
-            double db = 10.0*::log10(mag2 + 1e-300);
+            double m2 = mag2(ptr[ii]);
+            double db = 10.0*::log10(m2 + 1e-300);
             double bin = floor(8000.0 + 10.0*db);
             if (bin < 0) bin = 0;
             if (bin > 15999) bin = 15999;
@@ -10749,6 +11088,24 @@ namespace xm {
 }
     
 #if 0
+    // this one is good, need to bring it back
+    __attribute__ ((format (printf, 2, 3)))
+    static inline void check(bool cond, const char* fmt, ...) {
+        if (!cond) {
+            va_list args;
+            va_start(args, fmt);
+            int64 bytes = vsnprintf(0, 0, fmt, args);
+            va_end(args);
+
+            string msg(bytes, 0);
+            va_list again;
+            va_start(again, fmt);
+            vsnprintf(&msg[0], bytes + 1, fmt, again);
+            va_end(again);
+
+            throw std::runtime_error("check failed: " + msg);
+        }
+    }
     //{{{ sum funcs 
     
     template<class type>
@@ -11270,23 +11627,266 @@ namespace stack_trace_on_uncaught_exceptions {
     } this_is_constructed_before_main_is_called;
 }
 //}}}
-    __attribute__ ((format (printf, 2, 3)))
-    static inline void check(bool cond, const char* fmt, ...) {
-        if (!cond) {
-            va_list args;
-            va_start(args, fmt);
-            int64 bytes = vsnprintf(0, 0, fmt, args);
-            va_end(args);
+    //{{{ broken matrix operators
 
-            string msg(bytes, 0);
-            va_list again;
-            va_start(again, fmt);
-            vsnprintf(&msg[0], bytes + 1, fmt, again);
-            va_end(again);
 
-            throw std::runtime_error("check failed: " + msg);
+// XXX: Something is really wrong with all of the operator* functions....
+
+    /*
+    // matrix multiplication, specialized for complex*complex
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename matmultype<complex<t0>, r0, c0, complex<t1>, r1, c1>::type operator *(
+        const matrix<complex<t0>, r0, c0>& aa, const matrix<complex<t1>, r1, c1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = bb.cols();
+        const int64 size = aa.cols();
+        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
+        typename matmultype<complex<t0>, r0, c0, complex<t1>, r1, c1>::type cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                typename arithmetic<complex<t0>, complex<t1> >::type sum = 0;
+                for (int64 kk = 0; kk<size; kk++) {
+                    sum += aa(ii, kk)*bb(kk, jj);
+                }
+                cc(ii, jj) = sum;
+            }
         }
+        return cc;
     }
+    */
+
+    /*
+    // matrix multiplication, specialized for complex*real
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename matmultype<complex<t0>, r0, c0, t1, r1, c1>::type operator *(
+        const matrix<complex<t0>, r0, c0>& aa, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = bb.cols();
+        const int64 size = aa.cols();
+        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
+        typename matmultype<complex<t0>, r0, c0, t1, r1, c1>::type cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                typename arithmetic<complex<t0>, t1>::type sum = 0;
+                for (int64 kk = 0; kk<size; kk++) {
+                    sum += aa(ii, kk)*bb(kk, jj);
+                }
+                cc(ii, jj) = sum;
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // matrix multiplication, specialized for real*complex
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename matmultype<t0, r0, c0, complex<t1>, r1, c1>::type operator *(
+        const matrix<t0, r0, c0>& aa, const matrix<complex<t1>, r1, c1>& bb
+    ) {
+        const int64 rows = aa.rows();
+        const int64 cols = bb.cols();
+        const int64 size = aa.cols();
+        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
+        typename matmultype<t0, r0, c0, complex<t1>, r1, c1>::type cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                typename arithmetic<t0, complex<t1> >::type sum = 0;
+                for (int64 kk = 0; kk<size; kk++) {
+                    sum += aa(ii, kk)*bb(kk, jj);
+                }
+                cc(ii, jj) = sum;
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // specialized for complex*complex
+    template<class t0, class t1, int64 r1, int64 c1>
+    matrix<typename arithmetic<complex<t0>, complex<t1> >::type, r1, c1> operator *(
+        const complex<t0>& scalar, const matrix<complex<t1>, r1, c1>& bb
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<complex<t0>, complex<t1> >::type, r1, c1> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = scalar*bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // specialized for complex*real
+    template<class t0, class t1, int64 r1, int64 c1>
+    matrix<typename arithmetic<complex<t0>, t1>::type, r1, c1> operator *(
+        const complex<t0>& scalar, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<complex<t0>, t1>::type, r1, c1> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = scalar*bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // specialized for real*complex
+    template<class t0, class t1, int64 r1, int64 c1>
+    matrix<typename arithmetic<t0, complex<t1> >::type, r1, c1> operator *(
+        const t0& scalar, const matrix<complex<t1>, r1, c1>& bb
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<t0, complex<t1> >::type, r1, c1> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = scalar*bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // generalized without complex
+    template<class t0, class t1, int64 r1, int64 c1>
+    matrix<typename arithmetic<t0, t1>::type, r1, c1> operator *(
+        const t0& scalar, const matrix<t1, r1, c1>& bb
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<t0, t1>::type, r1, c1> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = scalar*bb(ii, jj);
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // specialized for complex*complex
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<typename arithmetic<complex<t0>, complex<t1> >::type, r0, c0> operator *(
+        const matrix<complex<t0>, r0, c0>& bb, const complex<t1>& scalar
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<complex<t0>, complex<t1> >::type, r0, c0> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = bb(ii, jj)*scalar;
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // specialized for complex*real
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<typename arithmetic<complex<t0>, t1>::type, r0, c0> operator *(
+        const matrix<complex<t0>, r0, c0>& bb, const t1& scalar
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<complex<t0>, t1>::type, r0, c0> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = bb(ii, jj)*scalar;
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // specialized for real*complex
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<typename arithmetic<t0, complex<t1> >::type, r0, c0> operator *(
+        const matrix<t0, r0, c0>& bb, const complex<t1>& scalar
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<t0, complex<t1> >::type, r0, c0> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = bb(ii, jj)*scalar;
+            }
+        }
+        return cc;
+    }
+    */
+
+    /*
+    // generalized without complex
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<typename arithmetic<t0, t1>::type, r0, c0> operator *(
+        const matrix<t0, r0, c0>& bb, const t1& scalar
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = bb.cols();
+        matrix<typename arithmetic<t0, t1>::type, r0, c0> cc(rows, cols);
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                cc(ii, jj) = bb(ii, jj)*scalar;
+            }
+        }
+        return cc;
+    }
+    */
+
+    
+    /*
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<t0, r0, c0>& operator *=(matrix<t0, r0, c0>& aa, const t1& scalar) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                aa(ii, jj) *= scalar;
+            }
+        }
+        return aa;
+    }
+    */
+    
+    /*
+    template<class t0, int64 r0, int64 c0, class t1>
+    matrix<t0, r0, c0>& operator /=(matrix<t0, r0, c0>& aa, const t1& scalar) {
+        const int64 rows = aa.rows();
+        const int64 cols = aa.cols();
+        for (int64 ii = 0; ii<rows; ii++) {
+            for (int64 jj = 0; jj<cols; jj++) {
+                aa(ii, jj) /= scalar;
+            }
+        }
+        return aa;
+    }
+    */
+    //}}}
+        //{{{ broken matmultype
+        struct matmultype {
+            typedef matrix<
+                typename arithmetic<t0, t1>::type,
+                // XXX: are these right?
+                matmulsize<r0, c1>::size,
+                matmulsize<c1, r0>::size
+            > type;
+        };
+        //}}}
 #endif
 
 #endif

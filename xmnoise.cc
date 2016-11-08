@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
     output->xdelta = 1/rate;
     output->xcount = samples;
 
-    vec<cfloat> data(1024);
+    vector<cfloat> data(1024);
 
     while (samples > 0) {
         int64 amount = min(1024, samples);

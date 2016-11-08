@@ -50,10 +50,9 @@ static double fircost(double* args) {
     using namespace xm;
 
     const int64 size = 10000;
-    vec<cfloat> timedata(size);
-    vec<cfloat> freqdata(size);
+    vector<cfloat> timedata(size, 0);
+    vector<cfloat> freqdata(size);
     kissfft<float> fft(size);
-    zero(timedata);
 
     const int64 taps = 4*muls + 1;
 
@@ -105,7 +104,7 @@ static double fircost(double* args) {
 
         fprintf(freqplot, "plot '-' with l\n");
         for (int64 ii = 0; ii<size; ii++) {
-            double db = 10*log10(magsqr(freqdata[ii]/2) + 1e-20);
+            double db = 10*log10(mag2(freqdata[ii]/2) + 1e-20);
             fprintf(freqplot, "%le %le\n", ii*(200.0/size), db);
         }
         fprintf(freqplot, "e\n");
@@ -114,7 +113,7 @@ static double fircost(double* args) {
 
     double cost = 0;
     for (int64 ii = 3000; ii<= 7000; ii++) {
-        cost = max(cost, magsqr(freqdata[ii]/2));
+        cost = max(cost, mag2(freqdata[ii]/2));
     }
     cost = 10*log10(cost + 1e-20);
 
@@ -137,8 +136,8 @@ static double tapcost(double* args) {
     const int64 size = 10000;
     const int64 taps = 4*muls + 1;
 
-    vec<cfloat> timedata(size, 0);
-    vec<cfloat> freqdata(size);
+    vector<cfloat> timedata(size, 0);
+    vector<cfloat> freqdata(size);
     kissfft<float> fft(size);
     
     timedata[taps/2] = 1.0;
@@ -174,7 +173,7 @@ static double tapcost(double* args) {
 
         fprintf(freqplot, "plot '-' with l\n");
         for (int64 ii = 0; ii<size; ii++) {
-            double db = 10*::log10(magsqr(freqdata[ii]/2) + 1e-20);
+            double db = 10*::log10(mag2(freqdata[ii]/2) + 1e-20);
             fprintf(freqplot, "%.18le %.18le\n", ii*(200.0/size), db);
         }
         fprintf(freqplot, "e\n");
@@ -185,7 +184,7 @@ static double tapcost(double* args) {
 
     double cost = 0;
     for (int64 ii = 3000; ii<= 7000; ii++) {
-        cost = max(cost, magsqr(freqdata[ii]/2));
+        cost = max(cost, mag2(freqdata[ii]/2));
     }
     cost = 10*log10(cost + 1e-20);
 
@@ -379,7 +378,7 @@ int main() {
         fprintf(freqplot, "set grid\n");
         fprintf(freqplot, "plot '-' with l\n");
         for (int64 ii = 0; ii<size; ii++) {
-            double db = 10*log10(magsqr(freqdata[ii]/2) + 1e-20);
+            double db = 10*log10(mag2(freqdata[ii]/2) + 1e-20);
             fprintf(freqplot, "%le %le\n", ii*(200.0/size), db);
         }
         fprintf(freqplot, "e\n");

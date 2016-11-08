@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
     output->itemsize = meta.itemsize;
     output->kwds     = meta.kwds;
 
-    vec<uint8_t> scratch(8192);
+    vector<uint8_t> scratch(8192);
     for (int64 ii = 0; ii<inpaths.size(); ii++) {
         bluereader input(inpaths[ii]);
         int64 length = input->xcount*input->ycount*input->itemsize;

@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
     check(total_bytes >= 0, "can't handle negative cut size");
 
     const int64 maxblock = 65536;
-    vec<uint8_t> buffer(maxblock);
+    vector<uint8_t> buffer(maxblock);
     while (total_bytes > 0) {
         int64 amount = total_bytes;
         if (amount > maxblock) amount = maxblock;

@@ -6,22 +6,23 @@ static void test0000() {
 }
 
 static void test0001() {
-    // Does vec<float> promote to vec<cfloat> correctly?
-    xm::vec<float> v(100);
+    // Does vector<float> promote to vector<cfloat> correctly?
+    xm::vector<float> v(100, 0);
     v[1] = 3;
     xm::cfloat z(1, 3);
-    xm::vec<xm::cfloat> w = z*v + v;
+    xm::vector<xm::cfloat> w = z*v + v;
+    //xm::vector<xm::cfloat> w = v*z + v;
     xm::check(w.size() == 100, "size");
     xm::check(w[1].re == 6, "real part");
     xm::check(w[1].im == 9, "imag part");
 }
 
 static void test0002() {
-    // Does mat<float> promote to mat<cfloat> correctly?
-    xm::mat<float> m(100, 100);
+    // Does matrix<float> promote to matrix<cfloat> correctly?
+    xm::matrix<float> m(100, 100, 0);
     m(1, 1) = 3;
     xm::cfloat z(1, 3);
-    xm::mat<xm::cfloat> w = z*m + m;
+    xm::matrix<xm::cfloat> w = z*m + m;
     xm::check(w.size() == 100*100, "size");
     xm::check(w(1, 1).re == 6, "real part");
     xm::check(w(1, 1).im == 9, "imag part");
