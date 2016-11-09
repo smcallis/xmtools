@@ -5043,13 +5043,11 @@ namespace xm {
     */
 
     //}}}
-    //{{{ Matrix Decompositions:         qrdecomp, lqdecomp, lddecomp, cholesky 
+    //{{{ Matrix Decompositions:         (qrdecomp), (lqdecomp), (lddecomp), cholesky 
     //}}}
-    //{{{ Eigen and SV Decomps:          svdecomp, symeigens, geneigens 
+    //{{{ Eigen and SV Decomps:          svdecomp, (symeigens), (geneigens) 
     //}}}
-    //{{{ Automatic Differentiation:     autodiff 
-    //}}}
-    //{{{ Linear Solvers:                gensolve, symsolve 
+    //{{{ Linear Solvers:                gensolve, (symsolve) 
     //}}}
     //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak, (polyroots) 
     //}}}
@@ -5071,7 +5069,7 @@ namespace xm {
     //}}}
     //{{{ Coordinate Systems:            cartesian, geodetic, transform 
     //}}}
-    //{{{ Precision Time:                timecode, datetime 
+    //{{{ Precision Time and Date:       timecode, datetime 
     //}}}
     //{{{ Raw Files and Memory Mapping:  rawfile 
     //{{{ rawfile
