@@ -5473,9 +5473,9 @@ namespace xm {
             return magr;
         }
 
-        // Apply the inverse of Householder row from A to R
+        // Special Householder for the gensolve() function
         template<class type>
-        void inverse_row_col(
+        void gensolve_row_col(
             const type* A, int64 arows, int64 acols,
                   type* R, int64 rrows, int64 rcols,
             int64 row, int64 col, int64 low=0
@@ -5497,10 +5497,9 @@ namespace xm {
             }
         }
 
-        /*
-        // Apply the inverse of Householder col from A to L
+        // Special Householder for upper_hessenber
         template<class type>
-        void inverse_col_row(
+        void hessenberg_col_row(
             const type* A, int64 arows, int64 acols,
                   type* L, int64 lrows, int64 lcols,
             int64 row, int64 col, int64 low=0
@@ -5508,6 +5507,7 @@ namespace xm {
             check(arows == lcols, "matching sizes");
             type pivot = A[row*acols + col];
             if (pivot == 0) return;
+            pivot = conj(pivot);
             type scale = 1.0/pivot;
             for (int64 ii = low; ii<lrows; ii++) {
                 type sum = 0;
@@ -5520,7 +5520,6 @@ namespace xm {
                 }
             }
         }
-        */
     }
 
     //

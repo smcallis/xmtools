@@ -23,6 +23,7 @@ PROGRAMS = \
     xmtest \
     xmtone \
     covar \
+    eigen \
     coswin \
 
 all: $(PROGRAMS)
