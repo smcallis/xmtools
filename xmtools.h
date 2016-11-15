@@ -35,8 +35,7 @@ namespace xm {
 
     //{{{ Type Promotions:               conditional, arithmetic 
     //{{{ arithmetic
-    namespace internal { struct must_be_arithmetic {}; } 
-    template<class t0, class t1> struct arithmetic { typedef internal::must_be_arithmetic type; };
+    template<class t0, class t1> struct arithmetic { struct type {}; };
 
     //
     // These are the "usual arithmetic conversions" according to the standard,
@@ -260,8 +259,7 @@ namespace xm {
     template<> struct arithmetic<       long double,        long double> { typedef        long double type; };
     //}}}
     //{{{ conditional
-    namespace internal { struct must_be_conditional {}; } 
-    template<class t0, class t1> struct conditional { typedef internal::must_be_conditional type; };
+    template<class t0, class t1> struct conditional { struct type {}; };
 
     //
     // These are the conversions that result from the ternary (conditional)
