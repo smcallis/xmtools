@@ -136,6 +136,36 @@ namespace xm {
     //}}}
 }
 
+//
+// Let T=a+d be the trace and D=ad-bc be the determinant of the matrix
+//
+//      | a   b |
+// A =  |       |
+//      | c   d |
+//
+//      The eigenvalues of A are
+//
+//      L1 = T/2 + (T2/4-D)1/2
+//      L2 = T/2 - (T2/4-D)1/2
+//
+//      If c is not zero, then the eigenvectors are
+//
+//      | L1-d |   | L2-d |
+//      |      | , |      |
+//      |   c  |   |   c  |
+//
+//      If b is not zero, then the eigenvectors are
+//
+//      |  b   |   |   b  |
+//      |      | , |      |
+//      | L1-a |   | L2-a |
+//
+//      If both b and c are zero, then the eigenvectors are
+//
+//      |  1  |   |  0  |
+//      |     | , |     |
+//      |  0  |   |  1  |
+//
 
 int main() {
     using namespace xm;
@@ -182,7 +212,7 @@ int main() {
     dump("A after:", A);
     dump("Q after:", Q);
     //dump("Q*A*Q':", matmul(Q, matmul(A, herm(Q))));
-    dump("Q'*A*Q:", matmul(herm(Q), matmul(A, Q)));
+    dump("Q'*A*Q:", herm(Q)*A*Q);
     //dump("Q*A:", matmul(Q, A));
 
 

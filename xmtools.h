@@ -35,7 +35,8 @@ namespace xm {
 
     //{{{ Type Promotions:               conditional, arithmetic 
     //{{{ arithmetic
-    template<class t0, class t1> struct arithmetic;
+    namespace internal { struct must_be_arithmetic {}; } 
+    template<class t0, class t1> struct arithmetic { typedef internal::must_be_arithmetic type; };
 
     //
     // These are the "usual arithmetic conversions" according to the standard,
@@ -259,7 +260,8 @@ namespace xm {
     template<> struct arithmetic<       long double,        long double> { typedef        long double type; };
     //}}}
     //{{{ conditional
-    template<class t0, class t1> struct conditional;
+    namespace internal { struct must_be_conditional {}; } 
+    template<class t0, class t1> struct conditional { typedef internal::must_be_conditional type; };
 
     //
     // These are the conversions that result from the ternary (conditional)
@@ -4026,34 +4028,7 @@ namespace xm {
     //}}}
     //{{{ binary * 
 
-    //{{{ complex * vector<complex> 
-    template<class t0, class t1, int64 ss>
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
-        const complex<t0>& aa, const vector<complex<t1>, ss>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::scalar_vector_mul<tt, complex<t0>, complex<t1>, ss>(aa, bb);
-    }
-    //}}}
-    //{{{ complex * vector<real>    
-    template<class t0, class t1, int64 ss>
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
-        const complex<t0>& aa, const vector<t1, ss>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::scalar_vector_mul<tt, complex<t0>, t1, ss>(aa, bb);
-    }
-    //}}}
-    //{{{ real    * vector<complex> 
-    template<class t0, class t1, int64 ss>
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
-        const t0& aa, const vector<complex<t1>, ss>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::scalar_vector_mul<tt, t0, complex<t1>, ss>(aa, bb);
-    }
-    //}}}
-    //{{{ real    * vector<real>    
+    //{{{ scalar * vector 
     template<class t0, class t1, int64 ss>
     vector<typename arithmetic<t0, t1>::type, ss> operator *(
         const t0& aa, const vector<t1, ss>& bb
@@ -4062,35 +4037,7 @@ namespace xm {
         return internal::scalar_vector_mul<tt, t0, t1, ss>(aa, bb);
     }
     //}}}
-
-    //{{{ vector<complex> * complex 
-    template<class t0, int64 ss, class t1> 
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
-        const vector<complex<t0>, ss>& aa, const complex<t1>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::vector_scalar_mul<tt, complex<t0>, ss, complex<t1> >(aa, bb);
-    }
-    //}}}
-    //{{{ vector<complex> * real    
-    template<class t0, int64 ss, class t1>
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
-        const vector<complex<t0>, ss>& aa, const t1& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::vector_scalar_mul<tt, complex<t0>, ss, t1>(aa, bb);
-    }
-    //}}}
-    //{{{ vector<real>    * complex 
-    template<class t0, int64 ss, class t1>
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator *(
-        const vector<t0, ss>& aa, const complex<t1>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::vector_scalar_mul<tt, t0, ss, complex<t1> >(aa, bb);
-    }
-    //}}}
-    //{{{ vector<real>    * real    
+    //{{{ vector * scalar 
     template<class t0, int64 ss, class t1>
     vector<typename arithmetic<t0, t1>::type, ss> operator *(
         const vector<t0, ss>& aa, const t1& bb
@@ -4099,38 +4046,38 @@ namespace xm {
         return internal::vector_scalar_mul<tt, t0, ss, t1>(aa, bb);
     }
     //}}}
+    //{{{ complex * vector 
+    template<class t0, class t1, int64 ss>
+    vector<typename arithmetic<complex<t0>, t1>::type, ss> operator *(
+        const complex<t0>& aa, const vector<t1, ss>& bb
+    ) {
+        typedef typename arithmetic<complex<t0>, t1>::type tt;
+        return internal::scalar_vector_mul<tt, complex<t0>, t1, ss>(aa, bb);
+    }
+    //}}}
+    //{{{ vector * complex 
+    template<class t0, int64 ss, class t1> 
+    vector<typename arithmetic<t0, complex<t1> >::type, ss> operator *(
+        const vector<t0, ss>& aa, const complex<t1>& bb
+    ) {
+        typedef typename arithmetic<t0, complex<t1> >::type tt;
+        return internal::vector_scalar_mul<tt, complex<t0>, ss, complex<t1> >(aa, bb);
+    }
+    //}}}
     
     //}}}
     //{{{ binary / 
 
-    //{{{ vector<complex> / complex 
-    template<class t0, int64 ss, class t1> 
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator /(
-        const vector<complex<t0>, ss>& aa, const complex<t1>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::vector_scalar_mul<tt, complex<t0>, ss, complex<t1> >(aa, 1/bb);
-    }
-    //}}}
-    //{{{ vector<complex> / real    
+    //{{{ vector / complex 
     template<class t0, int64 ss, class t1>
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator /(
-        const vector<complex<t0>, ss>& aa, const t1& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::vector_scalar_mul<tt, complex<t0>, ss, t1>(aa, 1/bb);
-    }
-    //}}}
-    //{{{ vector<real>    / complex 
-    template<class t0, int64 ss, class t1>
-    vector<complex<typename arithmetic<t0, t1>::type>, ss> operator /(
+    vector<typename arithmetic<t0, complex<t1> >::type, ss> operator /(
         const vector<t0, ss>& aa, const complex<t1>& bb
     ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        typedef typename arithmetic<t0, complex<t1> >::type tt;
         return internal::vector_scalar_mul<tt, t0, ss, complex<t1> >(aa, 1/bb);
     }
     //}}}
-    //{{{ vector<real>    / real    
+    //{{{ vector / scalar 
     template<class t0, int64 ss, class t1>
     vector<typename arithmetic<t0, t1>::type, ss> operator /(
         const vector<t0, ss>& aa, const t1& bb
@@ -4352,34 +4299,7 @@ namespace xm {
     //}}}
     //{{{ binary * 
 
-    //{{{ complex * matrix<complex> 
-    template<class t0, class t1, int64 rr, int64 cc>
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
-        const complex<t0>& aa, const matrix<complex<t1>, rr, cc>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::scalar_matrix_mul<tt, complex<t0>, complex<t1>, rr, cc>(aa, bb);
-    }
-    //}}}
-    //{{{ complex * matrix<real>    
-    template<class t0, class t1, int64 rr, int64 cc>
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
-        const complex<t0>& aa, const matrix<t1, rr, cc>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::scalar_matrix_mul<tt, complex<t0>, t1, rr, cc>(aa, bb);
-    }
-    //}}}
-    //{{{ real    * matrix<complex> 
-    template<class t0, class t1, int64 rr, int64 cc>
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
-        const t0& aa, const matrix<complex<t1>, rr, cc>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::scalar_matrix_mul<tt, t0, complex<t1>, rr, cc>(aa, bb);
-    }
-    //}}}
-    //{{{ real    * matrix<real>    
+    //{{{ scalar * matrix 
     template<class t0, class t1, int64 rr, int64 cc>
     matrix<typename arithmetic<t0, t1>::type, rr, cc> operator *(
         const t0& aa, const matrix<t1, rr, cc>& bb
@@ -4388,35 +4308,7 @@ namespace xm {
         return internal::scalar_matrix_mul<tt, t0, t1, rr, cc>(aa, bb);
     }
     //}}}
-
-    //{{{ matrix<complex> * complex 
-    template<class t0, int64 rr, int64 cc, class t1> 
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
-        const matrix<complex<t0>, rr, cc>& aa, const complex<t1>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, complex<t1> >(aa, bb);
-    }
-    //}}}
-    //{{{ matrix<complex> * real    
-    template<class t0, int64 rr, int64 cc, class t1>
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
-        const matrix<complex<t0>, rr, cc>& aa, const t1& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, t1>(aa, bb);
-    }
-    //}}}
-    //{{{ matrix<real>    * complex 
-    template<class t0, int64 rr, int64 cc, class t1>
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator *(
-        const matrix<t0, rr, cc>& aa, const complex<t1>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::matrix_scalar_mul<tt, t0, rr, cc, complex<t1> >(aa, bb);
-    }
-    //}}}
-    //{{{ matrix<real>    * real    
+    //{{{ matrix * scalar 
     template<class t0, int64 rr, int64 cc, class t1>
     matrix<typename arithmetic<t0, t1>::type, rr, cc> operator *(
         const matrix<t0, rr, cc>& aa, const t1& bb
@@ -4425,38 +4317,38 @@ namespace xm {
         return internal::matrix_scalar_mul<tt, t0, rr, cc, t1>(aa, bb);
     }
     //}}}
-    
+    //{{{ complex * matrix 
+    template<class t0, class t1, int64 rr, int64 cc>
+    matrix<typename arithmetic<complex<t0>, t1>::type, rr, cc> operator *(
+        const complex<t0>& aa, const matrix<t1, rr, cc>& bb
+    ) {
+        typedef typename arithmetic<complex<t0>, t1>::type tt;
+        return internal::scalar_matrix_mul<tt, complex<t0>, t1, rr, cc>(aa, bb);
+    }
+    //}}}
+    //{{{ matrix * complex 
+    template<class t0, int64 rr, int64 cc, class t1>
+    matrix<typename arithmetic<t0, complex<t1> >::type, rr, cc> operator *(
+        const matrix<t0, rr, cc>& aa, const complex<t1>& bb
+    ) {
+        typedef typename arithmetic<t0, complex<t1> >::type tt;
+        return internal::matrix_scalar_mul<tt, t0, rr, cc, complex<t1> >(aa, bb);
+    }
+    //}}}
+
     //}}}
     //{{{ binary / 
 
-    //{{{ matrix<complex> / complex 
-    template<class t0, int64 rr, int64 cc, class t1> 
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator /(
-        const matrix<complex<t0>, rr, cc>& aa, const complex<t1>& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, complex<t1> >(aa, 1/bb);
-    }
-    //}}}
-    //{{{ matrix<complex> / real    
+    //{{{ matrix / complex 
     template<class t0, int64 rr, int64 cc, class t1>
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator /(
-        const matrix<complex<t0>, rr, cc>& aa, const t1& bb
-    ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
-        return internal::matrix_scalar_mul<tt, complex<t0>, rr, cc, t1>(aa, 1/bb);
-    }
-    //}}}
-    //{{{ matrix<real>    / complex 
-    template<class t0, int64 rr, int64 cc, class t1>
-    matrix<complex<typename arithmetic<t0, t1>::type>, rr, cc> operator /(
+    matrix<typename arithmetic<t0, complex<t1> >::type, rr, cc> operator /(
         const matrix<t0, rr, cc>& aa, const complex<t1>& bb
     ) {
-        typedef complex<typename arithmetic<t0, t1>::type> tt;
+        typedef typename arithmetic<t0, complex<t1> >::type tt;
         return internal::matrix_scalar_mul<tt, t0, rr, cc, complex<t1> >(aa, 1/bb);
     }
     //}}}
-    //{{{ matrix<real>    / real    
+    //{{{ matrix / scalar    
     template<class t0, int64 rr, int64 cc, class t1>
     matrix<typename arithmetic<t0, t1>::type, rr, cc> operator /(
         const matrix<t0, rr, cc>& aa, const t1& bb
