@@ -4946,6 +4946,7 @@ namespace xm {
         return result;
     }
 
+    // XXX: replace this with cache oblivious version
     template<class tt, int64 rr, int64 cc> // build a transpose (not conjugate) of the matrix
     matrix<tt, cc, rr> trans(const matrix<tt, rr, cc>& aa) {
         // these are swapped on purpose
@@ -4960,6 +4961,7 @@ namespace xm {
         return result;
     }
 
+    // XXX: replace this with cache oblivious version
     template<class tt, int64 rr, int64 cc> // build the conjugate transpose of the matrix
     matrix<tt, cc, rr> herm(const matrix<tt, rr, cc>& aa) {
         // these are swapped on purpose
