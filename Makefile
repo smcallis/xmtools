@@ -25,7 +25,7 @@ PROGRAMS = \
     covar \
     eigen \
     coswin \
-    fixit \
+    matmul \
 
 all: $(PROGRAMS)
 

@@ -574,11 +574,25 @@ namespace xm {
         return aa < bb ? aa : bb;
     }
 
+    template<class atype, class btype, class ctype>
+    typename conditional<atype, btype>::type min(
+        const atype& aa, const btype& bb, const ctype& cc
+    ) { 
+        return min(aa, min(bb, cc));
+    }
+
     template<class atype, class btype>
     typename conditional<atype, btype>::type max(
         const atype& aa, const btype& bb
     ) { 
         return bb < aa ? aa : bb;
+    }
+
+    template<class atype, class btype, class ctype>
+    typename conditional<atype, btype>::type max(
+        const atype& aa, const btype& bb, const ctype& cc
+    ) { 
+        return max(aa, max(bb, cc));
     }
 
     static inline double stopwatch() {
@@ -4606,25 +4620,86 @@ namespace xm {
     }
     //}}}
     //{{{ binary * 
-    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
-    typename internal::matmultype<t0, r0, c0, t1, r1, c1>::type operator *(
-        const matrix<t0, r0, c0>& aa, const matrix<t1, r1, c1>& bb
-    ) {
-        const int64 rows = aa.rows();
-        const int64 cols = bb.cols();
-        const int64 size = aa.cols();
-        check(bb.rows() == size, "compatible size %lld == %lld", size, bb.rows());
-        typename internal::matmultype<t0, r0, c0, t1, r1, c1>::type cc(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                typename arithmetic<t0, t1>::type sum = 0;
-                for (int64 kk = 0; kk<size; kk++) {
-                    sum += aa(ii, kk)*bb(kk, jj);
+    //{{{ internal
+    namespace internal {
+        //
+        // This algorithm is taken from the Wikipedia page on matrix
+        // multiplication and references "Cache-Oblivious Algorithms",
+        // from Harald Prokop's 1999 Master's thesis at MIT.
+        //
+        // aa[rows, cols] = bb[rows, size] * cc[size, cols]
+        //
+        template<class atype, class btype, class ctype>
+        void recursive_matrix_mul(
+            atype* aa, const btype* bb, const ctype* cc,
+            int64 rows, int64 cols, int64 size, bool zero,
+            int64 ilo, int64 ihi,
+            int64 jlo, int64 jhi,
+            int64 klo, int64 khi
+        ) {
+            for (;;) {
+                int64 di = ihi - ilo;
+                int64 dj = jhi - jlo;
+                int64 dk = khi - klo;
+                int64 mm = max(di, dj, dk);
+
+                if (mm <= 32) {
+                    for (int64 ii = ilo; ii<ihi; ii++) {
+                        for (int64 jj = jlo; jj<jhi; jj++) {
+                            atype sum = zero ? 0 : aa[ii*cols + jj];
+                            for (int64 kk = klo; kk<khi; kk++) {
+                                sum += bb[ii*size + kk] * cc[kk*cols + jj];
+                            }
+                            aa[ii*cols + jj] = sum;
+                        }
+                    }
+                    return;
                 }
-                cc(ii, jj) = sum;
+
+                if (mm == di) {
+                    recursive_matrix_mul(
+                        aa, bb, cc, rows, cols, size, zero,
+                        ilo, ilo + di/2, jlo, jhi, klo, khi
+                    );
+                    ilo += di/2;
+                    continue;
+                }
+
+                if (mm == dj) {
+                    recursive_matrix_mul(
+                        aa, bb, cc, rows, cols, size, zero,
+                        ilo, ihi, jlo, jlo + dj/2, klo, khi
+                    );
+                    jlo += dj/2;
+                    continue;
+                }
+
+                recursive_matrix_mul(
+                    aa, bb, cc, rows, cols, size, zero,
+                    ilo, ihi, jlo, jhi, klo, klo + dk/2
+                );
+                zero = false;
+                klo += dk/2;
             }
         }
-        return cc;
+    }
+    //}}}
+
+    template<class t0, int64 r0, int64 c0, class t1, int64 r1, int64 c1>
+    typename internal::matmultype<t0, r0, c0, t1, r1, c1>::type operator *(
+        const matrix<t0, r0, c0>& bb, const matrix<t1, r1, c1>& cc
+    ) {
+        const int64 rows = bb.rows();
+        const int64 cols = cc.cols();
+        const int64 size = bb.cols();
+        check(cc.rows() == size, "compatible size %lld == %lld", size, cc.rows());
+        typename internal::matmultype<t0, r0, c0, t1, r1, c1>::type aa(rows, cols);
+        internal::recursive_matrix_mul(
+            aa.data(), bb.data(), cc.data(),
+            rows, cols, size, true,
+            0, rows, 0, cols, 0, size
+        );
+        return aa;
     }
     //}}}
     //{{{ binary % 
