@@ -19,6 +19,21 @@ namespace xm {
                 }
             }
         }
+
+
+        template<class type>
+        void standard_matrix_tran(
+            type* aa, const type* bb,
+            int64 rows, int64 cols
+        ) {
+            for (int64 ii = 0; ii<rows; ii++) {
+                for (int64 jj = 0; jj<cols; jj++) {
+                    aa[ii*cols + jj] = bb[jj*rows + ii];
+                }
+            }
+        }
+
+
     }
 
 
@@ -37,13 +52,67 @@ namespace xm {
 int main() {
     using namespace xm;
 
+    prng random(1);
+
+    const int64 rows = 1101;
+    const int64 cols = 1303;
+    matrix<int64> AA(rows, cols, 0);
+    matrix<int64> BB(cols, rows, 0);
+
+    /*
+    for (int64 ii = 0; ii<cols; ii++) {
+        for (int64 jj = 0; jj<rows; jj++) {
+            BB(ii, jj) = (int64)(random.uint64() % 10);
+        }
+    }
+    internal::recursive_matrix_trans(
+        AA.data(), BB.data(),
+        rows, cols, 0, rows, 0, cols
+    );
+    dump("A", AA);
+    dump("B", BB);
+    */
+
+    const int64 its = 1000;
+
+    int64 hack = BB(0, 0);
+    {
+        double before0 = stopwatch();
+        int64 sum0 = 0;
+        for (int64 tt = 0; tt<its; tt++) {
+            internal::standard_matrix_tran(
+                AA.data(), BB.data(),
+                rows, cols
+            );
+            sum0 += AA(0, 0);
+            BB(0, 0) += 1;
+        }
+        double after0 = stopwatch();
+        fprintf(stderr, "standard: %lf, %lld\n", after0 - before0, sum0);
+    }
+    BB(0, 0) = hack;
+
+    {
+        double before0 = stopwatch();
+        int64 sum0 = 0;
+        for (int64 tt = 0; tt<its; tt++) {
+            internal::recursive_matrix_trans(
+                AA.data(), BB.data(),
+                rows, cols, 0, rows, 0, cols
+            );
+            sum0 += AA(0, 0);
+            BB(0, 0) += 1;
+        }
+        double after0 = stopwatch();
+        fprintf(stderr, "standard: %lf, %lld\n", after0 - before0, sum0);
+    }
+
+    /*
     const int64 rows = 9000;
     const int64 cols = 800;
     const int64 size = 300;
     matrix<int64> BB(rows, size);
     matrix<int64> CC(size, cols);
-
-    prng random(1);
 
     for (int64 ii = 0; ii<rows; ii++) {
         for (int64 jj = 0; jj<size; jj++) {
@@ -98,6 +167,7 @@ int main() {
     //dump("A1", A1);
 
     //dump("A1 - A0", A1 - A0);
+    */
 
 
 

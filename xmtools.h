@@ -4946,34 +4946,127 @@ namespace xm {
         return result;
     }
 
-    // XXX: replace this with cache oblivious version
-    template<class tt, int64 rr, int64 cc> // build a transpose (not conjugate) of the matrix
-    matrix<tt, cc, rr> trans(const matrix<tt, rr, cc>& aa) {
-        // these are swapped on purpose
-        const int64 rows = aa.cols();
-        const int64 cols = aa.rows();
-        matrix<tt, cc, rr> result(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                result(ii, jj) = aa(jj, ii);
+    //{{{ internal 
+    namespace internal {
+        //
+        // This algorithm, and the one Hermition equivalent below, is taken
+        // from Wikipedia which references "Cache-Oblivious Algorithms", from
+        // Harald Prokop's 1999 Master's thesis at MIT.
+        //
+        // aa[rows, cols] = trans(bb[cols, rows])
+        //
+        template<class type>
+        void recursive_matrix_trans(
+            type* aa, const type* bb,
+            int64 rows, int64 cols,
+            int64 ilo, int64 ihi,
+            int64 jlo, int64 jhi
+        ) {
+            for (;;) {
+                int64 di = ihi - ilo;
+                int64 dj = jhi - jlo;
+                int64 mm = max(di, dj);
+
+                if (mm <= 32) {
+                    for (int64 ii = ilo; ii<ihi; ii++) {
+                        for (int64 jj = jlo; jj<jhi; jj++) {
+                            aa[ii*cols + jj] = bb[jj*rows + ii];
+                        }
+                    }
+                    return;
+                }
+
+                if (mm == di) {
+                    recursive_matrix_trans(
+                        aa, bb, rows, cols,
+                        ilo, ilo + di/2, jlo, jhi
+                    );
+                    ilo += di/2;
+                    continue;
+                }
+
+                if (mm == dj) {
+                    recursive_matrix_trans(
+                        aa, bb, rows, cols,
+                        ilo, ihi, jlo, jlo + dj/2
+                    );
+                    jlo += dj/2;
+                    continue;
+                }
             }
         }
-        return result;
+
+        //
+        // aa[rows, cols] = herm(bb[cols, rows])
+        //
+        template<class type>
+        void recursive_matrix_herm(
+            type* aa, const type* bb,
+            int64 rows, int64 cols,
+            int64 ilo, int64 ihi,
+            int64 jlo, int64 jhi
+        ) {
+            for (;;) {
+                int64 di = ihi - ilo;
+                int64 dj = jhi - jlo;
+                int64 mm = max(di, dj);
+
+                if (mm <= 32) {
+                    for (int64 ii = ilo; ii<ihi; ii++) {
+                        for (int64 jj = jlo; jj<jhi; jj++) {
+                            aa[ii*cols + jj] = conj(bb[jj*rows + ii]);
+                        }
+                    }
+                    return;
+                }
+
+                if (mm == di) {
+                    recursive_matrix_herm(
+                        aa, bb, rows, cols,
+                        ilo, ilo + di/2, jlo, jhi
+                    );
+                    ilo += di/2;
+                    continue;
+                }
+
+                if (mm == dj) {
+                    recursive_matrix_herm(
+                        aa, bb, rows, cols,
+                        ilo, ihi, jlo, jlo + dj/2
+                    );
+                    jlo += dj/2;
+                    continue;
+                }
+            }
+        }
+
+    }
+    //}}}
+
+    template<class tt, int64 rr, int64 cc> // build a transpose (not conjugate) of the matrix
+    matrix<tt, rr, cc> trans(const matrix<tt, cc, rr>& bb) {
+        // these are swapped on purpose
+        const int64 rows = bb.cols();
+        const int64 cols = bb.rows();
+        matrix<tt, rr, cc> aa(rows, cols);
+        internal::recursive_matrix_trans(
+            aa.data(), bb.data(), rows, cols,
+            0, rows, 0, cols
+        );
+        return aa;
     }
 
-    // XXX: replace this with cache oblivious version
     template<class tt, int64 rr, int64 cc> // build the conjugate transpose of the matrix
-    matrix<tt, cc, rr> herm(const matrix<tt, rr, cc>& aa) {
+    matrix<tt, rr, cc> herm(const matrix<tt, cc, rr>& bb) {
         // these are swapped on purpose
-        const int64 rows = aa.cols();
-        const int64 cols = aa.rows();
-        matrix<tt, cc, rr> result(rows, cols);
-        for (int64 ii = 0; ii<rows; ii++) {
-            for (int64 jj = 0; jj<cols; jj++) {
-                result(ii, jj) = conj(aa(jj, ii));
-            }
-        }
-        return result;
+        const int64 rows = bb.cols();
+        const int64 cols = bb.rows();
+        matrix<tt, rr, cc> aa(rows, cols);
+        internal::recursive_matrix_herm(
+            aa.data(), bb.data(), rows, cols,
+            0, rows, 0, cols
+        );
+        return aa;
     }
 
     /* XXX: how to handle the template sizes?
