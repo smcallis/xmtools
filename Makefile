@@ -26,6 +26,7 @@ PROGRAMS = \
     eigen \
     coswin \
     matmul \
+    hashit \
 
 all: $(PROGRAMS)
 
