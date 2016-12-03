@@ -1,5 +1,6 @@
 
-CC = g++ -std=c++98 -fwrapv -pthread -g -O3 -Wall
+CXXFLAGS = -std=c++98 -fwrapv -pthread -g -O3 -Wall -Wextra
+LDFLAGS = -lX11 -lm -lrt
 
 INCLUDES = \
     xmtools.h \
@@ -30,7 +31,7 @@ all: $(PROGRAMS)
 
 % : %.cc $(INCLUDES)
 	@/bin/echo Compiling $@
-	@$(CC) $< -o $@ -lX11 -lm -lrt
+	@$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
 
 clean:
 	/bin/rm -rf $(PROGRAMS) *.dSYM *.so *.pyc

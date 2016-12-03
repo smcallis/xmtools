@@ -93,6 +93,7 @@ namespace xm {
 
 
 
+    /*
     static inline void dump(const char* str, const matrix<cdouble>& A) {
         printf("%s\n", str);
         for (int64 ii = 0; ii<A.rows(); ii++) {
@@ -102,6 +103,7 @@ namespace xm {
             printf("\n");
         }
     }
+    */
 
     static inline void dump(const char* str, const matrix<double>& A) {
         printf("%s\n", str);

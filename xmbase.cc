@@ -3,6 +3,10 @@ using namespace xm;
 
 template<class type>
 int baseband(bluereader& input, bluewriter& output, ssize_t offset, ssize_t length) {
+    (void)input;
+    (void)output;
+    (void)offset;
+    (void)length;
     return 0;
 }
 

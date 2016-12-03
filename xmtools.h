@@ -7,6 +7,7 @@
 //{{{ includes
 
 #include <new>
+//#include <stdexcept>
 #include <math.h>
 #include <time.h>
 #include <ctype.h>
@@ -482,24 +483,24 @@ namespace xm {
     //}}}
     //{{{ Fundamental Functions:         check, alloc, swap, hash, max, min 
 
-    __attribute__ ((format (printf, 2, 3))) 
-    static inline void check(bool cond, const char* format, ...) {
+    __attribute__ ((format (printf, 2, 3)))
+    static inline void check(bool cond, const char* fmt, ...) {
         if (!cond) {
-            // Print the check(...) message
-            fprintf(stderr, "Check failed: ");
+            struct failure : std::exception {
+                char text[256];
+                const char* what() const throw() {
+                    return text;
+                }
+            } fail;
+
             va_list args;
-            va_start(args, format);
-            vfprintf(stderr, format, args);
+            va_start(args, fmt);
+            vsnprintf(fail.text, 256, fmt, args);
             va_end(args);
-            fprintf(stderr, "\nStack Trace:\n");
-
-            char command[64];
-            sprintf(command, "/usr/bin/pstack %d", (int)getpid());
-            if (system(command) != 0) fprintf(stderr, "failed to run pstack\n");
-
-            exit(EXIT_FAILURE);
+            throw fail;
         }
     }
+    
     // A checked version of malloc
     template<class type>
     type* alloc(int64 extra=0) {
@@ -642,7 +643,7 @@ namespace xm {
             template<class tt>
             void assign(const list<tt>& other);
 
-            template<class tt> friend class list;
+            template<class tt> friend struct list;
             template<class tt> friend void swap(
                 list<tt>& flip, list<tt>& flop
             );
@@ -1092,8 +1093,8 @@ namespace xm {
             int64 search(const ktype& key, size_t hh) const;
             void backshift(int64 index);
 
-            template<class kk, class vv> friend class dict;
-            template<class kk, class vv> friend class iter;
+            template<class kk, class vv> friend struct dict;
+            //template<class kk, class vv> friend struct iter;
             template<class kk, class vv> friend void swap(
                 dict<kk, vv>& flip, dict<kk, vv>&flop
             );
@@ -3086,7 +3087,7 @@ namespace xm {
             template<class t0, int64 s0> friend void swap(
                 vector<t0, s0>& flip, vector<t0, s0>& flop
             );
-            template<class anyt, int64 anys> friend class vector;
+            template<class anyt, int64 anys> friend struct vector;
 
             type storage[ss];
     };
@@ -3139,7 +3140,7 @@ namespace xm {
     template<class tt>
     vector<type, ss>& vector<type, ss>::operator =(const vector<tt, ss>& other) {
         for (int64 ii = 0; ii<ss; ii++) {
-            data[ii] = other.storage[ii];
+            storage[ii] = other.storage[ii];
         }
         return *this;
     }
@@ -3149,7 +3150,7 @@ namespace xm {
     vector<type, ss>& vector<type, ss>::operator =(const vector<tt, -1>& other) {
         check(other.size() == ss, "matching size");
         for (int64 ii = 0; ii<ss; ii++) {
-            data[ii] = other[ii];
+            storage[ii] = other[ii];
         }
         return *this;
     }
@@ -3157,7 +3158,7 @@ namespace xm {
     template<class type, int64 ss>
     vector<type, ss>& vector<type, ss>::operator =(const vector<type, ss>& other) {
         for (int64 ii = 0; ii<ss; ii++) {
-            data[ii] = other.storage[ii];
+            storage[ii] = other.storage[ii];
         }
         return *this;
     }
@@ -3230,7 +3231,7 @@ namespace xm {
             template<class tt> friend void swap(
                 vector<tt, -1>& flip, vector<tt, -1>& flop
             );
-            template<class anyt, int64 anys> friend class vector;
+            template<class anyt, int64 anys> friend struct vector;
 
             struct implementation {
                 int64 size, padding_;
@@ -3412,7 +3413,7 @@ namespace xm {
             template<class t0, int64 r0, int64 c0> friend void swap(
                 matrix<t0, r0, c0>& flip, matrix<t0, r0, c0>& flop
             );
-            template<class anyt, int64 anyr, int64 anyc> friend class matrix;
+            template<class anyt, int64 anyr, int64 anyc> friend struct matrix;
 
             type storage[rr*cc];
     };
@@ -3462,7 +3463,7 @@ namespace xm {
         const matrix<tt, rr, cc>& other
     ) {
         for (int64 ii = 0; ii<rr*cc; ii++) {
-            data[ii] = other.storage[ii];
+            storage[ii] = other.storage[ii];
         }
         return *this;
     }
@@ -3475,7 +3476,7 @@ namespace xm {
         check(other.rows() == rr, "matching rows");
         check(other.cols() == cc, "matching cols");
         for (int64 ii = 0; ii<rr*cc; ii++) {
-            data[ii] = other[ii];
+            storage[ii] = other[ii];
         }
         return *this;
     }
@@ -3485,7 +3486,7 @@ namespace xm {
         const matrix<type, rr, cc>& other
     ) {
         for (int64 ii = 0; ii<rr*cc; ii++) {
-            data[ii] = other.storage[ii];
+            storage[ii] = other.storage[ii];
         }
         return *this;
     }
@@ -3581,7 +3582,7 @@ namespace xm {
             template<class tt> friend void swap(
                 matrix<tt, -1, -1>& flip, matrix<tt, -1, -1>& flop
             );
-            template<class anyt, int64 anyr, int64 anyc> friend class matrix;
+            template<class anyt, int64 anyr, int64 anyc> friend struct matrix;
 
             struct implementation {
                 int64 rows, cols;
@@ -4795,6 +4796,7 @@ namespace xm {
 
     template<class type>
     type imag(const type& aa) {
+        (void)aa;
         return 0;
     }
 
@@ -5975,7 +5977,7 @@ namespace xm {
     //}}}
     //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak, (polyroots) 
     namespace internal {
-        static bool diffsign(double aa, double bb) {
+        static inline bool diffsign(double aa, double bb) {
             return (bool)signbit(aa) != (bool)signbit(bb);
         }
     }
@@ -8288,9 +8290,6 @@ namespace xm {
             fprintf(stderr, "    %s\n\t%s\n", name.data(), doc.data());
             return false;
         }
-        //for (auto ii = args.begin(); ii != args.end(); ++ii) {
-        //    if (*ii && *ii == name) {
-        //        *ii = (char*)0;
         for (int64 ii = 0; ii<args.size(); ii++) {
             if (args[ii] && args[ii] == name) {
                 args[ii] = 0;
@@ -8309,9 +8308,6 @@ namespace xm {
             );
             return "";
         }
-        //for (auto ii = args.begin(); ii != args.end(); ++ii) {
-        //    if (*ii) {
-        //        if (*ii[0] == '-' && strcmp(*ii, "-") != 0) {
         for (int64 ii = 0; ii<args.size(); ii++) {
             if (args[ii]) {
                 if (args[ii][0] == '-' && ::strcmp(args[ii], "-") != 0) {
@@ -9106,25 +9102,8 @@ namespace xm {
     //}}}
     }
     //}}}
-    //}}}
 
-// TODO:
-//
-//  make sure arguments are (const) references when they should be
-//  check() with line numbers
-//  symeigens()
-//  adaptmin()
-//  quasimin()
-//  covarmin()
-//  quickselect()
-//  prng.sample()
-//  prng.shuffle()
-//  upper(string), lower(string)
-//  struct heap<>
-//  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
-//  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
-//  struct autodiff<>
-//
+////////////////////////////////////////////////
 
     //{{{ xmheader
     namespace internal {
@@ -11137,26 +11116,28 @@ namespace xm {
     //}}}
 
 }
-    
+
 #if 0
-    // this one is good, need to bring it back
-    __attribute__ ((format (printf, 2, 3)))
-    static inline void check(bool cond, const char* fmt, ...) {
+    /*{{{ check() old version, exits instead of throws
+    __attribute__ ((format (printf, 2, 3))) 
+    static inline void check(bool cond, const char* format, ...) {
         if (!cond) {
+            // Print the check(...) message
+            fprintf(stderr, "Check failed: ");
             va_list args;
-            va_start(args, fmt);
-            int64 bytes = vsnprintf(0, 0, fmt, args);
+            va_start(args, format);
+            vfprintf(stderr, format, args);
             va_end(args);
+            fprintf(stderr, "\nStack Trace:\n");
 
-            string msg(bytes, 0);
-            va_list again;
-            va_start(again, fmt);
-            vsnprintf(&msg[0], bytes + 1, fmt, again);
-            va_end(again);
+            char command[64];
+            sprintf(command, "/usr/bin/pstack %d", (int)getpid());
+            if (system(command) != 0) fprintf(stderr, "failed to run pstack\n");
 
-            throw std::runtime_error("check failed: " + msg);
+            exit(EXIT_FAILURE);
         }
     }
+    }}}*/
     //{{{ sum funcs 
     
     template<class type>
@@ -11650,36 +11631,6 @@ namespace xm {
         //  +--+--+--+--+--+--+
         //
     //}}}
-//{{{ uncaught exception handler
-namespace stack_trace_on_uncaught_exceptions {
-    // There is no reason to use anything in here directly.  This block of code
-    // replaces the terminate handler with our custom version that prints a stack
-    // trace.  The handler is registered automatically before main is called.
-    static void handler() {
-        fprintf(stderr, "Termination Stack Trace:\n");
-        char command[64];
-        sprintf(command, "/usr/bin/pstack %d", (int)getpid());
-        if (system(command) != 0) {
-            fprintf(stderr, "  failed to run pstack (install gdb)\n");
-        }
-
-        try {
-            std::rethrow_exception(std::current_exception());
-        } catch (const char* msg) {
-            fprintf(stderr, "Exception: '%s'\n", msg);
-        } catch (const std::string& msg) {
-            fprintf(stderr, "Exception: '%s'\n", msg.data());
-        } catch (const std::exception& ee) {
-            fprintf(stderr, "Exception: '%s'\n", ee.what());
-        } catch (...) {
-            fprintf(stderr, "Unknown Exception\n");
-        }
-    }
-    static struct initializer {
-        initializer() { std::set_terminate(handler); }
-    } this_is_constructed_before_main_is_called;
-}
-//}}}
     //{{{ broken matrix operators
 
 
@@ -11940,6 +11891,41 @@ namespace stack_trace_on_uncaught_exceptions {
             > type;
         };
         //}}}
+//{{{ Uncaught Exception Handler     
+#if 0
+namespace stack_trace_on_uncaught_exceptions {
+    // There is no reason to use anything in here directly.  This block of code
+    // replaces the terminate handler with our custom version that prints a stack
+    // trace.  The handler is registered automatically before main is called.
+    static void handler() {
+        /*
+        fprintf(stderr, "Termination Stack Trace:\n");
+        char command[64];
+        sprintf(command, "/usr/bin/pstack %d", (int)getpid());
+        if (system(command) != 0) {
+            fprintf(stderr, "  failed to run pstack (install gdb)\n");
+        }
+        */
+
+        try {
+            //std::rethrow_exception(std::current_exception());
+            throw;
+        } catch (const char* msg) {
+            fprintf(stderr, "XXX Exception: '%s'\n", msg);
+        } catch (const string& msg) {
+            fprintf(stderr, "YYY Exception: '%s'\n", msg.data());
+        } catch (const std::exception& ee) {
+            fprintf(stderr, "ZZZ Exception: '%s'\n", ee.what());
+        } catch (...) {
+            fprintf(stderr, "Unknown Exception\n");
+        }
+    }
+    static struct initializer {
+        initializer() { std::set_terminate(handler); }
+    } this_is_constructed_before_main_is_called;
+}
+#endif
+//}}}
 #endif
 
 #endif
