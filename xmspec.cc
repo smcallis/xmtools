@@ -8,6 +8,7 @@ int main(int argc, char* argv[]) {
 
     args.done();
 
+    /*
 
     const int64 size = 16384;
     vector<cfloat> data(size, 0);
@@ -35,6 +36,7 @@ int main(int argc, char* argv[]) {
     fflush(gnuplot);
 
 
+    */
 
     return 0;
 }

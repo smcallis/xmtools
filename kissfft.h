@@ -80,13 +80,13 @@ namespace xm {
             return val;
         }
 
-        template<> f32x4 spread<f32x4>(double dd) {
+        template<> deprecated::f32x4 spread<deprecated::f32x4>(double dd) {
             float ff = (float)dd;
-            return (f32x4){ ff, ff, ff, ff };
+            return (deprecated::f32x4){ ff, ff, ff, ff };
         }
 
-        template<> f64x2 spread<f64x2>(double dd) {
-            return (f64x2){ dd, dd };
+        template<> deprecated::f64x2 spread<deprecated::f64x2>(double dd) {
+            return (deprecated::f64x2){ dd, dd };
         }
     }
 
@@ -382,86 +382,89 @@ namespace xm {
     }
     //}}}
     //}}}
-    //{{{ kisssse
-    
-    struct kisssse {
-        kisssse(int64 samples);
 
-        void fft(cfloat* data);
-
-        private:
-            kissfft<f32x4> kiss;
-            vector<cfloat> scratch;
-    };
-
-    kisssse::kisssse(int64 samples) : kiss(samples/4), scratch(samples) {
-        check(samples > 0 && samples%4 == 0, "must be multiple of 4 size");
-    }
-
-    void kisssse::fft(cfloat* data) {
-        const int64 size = scratch.size();
-        const int64 quarter = size/4;
-        float* ptr = (float*)data;
-
-        for (int64 ii = 0; ii<quarter; ii++) {
-            float re0 = ptr[ii*8 + 0];
-            float im0 = ptr[ii*8 + 1];
-            float re1 = ptr[ii*8 + 2];
-            float im1 = ptr[ii*8 + 3];
-            float re2 = ptr[ii*8 + 4];
-            float im2 = ptr[ii*8 + 5];
-            float re3 = ptr[ii*8 + 6];
-            float im3 = ptr[ii*8 + 7];
-
-            ptr[ii*8 + 0] = re0;
-            ptr[ii*8 + 1] = re1;
-            ptr[ii*8 + 2] = re2;
-            ptr[ii*8 + 3] = re3;
-            ptr[ii*8 + 4] = im0;
-            ptr[ii*8 + 5] = im1;
-            ptr[ii*8 + 6] = im2;
-            ptr[ii*8 + 7] = im3;
-        }
-
-        float* tmp = (float*)scratch.data();
-        typedef complex<f32x4> cf32x4;
-        kiss.exec((cf32x4*)tmp, (cf32x4*)ptr);
+    namespace deprecated {
+        //{{{ kisssse
         
-        //memcpy(ptr, tmp, size*sizeof(cfloat));
+        struct kisssse {
+            kisssse(int64 samples);
 
+            void fft(cfloat* data);
 
-        double cc = 1, ss = 0;
-        double aa = 2*sqr(::sin(-M_PI/size));
-        double bb = ::sin(-2*M_PI/size);
+            private:
+                kissfft<f32x4> kiss;
+                vector<cfloat> scratch;
+        };
 
-        for (int64 ii = 0; ii<quarter; ii++) {
-            cfloat t1(cc, ss);
-            cfloat t2 = t1*t1;
-            cfloat t3 = t2*t1;
-
-            cfloat z0 = cfloat(tmp[ii*8 + 0], tmp[ii*8 + 4]);
-            cfloat z1 = cfloat(tmp[ii*8 + 1], tmp[ii*8 + 5])*t1;
-            cfloat z2 = cfloat(tmp[ii*8 + 2], tmp[ii*8 + 6])*t2;
-            cfloat z3 = cfloat(tmp[ii*8 + 3], tmp[ii*8 + 7])*t3;
-
-            data[ii + 0*quarter].re = z0.re + z1.re + z2.re + z3.re;
-            data[ii + 0*quarter].im = z0.im + z1.im + z2.im + z3.im;
-            data[ii + 1*quarter].re = z0.re + z1.im - z2.re - z3.im;
-            data[ii + 1*quarter].im = z0.im - z1.re - z2.im + z3.re;
-            data[ii + 2*quarter].re = z0.re - z1.re + z2.re - z3.re;
-            data[ii + 2*quarter].im = z0.im - z1.im + z2.im - z3.im;
-            data[ii + 3*quarter].re = z0.re - z1.im - z2.re + z3.im;
-            data[ii + 3*quarter].im = z0.im + z1.re - z2.im - z3.re;
-
-            double tt = cc - (aa*cc + bb*ss);
-            ss = ss + (bb*cc - aa*ss);
-            cc = tt;
+        kisssse::kisssse(int64 samples) : kiss(samples/4), scratch(samples) {
+            check(samples > 0 && samples%4 == 0, "must be multiple of 4 size");
         }
 
+        void kisssse::fft(cfloat* data) {
+            const int64 size = scratch.size();
+            const int64 quarter = size/4;
+            float* ptr = (float*)data;
+
+            for (int64 ii = 0; ii<quarter; ii++) {
+                float re0 = ptr[ii*8 + 0];
+                float im0 = ptr[ii*8 + 1];
+                float re1 = ptr[ii*8 + 2];
+                float im1 = ptr[ii*8 + 3];
+                float re2 = ptr[ii*8 + 4];
+                float im2 = ptr[ii*8 + 5];
+                float re3 = ptr[ii*8 + 6];
+                float im3 = ptr[ii*8 + 7];
+
+                ptr[ii*8 + 0] = re0;
+                ptr[ii*8 + 1] = re1;
+                ptr[ii*8 + 2] = re2;
+                ptr[ii*8 + 3] = re3;
+                ptr[ii*8 + 4] = im0;
+                ptr[ii*8 + 5] = im1;
+                ptr[ii*8 + 6] = im2;
+                ptr[ii*8 + 7] = im3;
+            }
+
+            float* tmp = (float*)scratch.data();
+            typedef complex<f32x4> cf32x4;
+            kiss.exec((cf32x4*)tmp, (cf32x4*)ptr);
+            
+            //memcpy(ptr, tmp, size*sizeof(cfloat));
+
+
+            double cc = 1, ss = 0;
+            double aa = 2*sqr(::sin(-M_PI/size));
+            double bb = ::sin(-2*M_PI/size);
+
+            for (int64 ii = 0; ii<quarter; ii++) {
+                cfloat t1(cc, ss);
+                cfloat t2 = t1*t1;
+                cfloat t3 = t2*t1;
+
+                cfloat z0 = cfloat(tmp[ii*8 + 0], tmp[ii*8 + 4]);
+                cfloat z1 = cfloat(tmp[ii*8 + 1], tmp[ii*8 + 5])*t1;
+                cfloat z2 = cfloat(tmp[ii*8 + 2], tmp[ii*8 + 6])*t2;
+                cfloat z3 = cfloat(tmp[ii*8 + 3], tmp[ii*8 + 7])*t3;
+
+                data[ii + 0*quarter].re = z0.re + z1.re + z2.re + z3.re;
+                data[ii + 0*quarter].im = z0.im + z1.im + z2.im + z3.im;
+                data[ii + 1*quarter].re = z0.re + z1.im - z2.re - z3.im;
+                data[ii + 1*quarter].im = z0.im - z1.re - z2.im + z3.re;
+                data[ii + 2*quarter].re = z0.re - z1.re + z2.re - z3.re;
+                data[ii + 2*quarter].im = z0.im - z1.im + z2.im - z3.im;
+                data[ii + 3*quarter].re = z0.re - z1.im - z2.re + z3.im;
+                data[ii + 3*quarter].im = z0.im + z1.re - z2.im - z3.re;
+
+                double tt = cc - (aa*cc + bb*ss);
+                ss = ss + (bb*cc - aa*ss);
+                cc = tt;
+            }
+
+        }
+
+
+        //}}}
     }
-
-
-    //}}}
 
 }
 

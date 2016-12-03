@@ -24,8 +24,6 @@ PROGRAMS = \
     xmtone \
     covar \
     eigen \
-    coswin \
-    matmul \
     hashit \
 
 all: $(PROGRAMS)

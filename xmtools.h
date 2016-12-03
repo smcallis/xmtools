@@ -5103,309 +5103,91 @@ namespace xm {
     */
 
     //}}}
-    //{{{ Matrix Decompositions:         (qrdecomp), (lqdecomp), (lddecomp), cholesky 
+    //{{{ Matrix Decompositions:         (qrdecomp), (lqdecomp), (lddecomp) 
     //}}}
-    //{{{ Eigen and SV Decomps:          svdecomp, (symeigens), (geneigens) 
+    //{{{ Cholesky Functions:            cholesky, chokupdate, cholunitize 
+    
+    //
+    // Decompose A = L * L^t with the Cholesky algorithm
+    //
+    static inline void cholesky(double* L, const double* A, int64 dim) {
+        memset(L, 0, dim*dim*sizeof(double));
+        for (int64 ii = 0; ii<dim; ii++) {
+            for (int64 jj = 0; jj<=ii; jj++) {
+                double sum = 0;
+                for (int64 kk = 0; kk<jj; kk++) {
+                    sum += L[ii*dim + kk]*L[jj*dim + kk];
+                }
+                double inv = 1/L[jj*dim +jj];
+                L[ii*dim + jj] = (
+                    (ii == jj) ? sqrt(A[ii*dim + ii] - sum) :
+                    (A[ii*dim + jj] - sum) * inv
+                );
+            }
+        }
+    }
+
+    // Modify a cholesky composition.  It's either "update" or "downdate",
+    // depending on the sign.  (+1 = update, -1 = downdate).  Both arguments
+    // are modified.
+    static inline void cholupdate(
+        double* L, int sign, double* x, int64 len
+    ) {
+        check(sign == +1 || sign == -1, "sanity");
+        for (int64 jj = 0; jj<len; jj++) {
+            double rr = sqrt(
+                sqr(L[jj*len + jj]) + sign*sqr(x[jj])
+            );
+            double cc = rr/L[jj*len + jj];
+            double ss = x[jj]/L[jj*len + jj];
+            L[jj*len + jj] = rr;
+            for (int64 ii = jj+1; ii<len; ii++) {
+                L[ii*len + jj] = (L[ii*len + jj] + sign*ss*x[ii])/cc;
+            }
+            for (int64 ii = jj+1; ii<len; ii++) {
+                x[ii] = cc*x[ii] - ss*L[ii*len + jj];
+            }
+        }
+    }
+
+    // Scale L so the largest diagonal is 1.0
+    static inline void cholunitize(double* L, int64 dim) {
+        double biggest = 0;
+        for (int64 ii = 0; ii<dim; ii++) {
+            double norm = 0;
+            for (int64 jj = 0; jj<=ii; jj++) {
+                norm += sqr(L[ii*dim + jj]);
+            }
+            biggest = max(norm, biggest);
+        }
+        double scale = 1/sqrt(biggest);
+        for (int64 ii = 0; ii<dim; ii++) {
+            for (int64 jj = 0; jj<=ii; jj++) {
+                L[ii*dim + jj] *= scale;
+            }
+        }
+    }
+
+    // XXX: templatize this to work with fixed sized matrices
+    static inline matrix<double> cholesky(const matrix<double>& A) {
+        check(A.rows() == A.cols(), "must be a square matrix");
+        matrix<double> L(A.rows(), A.cols());
+        cholesky(L.data(), A.data(), A.rows());
+        return L;
+    }
+
+    // XXX: templatize this to work with fixed sized matrices
+    static inline matrix<double> cholupdate(
+        matrix<double> L, int sign, vector<double> x
+    ) {
+        check(L.rows() == L.cols(), "must be a square matrix");
+        check(L.rows() == x.size(), "must be a matching size");
+        cholupdate(L.data(), sign, x.data(), x.size());
+        return L;
+    }
+
     //}}}
     //{{{ Linear Solvers:                gensolve, (symsolve) 
-    //}}}
-    //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak, (polyroots) 
-    //}}}
-    //{{{ Numerical Optimization:        (adaptmin), covarmin, (quasimin) 
-    //}}}
-    //{{{ Automatic Differentiation:     (autodiff) 
-    //}}}
-    //{{{ Random Number Generation:      prng, shiftreg, gpsgold 
-    //}}}
-    //{{{ Statistics Functions:          ricepdf, ricecdf 
-    //}}}
-    //{{{ Fourier Transforms:            kissfft, kisssse, fftshift, ifftshift, shift2d 
-    //}}}
-    //{{{ Window Functions:              sinc, firwin, kaiswin, chebwin
-    //}}}
-    //{{{ IIR and FIR Filters:           firparks, halfpass 
-    //}}}
-    //{{{ Signal Processing:             blocktuner, polyphase, singleton 
-    //}}}
-    //{{{ Coordinate Systems:            cartesian, geodetic, transform 
-    //}}}
-    //{{{ Precision Time and Date:       timecode, datetime 
-    //}}}
-    //{{{ Raw Files and Memory Mapping:  rawfile 
-    //{{{ rawfile
-    namespace internal {
-
-        // C++ doesn't provide a good way to work directly with file descriptors.
-        // This class implements a container for the descriptor and a mmap ptr.
-        //
-        // This class returns errors rather than throwing exceptions, and we're
-        // hiding it in an internal namespace for now.  Don't rely on it staying.
-        //
-        struct rawfile;
-        static inline void swap(rawfile& flip, rawfile& flop);
-
-        struct rawfile {
-            ~rawfile() { clear(); }
-
-            // default constructor or with file descriptor
-            rawfile(int fd=-1) : fd(fd), ptr(0), len(0) {}
-
-            /* XXX:
-            // move constructor steals from the other object
-            rawfile(rawfile&& other) : fd(other.fd), ptr(other.ptr), len(other.len) {
-                other.fd = -1;
-                other.ptr = 0;
-                other.len = 0;
-            }
-            */
-
-            /* XXX:
-            rawfile& operator =(rawfile&& other) {
-                clear();
-                fd  = other.fd; other.fd  = -1;
-                ptr = other.ptr; other.ptr = 0;
-                len = other.len; other.len = 0;
-                return *this;
-            }
-            */
-
-
-            inline bool read(void* data, int64 bytes);
-            inline bool write(const void* data, int64 bytes);
-            inline bool seek(int64 offset);
-            inline bool skip(int64 bytes);
-            inline int64 size() const;
-            inline const void* mmap();
-
-            inline bool isfile() const;
-
-            private:
-                // no copies or defaults
-                void operator =(rawfile& other);// = delete;
-                rawfile(const rawfile&);// = delete;
-
-                void clear() {
-                    if (ptr) {
-                        msync(ptr, len, MS_SYNC);
-                        munmap(ptr, len);
-                    }
-                    if (fd >= 0) close(fd);
-                }
-                friend void swap(rawfile& flip, rawfile& flop);
-
-                // file descriptor
-                int fd;
-                // mmap fields
-                void* ptr;
-                int64 len;
-        };
-
-        bool rawfile::read(void* ptr, int64 len) {
-            char* buf = (char*)ptr;
-            int64 want = len;
-            while (want) {
-                int64 got = ::read(fd, buf, want);
-                if (got <= 0) {
-                    break;
-                }
-                want -= got;
-                buf += got;
-            }
-            return want == 0;
-        }
-
-        bool rawfile::write(const void* ptr, int64 len) {
-            const char* buf = (const char*)ptr;
-            while (len) {
-                int64 put = ::write(fd, buf, len);
-                if (put < 0) {
-                    break;
-                }
-                len -= put;
-                buf += put;
-            }
-            return len == 0;
-        }
-
-        bool rawfile::seek(int64 offset) {
-            off_t result = ::lseek(fd, offset, SEEK_SET);
-            return result != (off_t)-1;
-        }
-
-        bool rawfile::skip(int64 bytes) {
-            if (bytes == 0) {
-                return true;
-            }
-            off_t result = ::lseek(fd, bytes, SEEK_CUR);
-            if (result == (off_t)-1) {
-                if (errno != ESPIPE) {
-                    return false;
-                }
-                // Can't quickly seek, so we'll manually dump data
-                static char ignored[8192];
-                while (bytes) {
-                    int64 amt = bytes;
-                    if (amt > 8192) {
-                        amt = 8192;
-                    }
-                    int64 got = ::read(fd, ignored, amt);
-                    if (got != amt) {
-                        return false;
-                    }
-                    bytes -= got;
-                }
-            }
-            return true;
-        }
-
-        int64 rawfile::size() const {
-            struct stat st;
-            check(fstat(fd, &st) == 0, "fstat");
-            return st.st_size;
-        }
-
-        const void* rawfile::mmap() {
-            if (ptr) return ptr;
-            len = size();
-            return ptr = (char*)::mmap(0, len, PROT_READ, MAP_SHARED, fd, 0);
-        }
-
-        bool rawfile::isfile() const {
-            struct stat st;
-            check(fstat(fd, &st) == 0, "fstat");
-            return st.st_mode & S_IFREG;
-        }
-
-        static inline void swap(rawfile& flip, rawfile& flop) {
-            xm::swap(flip.fd, flop.fd);
-            xm::swap(flip.ptr, flop.ptr);
-            xm::swap(flip.len, flop.len);
-        }
-    }
-
-    //}}}
-    //}}}
-    //{{{ Unique Identifier              uniqueid 
-    //{{{ uniqueid
-    struct uniqueid {
-        uint8_t bytes[16];
-
-        static inline uniqueid parse(const string& text);
-    };
-
-    static inline size_t hash(const uniqueid& uuid) {
-        return hash(uuid.bytes, 16, 0);
-    }
-
-    static inline bool operator == (const uniqueid& aa, const uniqueid& bb) {
-        return memcmp(aa.bytes, bb.bytes, 16) == 0;
-    }
-
-    static inline bool operator != (const uniqueid& aa, const uniqueid& bb) {
-        return memcmp(aa.bytes, bb.bytes, 16) != 0;
-    }
-
-    static inline uniqueid genuuid() {
-        using namespace internal;
-        int fd = open("/dev/urandom", O_RDONLY);
-        check(fd >= 0, "opening '/dev/urandom' for reading");
-        rawfile file(fd);
-
-        uniqueid result;
-        check(file.read(result.bytes, 16), "reading /dev/urandom");
-        // this is the mask for randomly generated uuids
-        // ffffffff-ffff-4fff-bfff-ffffffffffff
-        result.bytes[6] &= 0x0f;
-        result.bytes[6] |= 0x40;
-        result.bytes[8] &= 0x0f;
-        result.bytes[8] |= 0xb0;
-        return result;
-    }
-
-    static inline string format(const uniqueid& uuid) {
-        return format(
-            "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-            uuid.bytes[ 0], uuid.bytes[ 1], uuid.bytes[ 2], uuid.bytes[ 3],
-            uuid.bytes[ 4], uuid.bytes[ 5], uuid.bytes[ 6], uuid.bytes[ 7],
-            uuid.bytes[ 8], uuid.bytes[ 9], uuid.bytes[10], uuid.bytes[11],
-            uuid.bytes[12], uuid.bytes[13], uuid.bytes[14], uuid.bytes[15]
-        );
-    }
-
-    inline uniqueid uniqueid::parse(const string &text) {
-        uniqueid uuid;
-        if(text.size() == 32) {
-            check(sscanf(
-                text.data(), "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx"
-                "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
-                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
-                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
-                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
-                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
-            ) == 16, "expected 16 pairs of hex chars with no hyphens");
-        }
-        else {
-            check(text.size() == 36, "expecting a 36 byte string");
-            check(sscanf(
-                text.data(), "%2hhx%2hhx%2hhx%2hhx-%2hhx%2hhx-"
-                "%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
-                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
-                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
-                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
-                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
-            ) == 16, "expected 16 pairs of hex chars with hyphens in the right places");
-        }
-        return uuid;
-    }
-
-    /* XXX
-    static inline std::ostream& operator <<(std::ostream& os, const uniqueid& uuid) {
-        os << format(uuid);
-        return os;
-    }
-    */
-
-    //}}}
-    //}}}
-    //{{{ Blue File Metadata:            bluekeyword, bluefield
-    //}}}
-    //{{{ Blue File Reader:              bluereader, load1000, load2000 
-    //}}}
-    //{{{ Blue File Writers:             bluewriter, dump1000, dump2000 
-    //}}}
-    //{{{ State Vectors:                 statevec, timestate, ephemeris, ephcache
-    //}}}
-    //{{{ Light Time:                    lightfwd, lightrev 
-    //}}}
-    //{{{ DTED Processing:               dtedtile, dtedcache 
-    //}}}
-    //{{{ Graphical Windows:             graphics, pixel, message, runwin 
-    //}}}
-    //{{{ Drawing Functions:             drawline, fillrect, drawtext 
-    //}}}
-    //{{{ Plotting Functions:            plotframe, plotseries, plotpoints 
-    //}}}
-    //{{{ Command Line Parsing:          cmdline 
-    //}}}
-
-// TODO:
-//
-//  make sure arguments are (const) references when they should be
-//  check() with line numbers
-//  symeigens()
-//  adaptmin()
-//  quasimin()
-//  covarmin()
-//  quickselect()
-//  prng.sample()
-//  prng.shuffle()
-//  upper(string), lower(string)
-//  struct heap<>
-//  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
-//  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
-//  struct autodiff<>
-//
-
     //{{{ gensolve
 
     namespace internal {
@@ -5691,6 +5473,8 @@ namespace xm {
 
 
     //}}}
+    //}}}
+    //{{{ Eigen and SV Decomps:          svdecomp, (symeigens), (geneigens) 
     //{{{ svdecomp
     namespace internal {
 
@@ -6188,332 +5972,318 @@ namespace xm {
     }
 
     //}}}
-    //{{{ qrsolve
-    //
-    // Solve A*X = B for X using QR decomposition
-    //
-    //    double A[rows * cols]
-    //    double B[rows * count]
-    //
-    // Returns false is A is singular
-    //
-    // A will be modified during the decomposition
-    //
-    // If successful, the result will be placed into the top
-    // 'cols' rows of B.  B will also be modified on failure
-    //
-    static inline bool qrsolve (
-        double* A, int64 rows, int64 cols,
-        double* B, int64 count
-    ) {
-        check(rows >= cols, "rows %lld must be >= cols %lld", rows, cols);
-
-        for (int64 jj = 0; jj<cols; jj++) {
-            double rr = 0;
-            for (int64 ii = jj; ii<rows; ii++) {
-                rr = hypot(rr, A[ii*cols + jj]);
-            }
-            // check if A is singular
-            if (rr == 0) return false;
-
-            // for numerical stability
-            if (A[jj*cols + jj] > 0) rr = -rr;
-
-            // normalize the Householder vector
-            double invrr = 1.0/rr;
-            for (int64 ii = jj; ii<rows; ii++) {
-                A[ii*cols + jj] *= invrr;
-            }
-            double pp = A[jj*cols + jj] -= 1;
-            double invpp = 1.0/pp;
-
-            // apply the Householder to the rest of A
-            for (int64 kk = jj + 1; kk<cols; kk++) {
-                double sum = 0;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    sum += A[ii*cols + jj]*A[ii*cols + kk];
-                }
-                sum *= invpp;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    A[ii*cols + kk] += sum*A[ii*cols + jj];
-                }
-            }
-
-            // apply the Householder to all of B
-            for (int64 kk = 0; kk<count; kk++) {
-                double sum = 0;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    sum += A[ii*cols + jj]*B[ii*count + kk];
-                }
-                sum *= invpp;
-                for (int64 ii = jj; ii<rows; ii++) {
-                    B[ii*count + kk] += sum*A[ii*cols + jj];
-                }
-            }
-
-            A[jj*cols + jj] = rr;
-        }
-
-        // back substitute R into B
-        for (int64 jj = cols - 1; jj >= 0; jj--) {
-            // divide by diagonal element
-            double dd = A[jj*cols + jj];
-            double invdd = 1.0/dd;
-            for (int64 kk = 0; kk<count; kk++) {
-                B[jj*count + kk] *= invdd;
-            }
-
-            // subtract from other rows
-            for (int64 ii = jj - 1; ii >= 0; ii--) {
-                double ss = A[ii*cols + jj];
-                for (int64 kk = 0; kk<count; kk++) {
-                    B[ii*count + kk] -= ss*B[jj*count + kk];
-                }
-            }
-        }
-
-        return true;
-    }
-
-    // Note for the next several wrappers: we intentionally take A and B by value
-    // so that copies will be made.  The worker routines will modify these copies.
-    static inline matrix<double> qrsolve(matrix<double> A, matrix<double> B) {
-        check(A.rows() >= A.cols(), "can't be underdetermined");
-        check(A.rows() == B.rows(), "need compatible sizes");
-        check(
-            qrsolve(A.data(), A.rows(), A.cols(), B.data(), B.cols()),
-            "matrix must not be singular"
-        );
-        matrix<double> X(A.cols(), B.cols());
-        for (int64 ii = 0; ii<X.rows(); ii++) {
-            for (int64 jj = 0; jj<X.cols(); jj++) {
-                X(ii, jj) = B(ii, jj);
-            }
-        }
-        return X;
-    }
-
-    static inline vector<double> qrsolve(matrix<double> A, vector<double> b) {
-        check(A.rows() >= A.cols(), "can't be underdetermined");
-        check(A.rows() == b.size(), "need compatible sizes");
-        check(
-            qrsolve(A.data(), A.rows(), A.cols(), b.data(), 1),
-            "matrix must not be singular"
-        );
-        vector<double> x(A.cols());
-        for (int64 ii = 0; ii<x.size(); ii++) {
-            x[ii] = b[ii];
-        }
-        return x;
-    }
     //}}}
-    //{{{ ldsolve
-    //
-    // Factor A using LDL^t decomposition.
-    //
-    // The matrix must be symmetric, but this is not checked.  The decomp is
-    // placed in the lower half of the A matrix.  This decomp is similar to a
-    // Cholesky decomp, but it does not require the matrix to be positive
-    // definite, only symmetric.  This function always succeeds, but the decomp
-    // is only unique when the matrix is non-singular.
-    //
-    static inline void ldfactor(double* A, int64 size) {
-        for (int64 jj = 0; jj < size; jj++) {
-            // Solve for Diagonal
-            double ajj = A[jj*size + jj];
-            for (int64 kk = 0; kk < jj; kk++) {
-                double dkk = A[kk*size + kk];
-                double ljk = A[jj*size + kk];
-                ajj -= ljk*(ljk)*dkk;
-            }
-            A[jj*size + jj] = ajj;
-            if (ajj == 0) ajj = 1;
-
-            // Solve for Lowers
-            for (int64 ii = jj + 1; ii < size; ii++) {
-                double aij = A[ii*size + jj];
-                for (int64 kk = 0; kk < jj; kk++) {
-                    double lik = A[ii*size + kk];
-                    double ljk = A[jj*size + kk];
-                    double dkk = A[kk*size + kk];
-                    aij -= lik*(ljk)*dkk;
-                }
-                A[ii*size + jj] = aij/ajj;
-            }
+    //{{{ Root and Peak Finding:         findzero, quadroots, quadpeak, (polyroots) 
+    namespace internal {
+        static bool diffsign(double aa, double bb) {
+            return (bool)signbit(aa) != (bool)signbit(bb);
         }
     }
 
-    //
-    // Check if the LD decomposition is positive definite.
-    //
-    static inline bool ldposdef(const double* LD, int64 size) {
-        for (int64 ii = 0; ii<size; ii++) {
-            if (LD[ii*size + ii] <= 0) return false;
-        }
-        return true;
-    }
+    template<class callable>
+    double findzero(callable func, double xlo, double xhi, double tol=0) {
+        using namespace internal;
+        if (xhi < xlo) swap(xlo, xhi);
+        double ylo = func(xlo); if (ylo == 0) return xlo;
+        double yhi = func(xhi); if (yhi == 0) return xhi;
+        check(diffsign(yhi, ylo), "must have opposite signs");
 
-    //
-    // Use the LDL^t decomposition in A to solve A*X = B.  X = A\B.
-    //
-    //     double LD[size * size]
-    //     double B[size * count]
-    //
-    // This function fails when the decomposition is singular (zero on diagonal)
-    //
-    static inline bool lddivide(const double* LD, int64 size, double* B, int64 count) {
-        for (int64 ii = 0; ii<size; ii++) {
-            if (LD[ii*size + ii] == 0) return false;
-        }
-        // Invert the Lower
-        for (int64 jj = 0; jj < size - 1; jj++) {
-            for (int64 ii = jj + 1; ii < size; ii++) {
-                for (int64 kk = 0; kk<count; kk++) {
-                    B[ii*count + kk] -= LD[ii*size + jj]*B[jj*count + kk];
+        while (xhi - xlo > tol) {
+            double half = .5*(xhi - xlo);
+            double xmid = xlo + half;
+            if (xmid == xlo || xmid == xhi) return xmid;
+            double ymid = func(xmid); if (ymid == 0) return xmid;
+
+            // We're using a variation of Ridder's method to find an
+            // interpolated point, slightly modified to avoid underflow.
+            double denom = ::hypot(ymid, ::sqrt(::fabs(ylo))*::sqrt(::fabs(yhi)));
+            double xexp = xmid + half*::copysign(1, ylo - yhi)*ymid/denom;
+            check(xlo <= xexp && xexp <= xhi, "in bounds");
+            double yexp = func(xexp); if (yexp == 0) return xexp;
+
+            double xx[4] = { xlo, xmid, xexp, xhi };
+            double yy[4] = { ylo, ymid, yexp, yhi };
+            if (xexp < xmid) { swap(xx[1], xx[2]); swap(yy[1], yy[2]); }
+
+            double best = xhi - xlo;
+            for (int ii = 0; ii<3; ii++) {
+                if (xx[ii+1] - xx[ii+0] < best && diffsign(yy[ii+0], yy[ii+1])) {
+                    xlo = xx[ii+0]; ylo = yy[ii+0];
+                    xhi = xx[ii+1]; yhi = yy[ii+1];
+                    best = xx[ii+1] - xx[ii+0];
                 }
             }
         }
-        // Invert the Diagonal
-        for (int64 ii = 0; ii < size; ii++) {
-            for (int64 kk = 0; kk<count; kk++) {
-                B[ii*count + kk] /= LD[ii*size + ii];
-            }
-        }
-        // Invert the Lower Transpose
-        for (int64 ii = size - 1; ii > 0; ii--) {
-            for (int64 jj = 0; jj < ii; jj++) {
-                for (int64 kk = 0; kk<count; kk++) {
-                    B[jj*count + kk] -= LD[ii*size + jj]*B[ii*count + kk];
-                }
-            }
-        }
-        return true;
+        return xhi + .5*(xhi - xlo);
     }
 
-    //
-    // Solve A*X = B for X using LDL^t decomposition
-    //
-    //     double A[size * size]
-    //     double B[size * count]
-    //
-    // Modifies A, places the result in B.  Returns false if A is singular.
-    //
-    static inline bool ldsolve (double* A, int64 size, double* B, int64 count) {
-        ldfactor(A, size);
-        return lddivide(A, size, B, count);
+    struct quadroots {
+        double lo, hi;
+    };
+
+    // Find the real roots of: a*x^2 + b*x + c (if possible).  It returns NaNs
+    // in bad cases.  XXX: Numerically stable, but there is room for
+    // improvement in special cases and error handling....
+    static inline quadroots quadsolve(double aa, double bb, double cc) {
+        double rad = sqrt(bb*bb - 4*aa*cc);
+        quadroots results;
+        if (bb < 0) {
+            double r0 = (2*cc)/(-bb + rad);
+            double r1 = (-bb + rad)/(2*aa);
+            results.lo = fmin(r0, r1);
+            results.hi = fmax(r0, r1);
+        } else {
+            double r0 = (-bb - rad)/(2*aa);
+            double r1 = (2*cc)/(-bb - rad);
+            results.lo = fmin(r0, r1);
+            results.hi = fmax(r0, r1);
+        }
+        return results;
     }
 
-    static inline matrix<double> ldsolve(matrix<double> A, matrix<double> B) {
-        check(A.rows() == A.cols(), "must be a square matrix");
-        check(A.rows() == B.rows(), "need compatible sizes");
-        check(
-            ldsolve(A.data(), A.rows(), B.data(), B.cols()),
-            "matrix must not be singular"
-        );
-        matrix<double> X(A.cols(), B.cols());
-        for (int64 ii = 0; ii<X.rows(); ii++) {
-            for (int64 jj = 0; jj<X.cols(); jj++) {
-                X(ii, jj) = B(ii, jj);
-            }
-        }
-        return X;
-    }
-
-    static inline vector<double> ldsolve(matrix<double> A, vector<double> b) {
-        check(A.rows() == A.cols(), "must be a square matrix");
-        check(A.rows() == b.size(), "need compatible sizes");
-        check(
-            ldsolve(A.data(), A.rows(), b.data(), 1),
-            "matrix must not be singular"
-        );
-        vector<double> x(A.cols());
-        for (int64 ii = 0; ii<x.size(); ii++) {
-            x[ii] = b[ii];
-        }
-        return x;
+    // Given 3 consecutive values, find the place where the derivative is zero
+    static inline double quadpeak(double before, double center, double after) {
+        double two_a = (before - 2*center + after);
+        double neg_b = .5*(before - after);
+        return neg_b/two_a;
     }
 
     //}}}
-    //{{{ cholesky
-    //
-    // Decompose A = L * L^t with the Cholesky algorithm
-    //
-    static inline void cholesky(double* L, const double* A, int64 dim) {
-        memset(L, 0, dim*dim*sizeof(double));
-        for (int64 ii = 0; ii<dim; ii++) {
-            for (int64 jj = 0; jj<=ii; jj++) {
-                double sum = 0;
-                for (int64 kk = 0; kk<jj; kk++) {
-                    sum += L[ii*dim + kk]*L[jj*dim + kk];
-                }
-                double inv = 1/L[jj*dim +jj];
-                L[ii*dim + jj] = (
-                    (ii == jj) ? sqrt(A[ii*dim + ii] - sum) :
-                    (A[ii*dim + jj] - sum) * inv
-                );
+    //{{{ Numerical Optimization:        (adaptmin), covarmin, (quasimin) 
+    //}}}
+    //{{{ Automatic Differentiation:     (autodiff) 
+    //}}}
+    //{{{ Random Number Generation:      prng, shiftreg, gpsgold 
+    //{{{ prng 
+    struct prng {
+        inline ~prng();
+        inline prng();
+        inline prng(const prng& other);
+        inline prng(uint64_t seed);
+        inline prng& operator =(const prng& other);
+        inline void reseed(uint64_t seed);
+
+        inline uint64_t uint64();
+        inline double uniform();
+        inline double uniform(double lo, double hi);
+        inline double normal();
+        inline cdouble cxnormal();
+
+        private:
+            uint64_t state[16];
+            int64 index;
+    };
+
+    prng::~prng() {}
+
+    prng::prng() {
+        reseed(0);
+    }
+
+    prng::prng(const prng& other) : index(other.index) {
+        for (int64 ii = 0; ii<16; ii++) {
+            state[ii] = other.state[ii];
+        }
+    }
+
+    prng::prng(uint64_t seed) {
+        reseed(seed);
+    }
+
+    prng& prng::operator =(const prng& other) {
+        index = other.index;
+        for (int64 ii = 0; ii<16; ii++) {
+            state[ii] = other.state[ii];
+        }
+        return *this;
+    }
+
+    void prng::reseed(uint64_t seed) {
+        while (seed == 0) {
+            struct timeval tv;
+            check(gettimeofday(&tv, 0) == 0, "gettimeofday");
+            seed = (tv.tv_sec*1000000ULL) ^ tv.tv_usec;
+        }
+        // This is 'xorshift64*' by Sebastiano Vigna (public domain).
+        // We're just using it to seed the other generator.
+        for (int64 ii = 0; ii<16; ii++) {
+            seed ^= seed >> 12;
+            seed ^= seed << 25;
+            seed ^= seed >> 27;
+            state[ii] = seed * 2685821657736338717LL;
+        }
+        index = 0;
+    }
+
+    uint64_t prng::uint64() {
+        // This is 'xorshift1024*' by Sebastiano Vigna (public domain).  It's
+        // an improved version of one from George Marsaglia, and should have a
+        // period of 2^1024 - 1, which is long enough for many things.  It does
+        // well on the "BigCrush" suite of tests (better than Mersenne Twister).
+        uint64_t state0 = state[index];
+        index = (index + 1)%16;
+        uint64_t state1 = state[index];
+        state1 ^= state1 << 31;
+        state1 ^= state1 >> 11;
+        state0 ^= state0 >> 30;
+        state[index] = state0 ^ state1;
+        return state[index] * 1181783497276652981LL; 
+    }
+
+    double prng::uniform() {
+        const double scale = pow(2, -63);
+        int64_t value = (int64_t)uint64();
+        return value*scale;
+    }
+
+    double prng::uniform(double lo, double hi) {
+        const double scale = pow(2, -64);
+        double value = scale*uint64();
+        return lo + (hi - lo)*value;
+    }
+
+    double prng::normal() {
+        cdouble zz = cxnormal();
+        return zz.re + zz.im;
+    }
+
+    cdouble prng::cxnormal() {
+        // u0 is in (0, 1], and u1 is in [0, 2pi)
+        const double s0 = 5.42101086242752217e-20;
+        const double u0 = s0*uint64() + s0;
+        const double s1 = 3.40612158008655459e-19;
+        const double u1 = s1*uint64();
+        // Box-Muller transform
+        const double len = ::sqrt(-::log(u0));
+        return cdouble(::cos(u1)*len, ::sin(u1)*len);
+    }
+    //}}}
+    //{{{ shiftreg
+    struct shiftreg {
+        inline shiftreg(
+            uint64_t poly = (1L<<61) | (1L<<60) | (1L<<45) | (1L<<1) | 1,
+            uint64_t seed = 0x196e6a4b093L, bool fibonacci=false
+        );
+
+        inline void shl();
+        inline void shr();
+
+        inline uint64_t val() const;
+        inline bool bit() const;
+
+        private:
+            static uint64_t popcnt(uint64_t poly);
+            static uint64_t gethi(uint64_t poly);
+
+            bool fib;
+            uint64_t poly, hibit, reg;
+    };
+
+    shiftreg::shiftreg(uint64_t poly, uint64_t seed, bool fibonacci) :
+        fib(fibonacci), poly(poly), hibit(gethi(poly)), reg(seed&(hibit - 1))
+    {}
+
+    uint64_t shiftreg::popcnt(uint64_t bits) {
+        return __builtin_popcountl(bits);
+    }
+
+    uint64_t shiftreg::gethi(uint64_t poly) {
+        check(poly != 0, "can't have a zero polynomial");
+        uint64_t hibit = 1;
+        poly >>= 1;
+        while (poly) {
+            hibit <<= 1;
+            poly >>= 1;
+        }
+        return hibit;
+    }
+
+    void shiftreg::shl() {
+        reg <<= 1;
+        if (fib) {
+            if (popcnt(reg&poly)%2) {
+                reg |= 1;
+            }
+            reg &= ~hibit;
+        } else {
+            if (reg&hibit) {
+                reg ^= poly;
             }
         }
     }
 
-    // Modify a cholesky composition.  It's either "update" or "downdate",
-    // depending on the sign.  (+1 = update, -1 = downdate).  Both arguments
-    // are modified.
-    static inline void cholupdate(
-        double* L, int sign, double* x, int64 len
-    ) {
-        check(sign == +1 || sign == -1, "sanity");
-        for (int64 jj = 0; jj<len; jj++) {
-            double rr = sqrt(
-                sqr(L[jj*len + jj]) + sign*sqr(x[jj])
-            );
-            double cc = rr/L[jj*len + jj];
-            double ss = x[jj]/L[jj*len + jj];
-            L[jj*len + jj] = rr;
-            for (int64 ii = jj+1; ii<len; ii++) {
-                L[ii*len + jj] = (L[ii*len + jj] + sign*ss*x[ii])/cc;
+    void shiftreg::shr() {
+        if (fib) {
+            if (popcnt(reg&poly)%2) {
+                reg |= hibit;
             }
-            for (int64 ii = jj+1; ii<len; ii++) {
-                x[ii] = cc*x[ii] - ss*L[ii*len + jj];
+        } else {
+            if (reg&1) {
+                reg ^= poly;
             }
         }
+        reg >>= 1;
     }
 
-    // Scale L so the largest diagonal is 1.0
-    static inline void cholunitize(double* L, int64 dim) {
-        double biggest = 0;
-        for (int64 ii = 0; ii<dim; ii++) {
-            double norm = 0;
-            for (int64 jj = 0; jj<=ii; jj++) {
-                norm += sqr(L[ii*dim + jj]);
-            }
-            biggest = max(norm, biggest);
-        }
-        double scale = 1/sqrt(biggest);
-        for (int64 ii = 0; ii<dim; ii++) {
-            for (int64 jj = 0; jj<=ii; jj++) {
-                L[ii*dim + jj] *= scale;
-            }
-        }
+    uint64_t shiftreg::val() const {
+        return reg;
     }
 
-    static inline matrix<double> cholesky(const matrix<double>& A) {
-        check(A.rows() == A.cols(), "must be a square matrix");
-        matrix<double> L(A.rows(), A.cols());
-        cholesky(L.data(), A.data(), A.rows());
-        return L;
-    }
-
-    static inline matrix<double> cholupdate(
-        matrix<double> L, int sign, vector<double> x
-    ) {
-        check(L.rows() == L.cols(), "must be a square matrix");
-        check(L.rows() == x.size(), "must be a matching size");
-        cholupdate(L.data(), sign, x.data(), x.size());
-        return L;
+    bool shiftreg::bit() const {
+        return (reg&1) ? true : false;
     }
 
     //}}}
-    //{{{ Rice PDF and CDF
+    //{{{ gpsgold
+    struct gpsgold {
+        inline gpsgold(int32_t prn);
+
+        inline void next();
+
+        inline bool bit() const;
+        inline int8_t chip() const;
+
+        private:
+            shiftreg g1;
+            shiftreg g2;
+    };
+
+    gpsgold::gpsgold(int32_t prn) :
+        // See ICD GPS 200, pages 29-30
+        g1((1<<10) | (1<<3) | 1, 0x3FF, true),
+        g2((1<<10) | (1<<9) | (1<<8) | (1<<6) | (1<<3) | (1<<2) | 1, 0x3ff, true)
+    {
+        check(1 <= prn && prn <= 37, "prn must be in range");
+        // see ICD GPS 200, pages 8-9
+        const static int32_t table[38] = {
+            // 0    1    2    3    4    5    6    7    8    9
+               0,   5,   6,   7,   8,  17,  18, 139, 140, 141,
+             251, 252, 254, 255, 256, 257, 258, 469, 470, 471,
+             472, 473, 474, 509, 512, 513, 514, 515, 516, 859,
+             860, 861, 862, 863, 950, 947, 948, 950
+        };
+        const int32_t delay = table[prn];
+        for (int32_t ii = 0; ii<delay; ii++) {
+            g2.shr();
+        }
+    }
+
+    void gpsgold::next() {
+        g1.shl();
+        g2.shl();
+    }
+
+    bool gpsgold::bit() const {
+        return ((g1.val() ^ g2.val()) & 0x200) >> 9;
+    }
+
+    int8_t gpsgold::chip() const {
+        return bit() ? +1 : -1;
+    }
+
+    //}}}
+    //}}}
+    //{{{ Statistics Functions:          ricepdf, ricecdf, mednoise 
     namespace internal {
         // XXX: verify this
         static inline double chebyshev(double xx, const double* cc, int nn) {
@@ -6617,13 +6387,117 @@ namespace xm {
         return sum;
     }
 
+    static inline double mednoise(const cfloat* ptr, ssize_t len) {
+        // XXX: consider doing this with quickselect instead of a histogram
+
+        // Floating point values can have a max exponent of about 38, so ignoring
+        // denormals and infinities, the magsquare exponent can go from about -76
+        // to +76.  That's -760 to +760 dB.  We're doing a histogram of tenths of a
+        // dB, so -8000 to +8000 should cover the range more than adequately.
+        vector<ssize_t> histogram(16000, 0);
+        ssize_t ii;
+
+        for (ii = 0; ii<len; ii++) {
+            double m2 = mag2(ptr[ii]);
+            double db = 10.0*::log10(m2 + 1e-300);
+            double bin = floor(8000.0 + 10.0*db);
+            if (bin < 0) bin = 0;
+            if (bin > 15999) bin = 15999;
+            histogram[(ssize_t)bin]++;
+        }
+
+        ssize_t count = 0;
+        for (ii = 0; ii<16000; ii++) {
+            count += histogram[ii];
+            if (count >= len/2) {
+                double db = (ii + .5 - 8000)/10.0;
+                double median = ::pow(10.0, db/10);
+
+                // Returns linear power after converting the median to mean.
+                // Assumes the original data was complex normal, and so the
+                // the mag squared data is Chi-square with 2 degrees of freedom.
+                return median/::log(2.0);
+            }
+        }
+
+        check(false, "shouldn't get here");
+        return -1;
+    }
     //}}}
-    //{{{ fir windows
+    //{{{ Rotational Shifting:           (fftshift), (ifftshift), hshift, vshift, shift2d 
+    namespace internal {
+        static inline int64 shiftgcd(int64 rot, int64 len) {
+            int64 gcd = len;
+            int64 tmp = rot;
+            while (tmp) {
+                int64 mod = gcd%tmp;
+                gcd = tmp;
+                tmp = mod;
+            }
+            return gcd;
+        }
+    }
+
+    template<class type>
+    static inline void hshift(type* data, int64 rows, int64 cols, int64 horz) {
+        using namespace internal;
+        horz = horz%cols;
+        if (horz == 0) return;
+        if (horz < 0) horz += cols;
+        int64 gcd = shiftgcd(horz, cols);
+        int64 cyc = cols/gcd - 1;
+
+        for (int64 ii = 0; ii<rows; ii++) {
+            type* ptr = data + ii*cols;
+            for (int64 jj = 0; jj<gcd; jj++) {
+                long lo = jj;
+                long hi = jj + horz;
+                for (int64 kk = 0; kk<cyc; kk++) {
+                    swap(ptr[lo], ptr[hi]);
+                    lo = hi; hi += horz;
+                    if (hi >= cols) hi -= cols;
+                }
+            }
+        }
+    }
+
+    template<class type>
+    static inline void vshift(type* data, int64 rows, int64 cols, int64 vert) {
+        using namespace internal;
+        vert = vert%rows;
+        if (vert == 0) return;
+        if (vert < 0) vert += rows;
+        int64 gcd = shiftgcd(vert, rows);
+        int64 cyc = rows/gcd - 1;
+
+        for (int64 ii = 0; ii<gcd; ii++) {
+            long lo = ii;
+            long hi = ii + vert;
+            for (int64 kk = 0; kk<cyc; kk++) {
+                for (int64 jj = 0; jj<cols; jj++) {
+                    swap(data[lo*cols + jj], data[hi*cols + jj]);
+                }
+                lo = hi; hi += vert;
+                if (hi >= rows) hi -= rows;
+            }
+        }
+    }
+
+    // Circularly shifts such that the offset at (ii, jj) will be at (0, 0)
+    template<class type>
+    static inline void shift2d(type* data, int64 rows, int64 cols, int64 ii, int64 jj) {
+        vshift(data, rows, cols, ii);
+        hshift(data, rows, cols, jj);
+    }
+    //}}}
+    //{{{ Window Functions:              sinc, firwin, kaiswin, chebwin
+    //{{{ sinc
     static inline double sinc(double x) {
         if (x == 0.0) return 1;
         return sin(M_PI*x)/(M_PI*x);
     }
-
+    //}}}
+    //{{{ firwin
     static inline double firwin(int window, double offset, double length) {
         if (offset > +.5*length) return 0;
         if (offset < -.5*length) return 0;
@@ -6679,7 +6553,6 @@ namespace xm {
 
         return 0;
     }
-
     // This is intended to approximate the effective decrease in
     // bandwidth when using a window before performing an FFT.
     static inline double apodize(int window) {
@@ -6695,6 +6568,8 @@ namespace xm {
         return 0;
     }
 
+    //}}}
+    //{{{ kaiswin
     // Kaiser-Bessel window, centered at zero. 
     // These windows have discontinuities at the end points.
     static inline double kaiswin(double alpha, double offset, double length) {
@@ -6708,7 +6583,8 @@ namespace xm {
             ) / internal::besseli0(M_PI*alpha)
         );
     }
-
+    //}}}
+    //{{{ chebwin
     namespace internal {
 
         //
@@ -6747,180 +6623,239 @@ namespace xm {
         const double scale = internal::chebwin(atten, 0, length);
         return internal::chebwin(atten, offset, length)/scale;
     }
-
     //}}}
-    //{{{ timecode
+    //}}}
+    //{{{ IIR and FIR Filters:           (firparks), (halfpass) 
+    //}}}
+    //{{{ Signal Processing:             blocktuner, singleton, polyphase 
+    //{{{ blocktuner
 
-    struct timecode {
-        // J1950 Epoch
-        int64 whole;
-        double fract;
+    // blocktuner uses a 64 bit integer to track phase.  This has more
+    // precision than a 64 bit double, and it does not lose accuracy as the
+    // sequence of data gets large.  A block of 1024 precomputed phasors is
+    // stored so there are no trig calls in the inner loop of the apply method.
+    struct blocktuner {
+        //~blocktuner() = default;
+        //blocktuner() = default;
+        //blocktuner(const blocktuner&) = default;
+        //blocktuner& operator =(const blocktuner&) = default;
 
-        static inline timecode parse(const string& ss);
+        // arguments are digital frequency (cycles per sample),
+        // and phase at the first sample (cycles)
+        inline blocktuner(double dfreq, double phase0=0.0);
+
+        // off - indicates the absolute offset where ptr is in
+        // the tuned data stream.  len is the number of samples
+        inline void apply(cfloat* ptr, int64 off, int64 len);
+
+        private:
+            cfloat block[1024];
+            uint64_t delta;
     };
 
-    // returns "seconds since midnight" before the timecode
-    static inline double ssm(timecode tc) {
-        return fmod(tc.whole%86400 + tc.fract, 86400.0);
-    }
 
-    struct datetime {
-        int32_t year, month, day;
-        int32_t hour, min;
-        double secs;
-    };
-
-    static inline timecode normalize(timecode tc) {
-        double lower = floor(tc.fract);
-        tc.whole += (int64)lower;
-        tc.fract -= lower;
-        return tc;
-    }
-
-    static inline timecode gettime(datetime dt) {
-        check(1950 <= dt.year  && dt.year  <  2100, "year in bounds: %d", dt.year);
-        check(1    <= dt.month && dt.month <=   12, "month in bounds: %d", dt.month);
-        check(0.0  <= dt.secs  && dt.secs  <= 60.0, "seconds in bounds: %lf", dt.secs);
-        // XXX: could check day, hour, min as well
-
-        static const int32_t moffset[] = {
-            0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334
-        };
-
-        int64 whole = (dt.year - 1950) * 365;  // add days in first
-        whole += (dt.year - 1949)/4;     // leap days since epoch
-        whole += moffset[dt.month - 1];  // days in current year
-
-        if ((dt.year % 4 == 0) && (dt.month > 2)) {
-            whole++;                  // possible current leap day
+    blocktuner::blocktuner(double dfreq, double phase0) {
+        dfreq = fmodl(dfreq, 1.0);
+        if (dfreq < 0) dfreq += 1.0;
+        delta = (uint64_t)roundl(dfreq*powl(2.0, +64));
+        for (uint64_t ii = 0; ii<1024; ii++) {
+            uint64_t phase = delta * ii;
+            double angle = 2*M_PI*(phase0 + phase*pow(2.0, -64));
+            block[ii] = cfloat(cos(angle), sin(angle));
         }
-
-        whole += dt.day-1;  whole *= 24; // day of the month, now at curent day
-        whole += dt.hour;   whole *= 60; // hours
-        whole += dt.min;    whole *= 60; // minutes
-        return normalize((timecode){ whole, dt.secs});
     }
 
-    static inline datetime getdate(timecode tc, int32_t places = -1) {
-        tc = normalize(tc);
-        if (places >= 0) {
-            double scale = pow(10, places);
-            tc.fract = round(tc.fract*scale)/scale;
-            if (tc.fract == 1.0) {
-                tc.whole += 1;
-                tc.fract = 0.0;
+    void blocktuner::apply(cfloat* ptr, int64 off, int64 len) {
+        // this assumes 2's complement, which should always be true
+        uint64_t phase = delta*(uint64_t)off;
+        while (len > 0) {
+            double angle = 2*M_PI*phase*pow(2.0, -64);
+            cfloat extra = cfloat(cos(angle), sin(angle));
+
+            uint64_t amt = len;
+            if (amt > 1024) amt = 1024;
+            for (uint64_t ii = 0; ii<amt; ii++) {
+                ptr[ii] = ptr[ii] * block[ii] * extra;
             }
+
+            len -= amt;
+            ptr += amt;
+            phase += amt*delta;
         }
-
-        static const int32_t mdays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-        int32_t sec  = tc.whole % 60; tc.whole /= 60;
-        int32_t min  = tc.whole % 60; tc.whole /= 60;
-        int32_t hour = tc.whole % 24; tc.whole /= 24;
-
-        // tc.whole is now days since 1950, switch to 1948 to make math easier
-        tc.whole += 365+366;
-        int32_t year = 1948 + tc.whole/(365*4+1)*4; tc.whole %= (365*4+1);
-
-        // handle remainder of years
-        int32_t curleap=1;
-        if (tc.whole > 365) {
-            year += 1;            tc.whole -= 366;
-            year += tc.whole/365; tc.whole %= 365;
-            curleap=0;
-        }
-
-        size_t ii;
-        for (ii=0; ii < 12; ii++) {
-            int32_t days = mdays[ii] + (((ii == 1) && curleap) ? 1 : 0);
-            if (tc.whole < days) {
-                break;
-            }
-            tc.whole -= days;
-        }
-
-        int32_t day   = tc.whole+1;
-        int32_t month = ii + 1;
-        return (datetime){ year, month, day, hour, min, sec + tc.fract };
     }
-
-    static inline timecode operator +(timecode tc, double dd) {
-        return normalize((timecode){ tc.whole, tc.fract + dd});
-    }
-
-    static inline timecode operator +(double dd, timecode tc) {
-        return normalize((timecode){ tc.whole, tc.fract + dd});
-    }
-
-    static inline timecode operator -(timecode tc, double dd) {
-        return normalize((timecode){ tc.whole, tc.fract - dd});
-    }
-
-    static inline double operator -(timecode aa, timecode bb) {
-        return (double)(aa.whole - bb.whole) + (aa.fract - bb.fract);
-    }
-
-    static inline timecode& operator +=(timecode& tc, double dd) {
-        return tc = tc + dd;
-    }
-
-    static inline timecode& operator -=(timecode& tc, double dd) {
-        return tc = tc - dd;
-    }
-
-    static inline bool operator <(timecode aa, timecode bb) {
-        return (aa - bb) < 0;
-    }
-
-    static inline bool operator >(timecode aa, timecode bb) {
-        return (aa - bb) > 0;
-    }
-
-    static inline bool operator <=(timecode aa, timecode bb) {
-        return (aa - bb) <= 0;
-    }
-
-    static inline bool operator >=(timecode aa, timecode bb) {
-        return (aa - bb) >= 0;
-    }
-
-    timecode timecode::parse(const string& ss) {
-        datetime dt;
-        int res = sscanf(
-            // XXX: This will silently ignore any timezone at the end.
-            // It should work with Z for UTC or none (defaulting to UTC).
-            ss.data(), " %u%*[/:-]%u%*[/:-]%u%*[/:T -]%u:%u:%lf ",
-            &dt.year, &dt.month, &dt.day,
-            &dt.hour, &dt.min, &dt.secs
-        );
-        check(res == 6, "expected valid timecode string '%s'", ss.data());
-
-        return gettime(dt);
-    }
-
-    static inline string format(timecode tc, int32_t places=12) {
-        datetime dt = getdate(tc, places);
-        if (places <= 0) {
-            return xm::format(
-                "%04d-%02d-%02dT%02d:%02d:%02.0f",
-                dt.year, dt.month, dt.day, dt.hour, dt.min, dt.secs
-            );
-        }
-        return xm::format(
-            "%04d-%02d-%02dT%02d:%02d:%0*.*lf",
-            dt.year, dt.month, dt.day, dt.hour, dt.min,
-            places + 3, places, dt.secs
-        );
-    }
-
-    /*
-    static inline std::ostream& operator <<(std::ostream& os, const timecode& tc) {
-        os << "timecode(whole: " << tc.whole << ", fract: " << tc.fract << ", text: " << format(tc) << ")";
-        return os;
-    }
-    */
 
     //}}}
+    //{{{ singleton
+
+    template<class atype, class btype>
+    static inline void singleton(
+        complex<atype>* dst, const complex<btype>* src, int64 len,
+        double cycles_lo, double cycles_hi
+    ) {
+        // We're going through a lot of pains here to avoid making
+        // expensive sine and cosine calls in the inner loop.  The
+        // naive trig recurrence is numerically unstable and incurs
+        // O(N) rounding error as it runs, so we don't do that.
+        // Instead, we're using a recurrence from Richard Singleton
+        // that incurs O(sqrt N) error.  For large lengths, that
+        // could still get too large, so we restart the recurrence
+        // after every 1024 samples as necessary.  We also subtract
+        // out integer cycles before converting to radians so that
+        // we aren't evaluating cosines and sines of large numbers.
+        double invlen = 1.0/len;
+        for (int64 jj = 0; jj<len; jj += 1024) {
+            int64 index_lo = jj;
+            int64 index_hi = min(jj + 1024, len);
+            double fract_lo = index_lo*invlen;
+            double fract_hi = index_hi*invlen;
+            double cyc0 = (1.0 - fract_lo)*cycles_lo + fract_lo*cycles_hi;
+            double cyc1 = (1.0 - fract_hi)*cycles_lo + fract_hi*cycles_hi;
+
+            double mid = round(.5*cyc0 + .5*cyc1);
+            double rad0 = 2*M_PI*(cyc0 - mid);
+            double rad1 = 2*M_PI*(cyc1 - mid);
+            double dph = (rad1 - rad0)/(index_hi - index_lo);
+            double cc = cos(rad0);
+            double ss = sin(rad0);
+            double aa = 2*sin(dph/2)*sin(dph/2);
+            double bb = sin(dph);
+
+            for (int64 ii = index_lo; ii<index_hi; ii++) {
+                double re = src[ii].re;
+                double im = src[ii].im;
+                dst[ii].re = re*cc - im*ss;
+                dst[ii].im = im*cc + re*ss;
+                // Singleton's trig recurrence
+                double tc = cc - (aa*cc + bb*ss);
+                double ts = ss + (bb*cc - aa*ss);
+                cc = tc;
+                ss = ts;
+            }
+        }
+    }
+    //XXX: This is the old one - delete it...
+#if 0
+    static inline void singleton_tune(cfloat* dst, const cfloat* src, int64 len, double ph0, double ph1) {
+        // We're going through a lot of pains here to avoid making
+        // expensive sine and cosine calls in the inner loop.  The
+        // naive trig recurrence is numerically unstable and incurs
+        // O(N) rounding error as it runs, so we don't do that.
+        // Instead, we're using a recurrence from Richard Singleton
+        // that incurs O(sqrt N) error.  For large lengths, that
+        // could still get too large, so we restart the recurrence
+        // after every 1024 samples as necessary.  We also subtract
+        // out integer cycles before converting to radians so that
+        // we aren't evaluating cosines and sines of large numbers.
+        double invlen = 1.0/len;
+        for (int64 jj = 0; jj<len; jj += 1024) {
+            int64 index_lo = jj;
+            int64 index_hi = min(jj + 1024, len);
+            double fract_lo = index_lo*invlen;
+            double fract_hi = index_hi*invlen;
+            double cyc0 = (1.0 - fract_lo)*ph0 + fract_lo*ph1;
+            double cyc1 = (1.0 - fract_hi)*ph0 + fract_hi*ph1;
+
+            double mid = round(.5*cyc0 + .5*cyc1);
+            double rad0 = 2*M_PI*(cyc0 - mid);
+            double rad1 = 2*M_PI*(cyc1 - mid);
+            double dph = (rad1 - rad0)/(index_hi - index_lo);
+            double cc = cos(rad0);
+            double ss = sin(rad0);
+            double aa = 2*sin(dph/2)*sin(dph/2);
+            double bb = sin(dph);
+
+            for (int64 ii = index_lo; ii<index_hi; ii++) {
+                dst[ii] = cfloat(cc, ss)*src[ii];
+                /*
+                double re = src[ii].re;
+                double im = src[ii].im;
+                dst[ii].re = re*cc - im*ss;
+                dst[ii].im = im*cc + re*ss;
+                */
+                // Singleton's trig recurrence
+                double tc = cc - (aa*cc + bb*ss);
+                double ts = ss + (bb*cc - aa*ss);
+                cc = tc;
+                ss = ts;
+            }
+        }
+    }
+#endif
+    //}}}
+    //{{{ polyphase
+    struct polyphase {
+
+        //~polyphase() = default;
+        //polyphase() = default;
+        //polyphase(const polyphase&) = default;
+        //polyphase& operator =(const polyphase&) = default;
+
+        inline polyphase(int window, double dwidth, int64 taps);
+
+        inline void resample(
+            cfloat* dst_ptr, int64 dst_len,
+            const cfloat* src_ptr, double src_lo, double src_hi
+        ) const;
+
+        private:
+            enum { COUNT = 1024 };
+            int64 taps;
+            vector<float> bank;
+
+            inline void makefir(float* ptr, double fract, int window, double dwidth);
+            inline cfloat interp(const cfloat* src, double where) const;
+    };
+
+    polyphase::polyphase(int window, double dwidth, int64 taps) : taps(taps), bank(taps*COUNT) {
+        for (int64 ii = 0; ii<COUNT; ii++) {
+            double fract = ii/(double)COUNT;
+            makefir(bank.data() + ii*taps, fract, window, dwidth);
+        }
+    }
+
+    void polyphase::makefir(float* ptr, double fract, int window, double dwidth) {
+        double sum = 0.0;
+        for (int64 jj = 0; jj<taps; jj++) {
+            double xx = jj + 1 - taps/2 - fract;
+            double tap = firwin(window, xx, taps)*sinc(xx*dwidth);
+            ptr[jj] = tap;
+            sum += tap;
+        }
+        double inv = 1.0/sum;
+        for (int64 jj = 0; jj<taps; jj++) {
+            ptr[jj] *= inv;
+        }
+    }
+
+    cfloat polyphase::interp(const cfloat* src, double where) const {
+        double re = 0;
+        double im = 0;
+        int64 fixed = llrint(where*COUNT);
+        int64 index = fixed/COUNT;
+        int64 which = fixed%COUNT;
+        const cfloat* ptr = src + index + 1 - taps/2;
+        const float* filt = bank.data() + taps*which;
+        for (int64 ii = 0; ii<taps; ii++) {
+            re += ptr[ii].re*filt[ii];
+            im += ptr[ii].im*filt[ii];
+        }
+        return cfloat(re, im);
+    }
+
+    void polyphase::resample(
+        cfloat* dst_ptr, int64 dst_len,
+        const cfloat* src_ptr, double src_lo, double src_hi
+    ) const {
+        double df = 1.0/dst_len;
+        for (int64 ii = 0; ii<dst_len; ii++) {
+            double ff = ii*df;
+            dst_ptr[ii] = interp(src_ptr, (1.0 - ff)*src_lo + ff*src_hi);
+        }
+    }
+
+    //}}}
+    //}}}
+    //{{{ Coordinate Systems:            cartesian, transform, geodetic 
     //{{{ cartesian
     struct cartesian {
         double x, y, z;
@@ -7000,27 +6935,6 @@ namespace xm {
     /*
     static inline std::ostream& operator <<(std::ostream& os, const cartesian& xyz) {
         os << "cartesian(x: " << xyz.x << ", y: " << xyz.y << ", z: " << xyz.z << ")";
-        return os;
-    }
-    */
-
-    //}}}
-    //{{{ statevec
-    struct statevec {
-        cartesian pos, vel, acc;
-    };
-
-    static inline statevec operator +(statevec aa, statevec bb) {
-    	return (statevec){ aa.pos + bb.pos, aa.vel + bb.vel, aa.acc + bb.acc};
-    }
-
-    /*
-    static inline std::ostream& operator <<(std::ostream& os, const statevec& sv) {
-        os << "statevec(";
-        os << "pos: { " << sv.pos.x << ", " << sv.pos.y << ", " << sv.pos.z << " }, ";
-        os << "vel: { " << sv.vel.x << ", " << sv.vel.y << ", " << sv.vel.z << " }, ";
-        os << "acc: { " << sv.acc.x << ", " << sv.acc.y << ", " << sv.acc.z << " }";
-        os << ")";
         return os;
     }
     */
@@ -7267,20 +7181,928 @@ namespace xm {
 
 
     //}}}
-    //{{{ cmdline
+    //}}}
+    //{{{ Precision Time and Date:       timecode, datetime 
+
+    struct timecode {
+        // J1950 Epoch
+        int64 whole;
+        double fract;
+
+        static inline timecode parse(const string& ss);
+    };
+
+    // returns "seconds since midnight" before the timecode
+    static inline double ssm(timecode tc) {
+        return fmod(tc.whole%86400 + tc.fract, 86400.0);
+    }
+
+    struct datetime {
+        int32_t year, month, day;
+        int32_t hour, min;
+        double secs;
+    };
+
+    static inline timecode normalize(timecode tc) {
+        double lower = floor(tc.fract);
+        tc.whole += (int64)lower;
+        tc.fract -= lower;
+        return tc;
+    }
+
+    static inline timecode gettime(datetime dt) {
+        check(1950 <= dt.year  && dt.year  <  2100, "year in bounds: %d", dt.year);
+        check(1    <= dt.month && dt.month <=   12, "month in bounds: %d", dt.month);
+        check(0.0  <= dt.secs  && dt.secs  <= 60.0, "seconds in bounds: %lf", dt.secs);
+        // XXX: could check day, hour, min as well
+
+        static const int32_t moffset[] = {
+            0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334
+        };
+
+        int64 whole = (dt.year - 1950) * 365;  // add days in first
+        whole += (dt.year - 1949)/4;     // leap days since epoch
+        whole += moffset[dt.month - 1];  // days in current year
+
+        if ((dt.year % 4 == 0) && (dt.month > 2)) {
+            whole++;                  // possible current leap day
+        }
+
+        whole += dt.day-1;  whole *= 24; // day of the month, now at curent day
+        whole += dt.hour;   whole *= 60; // hours
+        whole += dt.min;    whole *= 60; // minutes
+        return normalize((timecode){ whole, dt.secs});
+    }
+
+    static inline datetime getdate(timecode tc, int32_t places = -1) {
+        tc = normalize(tc);
+        if (places >= 0) {
+            double scale = pow(10, places);
+            tc.fract = round(tc.fract*scale)/scale;
+            if (tc.fract == 1.0) {
+                tc.whole += 1;
+                tc.fract = 0.0;
+            }
+        }
+
+        static const int32_t mdays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+        int32_t sec  = tc.whole % 60; tc.whole /= 60;
+        int32_t min  = tc.whole % 60; tc.whole /= 60;
+        int32_t hour = tc.whole % 24; tc.whole /= 24;
+
+        // tc.whole is now days since 1950, switch to 1948 to make math easier
+        tc.whole += 365+366;
+        int32_t year = 1948 + tc.whole/(365*4+1)*4; tc.whole %= (365*4+1);
+
+        // handle remainder of years
+        int32_t curleap=1;
+        if (tc.whole > 365) {
+            year += 1;            tc.whole -= 366;
+            year += tc.whole/365; tc.whole %= 365;
+            curleap=0;
+        }
+
+        size_t ii;
+        for (ii=0; ii < 12; ii++) {
+            int32_t days = mdays[ii] + (((ii == 1) && curleap) ? 1 : 0);
+            if (tc.whole < days) {
+                break;
+            }
+            tc.whole -= days;
+        }
+
+        int32_t day   = tc.whole+1;
+        int32_t month = ii + 1;
+        return (datetime){ year, month, day, hour, min, sec + tc.fract };
+    }
+
+    static inline timecode operator +(timecode tc, double dd) {
+        return normalize((timecode){ tc.whole, tc.fract + dd});
+    }
+
+    static inline timecode operator +(double dd, timecode tc) {
+        return normalize((timecode){ tc.whole, tc.fract + dd});
+    }
+
+    static inline timecode operator -(timecode tc, double dd) {
+        return normalize((timecode){ tc.whole, tc.fract - dd});
+    }
+
+    static inline double operator -(timecode aa, timecode bb) {
+        return (double)(aa.whole - bb.whole) + (aa.fract - bb.fract);
+    }
+
+    static inline timecode& operator +=(timecode& tc, double dd) {
+        return tc = tc + dd;
+    }
+
+    static inline timecode& operator -=(timecode& tc, double dd) {
+        return tc = tc - dd;
+    }
+
+    static inline bool operator <(timecode aa, timecode bb) {
+        return (aa - bb) < 0;
+    }
+
+    static inline bool operator >(timecode aa, timecode bb) {
+        return (aa - bb) > 0;
+    }
+
+    static inline bool operator <=(timecode aa, timecode bb) {
+        return (aa - bb) <= 0;
+    }
+
+    static inline bool operator >=(timecode aa, timecode bb) {
+        return (aa - bb) >= 0;
+    }
+
+    timecode timecode::parse(const string& ss) {
+        datetime dt;
+        int res = sscanf(
+            // XXX: This will silently ignore any timezone at the end.
+            // It should work with Z for UTC or none (defaulting to UTC).
+            ss.data(), " %u%*[/:-]%u%*[/:-]%u%*[/:T -]%u:%u:%lf ",
+            &dt.year, &dt.month, &dt.day,
+            &dt.hour, &dt.min, &dt.secs
+        );
+        check(res == 6, "expected valid timecode string '%s'", ss.data());
+
+        return gettime(dt);
+    }
+
+    static inline string format(timecode tc, int32_t places=12) {
+        datetime dt = getdate(tc, places);
+        if (places <= 0) {
+            return xm::format(
+                "%04d-%02d-%02dT%02d:%02d:%02.0f",
+                dt.year, dt.month, dt.day, dt.hour, dt.min, dt.secs
+            );
+        }
+        return xm::format(
+            "%04d-%02d-%02dT%02d:%02d:%0*.*lf",
+            dt.year, dt.month, dt.day, dt.hour, dt.min,
+            places + 3, places, dt.secs
+        );
+    }
+
+    /*
+    static inline std::ostream& operator <<(std::ostream& os, const timecode& tc) {
+        os << "timecode(whole: " << tc.whole << ", fract: " << tc.fract << ", text: " << format(tc) << ")";
+        return os;
+    }
+    */
+
+    //}}}
+    //{{{ Raw Files and Memory Mapping:  rawfile 
+    //{{{ rawfile
+    namespace internal {
+
+        // C++ doesn't provide a good way to work directly with file descriptors.
+        // This class implements a container for the descriptor and a mmap ptr.
+        //
+        // This class returns errors rather than throwing exceptions, and we're
+        // hiding it in an internal namespace for now.  Don't rely on it staying.
+        //
+        struct rawfile;
+        static inline void swap(rawfile& flip, rawfile& flop);
+
+        struct rawfile {
+            ~rawfile() { clear(); }
+
+            // default constructor or with file descriptor
+            rawfile(int fd=-1) : fd(fd), ptr(0), len(0) {}
+
+            /* XXX:
+            // move constructor steals from the other object
+            rawfile(rawfile&& other) : fd(other.fd), ptr(other.ptr), len(other.len) {
+                other.fd = -1;
+                other.ptr = 0;
+                other.len = 0;
+            }
+            */
+
+            /* XXX:
+            rawfile& operator =(rawfile&& other) {
+                clear();
+                fd  = other.fd; other.fd  = -1;
+                ptr = other.ptr; other.ptr = 0;
+                len = other.len; other.len = 0;
+                return *this;
+            }
+            */
+
+
+            inline bool read(void* data, int64 bytes);
+            inline bool write(const void* data, int64 bytes);
+            inline bool seek(int64 offset);
+            inline bool skip(int64 bytes);
+            inline int64 size() const;
+            inline const void* mmap();
+
+            inline bool isfile() const;
+
+            private:
+                // no copies or defaults
+                void operator =(rawfile& other);// = delete;
+                rawfile(const rawfile&);// = delete;
+
+                void clear() {
+                    if (ptr) {
+                        msync(ptr, len, MS_SYNC);
+                        munmap(ptr, len);
+                    }
+                    if (fd >= 0) close(fd);
+                }
+                friend void swap(rawfile& flip, rawfile& flop);
+
+                // file descriptor
+                int fd;
+                // mmap fields
+                void* ptr;
+                int64 len;
+        };
+
+        bool rawfile::read(void* ptr, int64 len) {
+            char* buf = (char*)ptr;
+            int64 want = len;
+            while (want) {
+                int64 got = ::read(fd, buf, want);
+                if (got <= 0) {
+                    break;
+                }
+                want -= got;
+                buf += got;
+            }
+            return want == 0;
+        }
+
+        bool rawfile::write(const void* ptr, int64 len) {
+            const char* buf = (const char*)ptr;
+            while (len) {
+                int64 put = ::write(fd, buf, len);
+                if (put < 0) {
+                    break;
+                }
+                len -= put;
+                buf += put;
+            }
+            return len == 0;
+        }
+
+        bool rawfile::seek(int64 offset) {
+            off_t result = ::lseek(fd, offset, SEEK_SET);
+            return result != (off_t)-1;
+        }
+
+        bool rawfile::skip(int64 bytes) {
+            if (bytes == 0) {
+                return true;
+            }
+            off_t result = ::lseek(fd, bytes, SEEK_CUR);
+            if (result == (off_t)-1) {
+                if (errno != ESPIPE) {
+                    return false;
+                }
+                // Can't quickly seek, so we'll manually dump data
+                static char ignored[8192];
+                while (bytes) {
+                    int64 amt = bytes;
+                    if (amt > 8192) {
+                        amt = 8192;
+                    }
+                    int64 got = ::read(fd, ignored, amt);
+                    if (got != amt) {
+                        return false;
+                    }
+                    bytes -= got;
+                }
+            }
+            return true;
+        }
+
+        int64 rawfile::size() const {
+            struct stat st;
+            check(fstat(fd, &st) == 0, "fstat");
+            return st.st_size;
+        }
+
+        const void* rawfile::mmap() {
+            if (ptr) return ptr;
+            len = size();
+            return ptr = (char*)::mmap(0, len, PROT_READ, MAP_SHARED, fd, 0);
+        }
+
+        bool rawfile::isfile() const {
+            struct stat st;
+            check(fstat(fd, &st) == 0, "fstat");
+            return st.st_mode & S_IFREG;
+        }
+
+        static inline void swap(rawfile& flip, rawfile& flop) {
+            xm::swap(flip.fd, flop.fd);
+            xm::swap(flip.ptr, flop.ptr);
+            xm::swap(flip.len, flop.len);
+        }
+    }
+
+    //}}}
+    //}}}
+    //{{{ Unique Identifier              uniqueid 
+    //{{{ uniqueid
+    struct uniqueid {
+        uint8_t bytes[16];
+
+        static inline uniqueid parse(const string& text);
+    };
+
+    static inline size_t hash(const uniqueid& uuid) {
+        return hash(uuid.bytes, 16, 0);
+    }
+
+    static inline bool operator == (const uniqueid& aa, const uniqueid& bb) {
+        return memcmp(aa.bytes, bb.bytes, 16) == 0;
+    }
+
+    static inline bool operator != (const uniqueid& aa, const uniqueid& bb) {
+        return memcmp(aa.bytes, bb.bytes, 16) != 0;
+    }
+
+    static inline uniqueid genuuid() {
+        using namespace internal;
+        int fd = open("/dev/urandom", O_RDONLY);
+        check(fd >= 0, "opening '/dev/urandom' for reading");
+        rawfile file(fd);
+
+        uniqueid result;
+        check(file.read(result.bytes, 16), "reading /dev/urandom");
+        // this is the mask for randomly generated uuids
+        // ffffffff-ffff-4fff-bfff-ffffffffffff
+        result.bytes[6] &= 0x0f;
+        result.bytes[6] |= 0x40;
+        result.bytes[8] &= 0x0f;
+        result.bytes[8] |= 0xb0;
+        return result;
+    }
+
+    static inline string format(const uniqueid& uuid) {
+        return format(
+            "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+            uuid.bytes[ 0], uuid.bytes[ 1], uuid.bytes[ 2], uuid.bytes[ 3],
+            uuid.bytes[ 4], uuid.bytes[ 5], uuid.bytes[ 6], uuid.bytes[ 7],
+            uuid.bytes[ 8], uuid.bytes[ 9], uuid.bytes[10], uuid.bytes[11],
+            uuid.bytes[12], uuid.bytes[13], uuid.bytes[14], uuid.bytes[15]
+        );
+    }
+
+    inline uniqueid uniqueid::parse(const string &text) {
+        uniqueid uuid;
+        if(text.size() == 32) {
+            check(sscanf(
+                text.data(), "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx"
+                "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
+                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
+                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
+                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
+                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
+            ) == 16, "expected 16 pairs of hex chars with no hyphens");
+        }
+        else {
+            check(text.size() == 36, "expecting a 36 byte string");
+            check(sscanf(
+                text.data(), "%2hhx%2hhx%2hhx%2hhx-%2hhx%2hhx-"
+                "%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
+                uuid.bytes +  0, uuid.bytes +  1, uuid.bytes +  2, uuid.bytes +  3,
+                uuid.bytes +  4, uuid.bytes +  5, uuid.bytes +  6, uuid.bytes +  7,
+                uuid.bytes +  8, uuid.bytes +  9, uuid.bytes + 10, uuid.bytes + 11,
+                uuid.bytes + 12, uuid.bytes + 13, uuid.bytes + 14, uuid.bytes + 15
+            ) == 16, "expected 16 pairs of hex chars with hyphens in the right places");
+        }
+        return uuid;
+    }
+
+    /* XXX
+    static inline std::ostream& operator <<(std::ostream& os, const uniqueid& uuid) {
+        os << format(uuid);
+        return os;
+    }
+    */
+
+    //}}}
+    //}}}
+    //{{{ Blue File Metadata:            bluekeyword, bluefield
+    //}}}
+    //{{{ Blue File Readers:             bluereader, load1000, load2000 
+    //}}}
+    //{{{ Blue File Writers:             bluewriter, dump1000, dump2000 
+    //}}}
+    //{{{ State Vectors:                 statevec, timestate, ephemeris, ephcache 
+    //{{{ statevec
+    struct statevec {
+        cartesian pos, vel, acc;
+    };
+
+    static inline statevec operator +(statevec aa, statevec bb) {
+    	return (statevec){ aa.pos + bb.pos, aa.vel + bb.vel, aa.acc + bb.acc};
+    }
+
+    /*
+    static inline std::ostream& operator <<(std::ostream& os, const statevec& sv) {
+        os << "statevec(";
+        os << "pos: { " << sv.pos.x << ", " << sv.pos.y << ", " << sv.pos.z << " }, ";
+        os << "vel: { " << sv.vel.x << ", " << sv.vel.y << ", " << sv.vel.z << " }, ";
+        os << "acc: { " << sv.acc.x << ", " << sv.acc.y << ", " << sv.acc.z << " }";
+        os << ")";
+        return os;
+    }
+    */
+
+    //}}}
+    //{{{ timestate
+    struct timestate {
+        timecode tc;
+        statevec sv;
+    };
+
+    static inline bool operator <(const timestate& aa, const timestate& bb) {
+        return (aa.tc - bb.tc) < 0.0;
+    }
+
+    namespace internal {
+
+        // Evaluates an interpolating polynomial:
+        //
+        //      P(t) = a + b*t + c*t^2 + d*t^3 + e*t^4 + f*t^5
+        //
+        //  Such that:
+        //
+        //      P(-1) = plo      P(+1) = phi
+        //     P'(-1) = vlo     P'(+1) = vhi
+        //     P"(-1) = alo     P"(+1) = ahi
+        //
+        static double hermite5(
+            double plo, double vlo, double alo,
+            double phi, double vhi, double ahi,
+            double tt
+        ) {
+            plo *= .0625; vlo *= .0625; alo *= .0625;
+            phi *= .0625; vhi *= .0625; ahi *= .0625;
+
+            double aa =   8*phi +  8*plo -  5*vhi +  5*vlo + 1*ahi + 1*alo;
+            double bb =  15*phi - 15*plo -  7*vhi -  7*vlo + 1*ahi - 1*alo;
+            double cc =                     6*vhi -  6*vlo - 2*ahi - 2*alo;
+            double dd = -10*phi + 10*plo + 10*vhi + 10*vlo - 2*ahi + 2*alo;
+            double ee =                  -  1*vhi +  1*vlo + 1*ahi + 1*alo;
+            double ff =   3*phi -  3*plo -  3*vhi -  3*vlo + 1*ahi - 1*alo;
+
+            return aa + (bb + (cc + (dd + (ee + ff*tt)*tt)*tt)*tt)*tt;
+        }
+
+        // Evaluates an interpolating polynomial:
+        //
+        //      P(t) = a + b*t + c*t^2 + d*t^3
+        //
+        //  Such that:
+        //
+        //      P(-1) = plo      P(+1) = phi
+        //     P'(-1) = vlo     P'(+1) = vhi
+        //
+        static double hermite3(
+            double plo, double vlo,
+            double phi, double vhi,
+            double tt
+        ) {
+            plo *= .25; vlo *= .25;
+            phi *= .25; vhi *= .25;
+
+            double aa =  2*phi + 2*plo - 1*vhi + 1*vlo;
+            double bb =  3*phi - 3*plo - 1*vhi - 1*vlo;
+            double cc =                  1*vhi - 1*vlo;
+            double dd = -1*phi + 1*plo + 1*vhi + 1*vlo;
+
+            return aa + (bb + (cc + dd*tt)*tt)*tt;
+        }
+
+        // This is really just linear interpolation with t in [-1,+1]
+        static double hermite1(double plo, double phi, double tt) {
+            return (plo*(1.0 - tt) + phi*(1.0 + tt))*0.5;
+        }
+
+    }
+
+    static inline statevec interp(
+        const timestate& ts0, const timestate& ts1, const timecode& tc
+    ) {
+        using namespace internal;
+        double range = ts1.tc - ts0.tc;
+        double half = range*.5;
+        double tt = ((tc - ts1.tc) + (tc - ts0.tc)) / range;
+
+        return (statevec){
+            (cartesian){
+                hermite5(
+                    ts0.sv.pos.x, ts0.sv.vel.x*half, ts0.sv.acc.x*half*half,
+                    ts1.sv.pos.x, ts1.sv.vel.x*half, ts1.sv.acc.x*half*half, tt
+                ),
+                hermite5(
+                    ts0.sv.pos.y, ts0.sv.vel.y*half, ts0.sv.acc.y*half*half,
+                    ts1.sv.pos.y, ts1.sv.vel.y*half, ts1.sv.acc.y*half*half, tt
+                ),
+                hermite5(
+                    ts0.sv.pos.z, ts0.sv.vel.z*half, ts0.sv.acc.z*half*half,
+                    ts1.sv.pos.z, ts1.sv.vel.z*half, ts1.sv.acc.z*half*half, tt
+                )
+            },
+            (cartesian){
+                hermite3(
+                    ts0.sv.vel.x, ts0.sv.acc.x*half,
+                    ts1.sv.vel.x, ts1.sv.acc.x*half, tt
+                ),
+                hermite3(
+                    ts0.sv.vel.y, ts0.sv.acc.y*half,
+                    ts1.sv.vel.y, ts1.sv.acc.y*half, tt
+                ),
+                hermite3(
+                    ts0.sv.vel.z, ts0.sv.acc.z*half,
+                    ts1.sv.vel.z, ts1.sv.acc.z*half, tt
+                )
+            },
+            (cartesian){
+                hermite1(ts0.sv.acc.x, ts1.sv.acc.x, tt),
+                hermite1(ts0.sv.acc.y, ts1.sv.acc.y, tt),
+                hermite1(ts0.sv.acc.z, ts1.sv.acc.z, tt)
+            }
+        };
+    }
+    //}}}
+    //}}}
+    //{{{ Light Time:                    lightfwd, lightrev 
+    //}}}
+    //{{{ DTED Processing:               dtedtile, dtedcache 
+    //{{{ dtedtile
+    namespace internal {
+        static int16_t dtedsignmag(uint16_t xx) {
+            xx = be16toh(xx);
+            int16_t signbit = xx&0x8000;
+            int16_t magbits = xx&0x7FFF;
+            if (signbit) magbits *= -1;
+            return magbits;
+        }
+
+        static int16_t dtedgetbits(const char* data, int64 off, int64 len) {
+            int64 byte = off/8;
+            int64 bit = off%8;
+            int32_t result = 0;
+            memcpy(&result, data + byte, sizeof(int32_t));
+            result = be32toh(result);
+            result <<= bit;
+            result >>= 32 - len;
+            return result;
+        }
+    }
+
+    struct dtedtile {
+        inline dtedtile(const string& path);
+
+        //inline ~dtedtile() = default;
+        inline dtedtile() : lats(0), lons(0) {}
+        //inline dtedtile(const dtedtile&) = default;
+        //inline dtedtile& operator =(const dtedtile&) = default;
+
+        inline double lookup(double fractlat, double fractlon);
+        inline bool isvalid();
+
+        private:
+            // data is stored column major, starting from the lower
+            // left through each latitude, then increasing longitude.
+            int64 lats, lons;
+            vector<int16_t> data;
+    };
+
+    dtedtile::dtedtile(const string& path) {
+        using namespace internal;
+
+        // An empty path is used to indicate the absence of a tile.
+        // This is used by dtedcache to indicate it should use MSL lookup.
+        if (path == "") return;
+
+        int fd = open(path.data(), O_RDONLY);
+        check(fd >= 0, "opening '%s' for reading", path.data());
+        rawfile file(fd);
+        const char* ptr = (const char*)file.mmap();
+
+        if (memcmp(ptr, "UHL", 3) == 0) {
+            // uncompressed data
+            char temp[5] = {};
+            memcpy(temp, ptr + 47, 4);
+            lons = strtol(temp, 0, 10);
+            memcpy(temp, ptr + 51, 4);
+            lats = strtol(temp, 0, 10);
+            data.resize(lats*lons);
+            for (int64 ii = 0; ii<lons; ii++) {
+                const int64 skip = 80 + 648 + 2700 + 8;
+                const int64 offset = skip + ii*(12 + lats*sizeof(int16_t));
+                memcpy(&data[ii*lats], ptr + offset, lats*sizeof(int16_t));
+                for (int64 jj = 0; jj<lats; jj++) {
+                    data[ii*lats + jj] = dtedsignmag(data[ii*lats + jj]);
+                }
+            }
+            return;
+        }
+
+        if (memcmp(ptr, "DTC", 3) == 0) {
+            // compressed data
+            char temp[5] = {};
+            memcpy(temp, ptr + 51, 4);
+            lons = strtol(temp, 0, 10);
+            memcpy(temp, ptr + 55, 4);
+            lats = strtol(temp, 0, 10);
+            data.resize(lats*lons);
+
+            const uint32_t* offset = (const uint32_t*)(ptr + 80 + 648 + 23);
+
+            const int64 blockstart = 80 + 648 + 23 + 400;
+            for (int64 ii = 0; ii<10; ii++) {
+                for (int64 jj = 0; jj<10; jj++) {
+
+                    const char* blockptr = ptr + offset[ii*10 + jj] + blockstart + 4;
+                    const int64 blocklats = lats / 10 + (ii == 9 ? lats%10 : 0);
+                    const int64 blocklons = lons / 10 + (jj == 9 ? lons%10 : 0);
+
+                    int8_t nchunks = *(int8_t*)blockptr;
+                    blockptr += 1;
+
+                    for (int64 kk = 0; kk<blocklons; kk++) {
+                        int16_t* line = &data[jj*lats*(lons/10) + ii*(lats/10) + kk*lats];
+
+                        int64 total = 0;
+
+                        for (int64 nn = 0; nn<nchunks; nn++) {
+                            int64 samples = blocklats/nchunks + (nn == nchunks-1 ? blocklats%nchunks : 0);
+                            uint8_t nbits = *(uint8_t*)(blockptr);
+                            blockptr += 1;
+                            check(nbits == 0xFF || nbits <= 16, "in bounds");
+
+                            if (nbits == 0xFF) {
+                                memcpy(line, blockptr, samples*2);
+                                blockptr += samples*2;
+                            } else {
+                                int16_t accum = *(int16_t*)(blockptr);
+                                blockptr += 2;
+                                int64 bitoff = 0;
+                                for (int64 ss = 0; ss<samples; ss++) {
+                                    line[ss] = accum;
+                                    if (ss != samples-1 && nbits > 0) {
+                                        accum += dtedgetbits(blockptr, bitoff, nbits);
+                                        bitoff += nbits;
+                                    }
+                                }
+                                blockptr += (bitoff + 7)/8;
+                            }
+                            line += samples;
+                            total += samples;
+                        }
+
+                        check(total == blocklats, "sanity %lld %lld", total, blocklats);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        check(false, "unrecognized DTED file format");
+    }
+
+    double dtedtile::lookup(double fractlat, double fractlon) {
+        check(fractlat >= 0.0, "fract lat in bounds: %lf", fractlat);
+        check(fractlon >= 0.0, "fract lon in bounds: %lf", fractlon);
+        check(fractlat <  1.0, "fract lat in bounds: %lf", fractlat);
+        check(fractlon <  1.0, "fract lon in bounds: %lf", fractlon);
+
+        double floatrow = (lats - 1)*fractlat;
+        double floatcol = (lons - 1)*fractlon;
+        int64 wholerow = floor(floatrow);
+        int64 wholecol = floor(floatcol);
+        double fractrow = floatrow - wholerow;
+        double fractcol = floatcol - wholecol;
+
+        //check(wholerow >= 0, "in bounds wholerow %lld < 0", wholerow);
+        //check(wholecol >= 0, "in bounds wholecol %lld < 0", wholecol);
+        //check(wholerow < lats - 1, "in bounds wholerow %lld < %lld", wholerow, lats - 1);
+        //check(wholecol < lons - 1, "in bounds wholecol %lld < %lld", wholecol, lons - 1);
+
+        double bl = data[(wholerow + 0) + lats*(wholecol + 0)];
+        double br = data[(wholerow + 0) + lats*(wholecol + 1)];
+        double tl = data[(wholerow + 1) + lats*(wholecol + 0)];
+        double tr = data[(wholerow + 1) + lats*(wholecol + 1)];
+
+        return (
+            bl*(1.0 - fractrow)*(1.0 - fractcol) +
+            br*(1.0 - fractrow)*(0.0 + fractcol) +
+            tl*(0.0 + fractrow)*(1.0 - fractcol) +
+            tr*(0.0 + fractrow)*(0.0 + fractcol)
+        );
+    }
+
+    bool dtedtile::isvalid() {
+        return data.size() > 0;
+    }
+
+    //}}}
+    //{{{ dtedcache
+    namespace internal {
+        struct latlon {
+            int32_t lat;
+            int32_t lon;
+            bool operator ==(const latlon& other) const {
+                return lat == other.lat && lon == other.lon;
+            }
+        };
+
+        static inline size_t hash(const latlon& ll) {
+            return xm::hash(ll.lat) ^ 5*xm::hash(ll.lon);
+        }
+    }
+
+    struct dtedcache {
+        //inline ~dtedcache() = default;
+        //inline dtedcache(const dtedcache&) = default;
+        //inline dtedcache& operator =(const dtedcache&) = default;
+        inline dtedcache(int64 maxtiles=64);
+
+        inline double lookup(double lat, double lon);
+
+        private:
+            inline string trypath(int32_t lat, int32_t lon);
+            int64 maxsize;
+            int64 counter;
+            struct countdted {
+                int64 count;
+                dtedtile tile;
+            };
+            dict<internal::latlon, countdted> cache;
+
+            inline double getmsl(double lat, double lon);
+
+            // MSL data is stored row-major starting from
+            // 0-lon at the north pole, moving southward per row
+            enum { MSL_LATS = 180*4 + 1, MSL_LONS = 360*4 + 1 };
+            vector<float> msl;
+    };
+
+    dtedcache::dtedcache(int64 maxtiles) : maxsize(maxtiles), counter(0) {
+        using namespace internal;
+
+        // This should be: /full/path/to/WW15MGH.BIN
+        char* dtedmsl = getenv("DTED_MSL");
+        if (!dtedmsl) return;
+
+        int fd = open(dtedmsl, O_RDONLY);
+        check(fd >= 0, "opening '%s' for reading", dtedmsl);
+        rawfile file(fd);
+        check(
+            file.size() >= int64((MSL_LATS*MSL_LONS + 6)*sizeof(float)),
+            "expected size for MSL"
+        );
+        const float* ptr = (const float*)file.mmap();
+        msl.resize(MSL_LATS*MSL_LONS + 6);
+        memcpy(msl.data(), ptr, (MSL_LATS*MSL_LONS + 6)*sizeof(float));
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+        // XXX: reimplement this without C++11
+        for (auto ii = msl.begin(); ii != msl.end(); ++ii) {
+            byteswap4(&*ii);
+        }
+#endif
+        check(msl[0] == -90, "expected 0");
+        check(msl[1] == +90, "expected 1");
+        check(msl[2] ==   0, "expected 2");
+        check(msl[3] == 360, "expected 3");
+        check(msl[4] == .25, "expected 4");
+        check(msl[5] == .25, "expected 5");
+    }
+
+    string dtedcache::trypath(int32_t lat, int32_t lon) {
+        const char* dteddir = getenv("DTED_DIR");
+        check(dteddir != 0, "DTED_DIR must be set");
+
+        char ns = 'n';
+        char ew = 'e';
+        if (lat < 0) {
+            ns = 's';
+            lat *= -1;
+        }
+        if (lon < 0) {
+            ew = 'w';
+            lon *= -1;
+        }
+
+        list<string> paths;
+        paths.append(format("%s/%c%03d/%c%02d.cdt2", dteddir, ew, lon, ns, lat));
+        paths.append(format("%s/%c%03d/%c%02d.cdt1", dteddir, ew, lon, ns, lat));
+        paths.append(format("%s/%c%03d/%c%02d.dt0",  dteddir, ew, lon, ns, lat));
+
+        for (int64 ii = 0; ii<paths.size(); ii++) {
+            const string& path = paths[ii];
+            struct stat buf;
+            if (stat(path.data(), &buf) == 0) {
+                return path;
+            }
+        }
+
+        return "";
+    }
+
+    inline double dtedcache::lookup(double lat, double lon) {
+        using namespace internal;
+
+        int32_t wholelat = (int32_t)floor(lat);
+        int32_t wholelon = (int32_t)floor(lon);
+        double fractlat = lat - wholelat;
+        double fractlon = lon - wholelon;
+        latlon ll = { wholelat, wholelon };
+
+        if (!cache.haskey(ll)) {
+            if ((int64)cache.size() >= maxsize) {
+                // the oldest will have the lowest count
+                latlon oldest = (latlon){ -1, -1 };
+                int64 lowest = INT64_MAX;
+                for (int64 ii = 0; ii<cache.bins(); ii++) {
+                    if (cache.skip(ii)) continue;
+                    if (cache.val(ii).count < lowest) {
+                        oldest = cache.key(ii);
+                        lowest = cache.val(ii).count;
+                    }
+                }
+                cache.remove(oldest);
+            }
+            cache[ll] = (countdted){ counter, dtedtile(trypath(wholelat, wholelon)) };
+        }
+
+        countdted& dt = cache[ll];
+        dt.count = ++counter;
+        if (dt.tile.isvalid()) {
+            return dt.tile.lookup(fractlat, fractlon);
+        }
+
+        return getmsl(lat, lon);
+    }
+
+    double dtedcache::getmsl(double lat, double lon) {
+        if (msl.size() == 0) return 0.0;
+        if (lat >= +90) return msl[0];
+        if (lat <= -90) return msl[MSL_LATS*MSL_LONS - 1];
+
+        double rowcoord = 90.0 - lat;
+        double colcoord = fmod(lon + 360.0, 360.0);
+        double rowfloat = rowcoord*((MSL_LATS - 1)/180.0);
+        double colfloat = colcoord*((MSL_LONS - 1)/360.0);
+        int64 rowwhole = floor(rowfloat);
+        int64 colwhole = floor(colfloat);
+        check(rowwhole >= 0, "lat in bounds: %lf >= 0", lat);
+        check(colwhole >= 0, "lon in bounds: %lf >= 0", lon);
+        check(rowwhole < MSL_LATS - 1, "lat in bounds: %lf (%lld)", lat, rowwhole);
+        check(colwhole < MSL_LONS - 1, "lon in bounds: %lf (%lld)", lon, colwhole);
+        double rowfract = rowfloat - rowwhole;
+        double colfract = colfloat - colwhole;
+
+        float tl = msl[(rowwhole + 0)*MSL_LONS + (colwhole + 0) + 6];
+        float tr = msl[(rowwhole + 0)*MSL_LONS + (colwhole + 1) + 6];
+        float bl = msl[(rowwhole + 1)*MSL_LONS + (colwhole + 0) + 6];
+        float br = msl[(rowwhole + 1)*MSL_LONS + (colwhole + 1) + 6];
+
+        return (
+            tl*(1.0 - rowfract)*(1.0 - colfract) +
+            tr*(1.0 - rowfract)*(0.0 + colfract) +
+            bl*(0.0 + rowfract)*(1.0 - colfract) +
+            br*(0.0 + rowfract)*(0.0 + colfract)
+        );
+    }
+
+
+    //}}}
+    //}}}
+    //{{{ Graphical Windows:             graphics, pixel, message, runwin 
+    //}}}
+    //{{{ Drawing Functions:             drawline, fillrect, drawtext 
+    //}}}
+    //{{{ Plotting Functions:            plotframe, plotseries, plotpoints 
+    //}}}
+    //{{{ Command Line Parsing:          cmdline 
 
     struct cmdline {
         inline ~cmdline();
         inline cmdline(int argc, char const * const * const argv, string doc);
 
-        inline string         getstring(    string name, string             def, string doc);
-        inline double         getdouble(    string name, double          def, string doc);
-        inline int64          getint64(     string name, int64           def, string doc);
-        inline timecode       gettimecode(  string name, timecode        def, string doc);
-        inline cartesian      getcartesian( string name, cartesian       def, string doc);
-        inline geodetic       getgeodetic(  string name, geodetic        def, string doc);
+        inline string         getstring(    string name, string    def, string doc);
+        inline double         getdouble(    string name, double    def, string doc);
+        inline int64          getint64(     string name, int64     def, string doc);
+        inline timecode       gettimecode(  string name, timecode  def, string doc);
+        inline cartesian      getcartesian( string name, cartesian def, string doc);
+        inline geodetic       getgeodetic(  string name, geodetic  def, string doc);
 
-        inline string            getstring(    string name, string doc);
+        inline string         getstring(    string name, string doc);
         inline double         getdouble(    string name, string doc);
         inline int64          getint64(     string name, string doc);
         inline timecode       gettimecode(  string name, string doc);
@@ -7289,9 +8111,9 @@ namespace xm {
 
         inline bool           getswitch(    string name, string doc);
 
-        inline string            getinput(     string name, string doc);
-        inline string            getoutput(    string name, string doc);
-        inline list<string>      getinputs(    string name, string doc);
+        inline string         getinput(     string name, string doc);
+        inline string         getoutput(    string name, string doc);
+        inline list<string>   getinputs(    string name, string doc);
 
         inline void done();
 
@@ -7649,6 +8471,661 @@ namespace xm {
     }
 
     //}}}
+    //{{{ Deprecated Functions and Types 
+    namespace deprecated {
+        //{{{ qrsolve
+        //
+        // Solve A*X = B for X using QR decomposition
+        //
+        //    double A[rows * cols]
+        //    double B[rows * count]
+        //
+        // Returns false is A is singular
+        //
+        // A will be modified during the decomposition
+        //
+        // If successful, the result will be placed into the top
+        // 'cols' rows of B.  B will also be modified on failure
+        //
+        static inline bool qrsolve (
+            double* A, int64 rows, int64 cols,
+            double* B, int64 count
+        ) {
+            check(rows >= cols, "rows %lld must be >= cols %lld", rows, cols);
+
+            for (int64 jj = 0; jj<cols; jj++) {
+                double rr = 0;
+                for (int64 ii = jj; ii<rows; ii++) {
+                    rr = hypot(rr, A[ii*cols + jj]);
+                }
+                // check if A is singular
+                if (rr == 0) return false;
+
+                // for numerical stability
+                if (A[jj*cols + jj] > 0) rr = -rr;
+
+                // normalize the Householder vector
+                double invrr = 1.0/rr;
+                for (int64 ii = jj; ii<rows; ii++) {
+                    A[ii*cols + jj] *= invrr;
+                }
+                double pp = A[jj*cols + jj] -= 1;
+                double invpp = 1.0/pp;
+
+                // apply the Householder to the rest of A
+                for (int64 kk = jj + 1; kk<cols; kk++) {
+                    double sum = 0;
+                    for (int64 ii = jj; ii<rows; ii++) {
+                        sum += A[ii*cols + jj]*A[ii*cols + kk];
+                    }
+                    sum *= invpp;
+                    for (int64 ii = jj; ii<rows; ii++) {
+                        A[ii*cols + kk] += sum*A[ii*cols + jj];
+                    }
+                }
+
+                // apply the Householder to all of B
+                for (int64 kk = 0; kk<count; kk++) {
+                    double sum = 0;
+                    for (int64 ii = jj; ii<rows; ii++) {
+                        sum += A[ii*cols + jj]*B[ii*count + kk];
+                    }
+                    sum *= invpp;
+                    for (int64 ii = jj; ii<rows; ii++) {
+                        B[ii*count + kk] += sum*A[ii*cols + jj];
+                    }
+                }
+
+                A[jj*cols + jj] = rr;
+            }
+
+            // back substitute R into B
+            for (int64 jj = cols - 1; jj >= 0; jj--) {
+                // divide by diagonal element
+                double dd = A[jj*cols + jj];
+                double invdd = 1.0/dd;
+                for (int64 kk = 0; kk<count; kk++) {
+                    B[jj*count + kk] *= invdd;
+                }
+
+                // subtract from other rows
+                for (int64 ii = jj - 1; ii >= 0; ii--) {
+                    double ss = A[ii*cols + jj];
+                    for (int64 kk = 0; kk<count; kk++) {
+                        B[ii*count + kk] -= ss*B[jj*count + kk];
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        // Note for the next several wrappers: we intentionally take A and B by value
+        // so that copies will be made.  The worker routines will modify these copies.
+        static inline matrix<double> qrsolve(matrix<double> A, matrix<double> B) {
+            check(A.rows() >= A.cols(), "can't be underdetermined");
+            check(A.rows() == B.rows(), "need compatible sizes");
+            check(
+                qrsolve(A.data(), A.rows(), A.cols(), B.data(), B.cols()),
+                "matrix must not be singular"
+            );
+            matrix<double> X(A.cols(), B.cols());
+            for (int64 ii = 0; ii<X.rows(); ii++) {
+                for (int64 jj = 0; jj<X.cols(); jj++) {
+                    X(ii, jj) = B(ii, jj);
+                }
+            }
+            return X;
+        }
+
+        static inline vector<double> qrsolve(matrix<double> A, vector<double> b) {
+            check(A.rows() >= A.cols(), "can't be underdetermined");
+            check(A.rows() == b.size(), "need compatible sizes");
+            check(
+                qrsolve(A.data(), A.rows(), A.cols(), b.data(), 1),
+                "matrix must not be singular"
+            );
+            vector<double> x(A.cols());
+            for (int64 ii = 0; ii<x.size(); ii++) {
+                x[ii] = b[ii];
+            }
+            return x;
+        }
+        //}}}
+        //{{{ ldsolve
+        //
+        // Factor A using LDL^t decomposition.
+        //
+        // The matrix must be symmetric, but this is not checked.  The decomp is
+        // placed in the lower half of the A matrix.  This decomp is similar to a
+        // Cholesky decomp, but it does not require the matrix to be positive
+        // definite, only symmetric.  This function always succeeds, but the decomp
+        // is only unique when the matrix is non-singular.
+        //
+        static inline void ldfactor(double* A, int64 size) {
+            for (int64 jj = 0; jj < size; jj++) {
+                // Solve for Diagonal
+                double ajj = A[jj*size + jj];
+                for (int64 kk = 0; kk < jj; kk++) {
+                    double dkk = A[kk*size + kk];
+                    double ljk = A[jj*size + kk];
+                    ajj -= ljk*(ljk)*dkk;
+                }
+                A[jj*size + jj] = ajj;
+                if (ajj == 0) ajj = 1;
+
+                // Solve for Lowers
+                for (int64 ii = jj + 1; ii < size; ii++) {
+                    double aij = A[ii*size + jj];
+                    for (int64 kk = 0; kk < jj; kk++) {
+                        double lik = A[ii*size + kk];
+                        double ljk = A[jj*size + kk];
+                        double dkk = A[kk*size + kk];
+                        aij -= lik*(ljk)*dkk;
+                    }
+                    A[ii*size + jj] = aij/ajj;
+                }
+            }
+        }
+
+        //
+        // Check if the LD decomposition is positive definite.
+        //
+        static inline bool ldposdef(const double* LD, int64 size) {
+            for (int64 ii = 0; ii<size; ii++) {
+                if (LD[ii*size + ii] <= 0) return false;
+            }
+            return true;
+        }
+
+        //
+        // Use the LDL^t decomposition in A to solve A*X = B.  X = A\B.
+        //
+        //     double LD[size * size]
+        //     double B[size * count]
+        //
+        // This function fails when the decomposition is singular (zero on diagonal)
+        //
+        static inline bool lddivide(const double* LD, int64 size, double* B, int64 count) {
+            for (int64 ii = 0; ii<size; ii++) {
+                if (LD[ii*size + ii] == 0) return false;
+            }
+            // Invert the Lower
+            for (int64 jj = 0; jj < size - 1; jj++) {
+                for (int64 ii = jj + 1; ii < size; ii++) {
+                    for (int64 kk = 0; kk<count; kk++) {
+                        B[ii*count + kk] -= LD[ii*size + jj]*B[jj*count + kk];
+                    }
+                }
+            }
+            // Invert the Diagonal
+            for (int64 ii = 0; ii < size; ii++) {
+                for (int64 kk = 0; kk<count; kk++) {
+                    B[ii*count + kk] /= LD[ii*size + ii];
+                }
+            }
+            // Invert the Lower Transpose
+            for (int64 ii = size - 1; ii > 0; ii--) {
+                for (int64 jj = 0; jj < ii; jj++) {
+                    for (int64 kk = 0; kk<count; kk++) {
+                        B[jj*count + kk] -= LD[ii*size + jj]*B[ii*count + kk];
+                    }
+                }
+            }
+            return true;
+        }
+
+        //
+        // Solve A*X = B for X using LDL^t decomposition
+        //
+        //     double A[size * size]
+        //     double B[size * count]
+        //
+        // Modifies A, places the result in B.  Returns false if A is singular.
+        //
+        static inline bool ldsolve(double* A, int64 size, double* B, int64 count) {
+            ldfactor(A, size);
+            return lddivide(A, size, B, count);
+        }
+
+        static inline matrix<double> ldsolve(matrix<double> A, matrix<double> B) {
+            check(A.rows() == A.cols(), "must be a square matrix");
+            check(A.rows() == B.rows(), "need compatible sizes");
+            check(
+                ldsolve(A.data(), A.rows(), B.data(), B.cols()),
+                "matrix must not be singular"
+            );
+            matrix<double> X(A.cols(), B.cols());
+            for (int64 ii = 0; ii<X.rows(); ii++) {
+                for (int64 jj = 0; jj<X.cols(); jj++) {
+                    X(ii, jj) = B(ii, jj);
+                }
+            }
+            return X;
+        }
+
+        static inline vector<double> ldsolve(matrix<double> A, vector<double> b) {
+            check(A.rows() == A.cols(), "must be a square matrix");
+            check(A.rows() == b.size(), "need compatible sizes");
+            check(
+                ldsolve(A.data(), A.rows(), b.data(), 1),
+                "matrix must not be singular"
+            );
+            vector<double> x(A.cols());
+            for (int64 ii = 0; ii<x.size(); ii++) {
+                x[ii] = b[ii];
+            }
+            return x;
+        }
+
+        //}}}
+    //{{{ SVD 2x2
+
+    template<class type>
+    struct svd2x2t {
+        type L[2][2];
+        double S[2];
+        type R[2][2];
+    };
+
+    typedef svd2x2t<double> rsvd2x2;
+    typedef svd2x2t<cdouble> csvd2x2;
+
+    namespace internal {
+        static inline rsvd2x2 diagonalize (double ff, double gg, double hh) {
+            // Diagonalize a 2x2 real valued lower bi-diagonal matrix.
+            //
+            // We can always factor an arbitrary 2x2 real or complex matrix
+            // into this special case by using Householder (or Givens)
+            // rotations as shown in the functions below.
+            //
+            // This algorithm is loosely taken from an article titled,
+            // "Accuracy of two SVD algorithms for 2x2 triangular matrices"
+            // published in Applied Mathematic and Computation in 2009.
+            //
+            // We want to find two rotation matrices such that:
+            //
+            //    [ff  0] = [Lc -Ls] [S0 0] [Rc -Rs]
+            //    [gg hh]   [Ls  Lc] [0 S1] [Rs  Rc]
+            //
+            //    Where Lc = cos(L), Ls = sin(L), Rc = cos(R), Rs = sin(R)
+            //
+            // Transposing to invert and rearranging:
+            //
+            //    [ Lc Ls] [ff  0] [ Rc Rs] = [S0 0]
+            //    [-Ls Lc] [gg hh] [-Rs Rc]   [0 S1]
+            //
+            // Expanding the left:
+            //
+            //    [( Lc*ff + Ls*gg) Ls*hh] [ Rc Rs] = [S0 0]
+            //    [(-Ls*ff + Lc*gg) Lc*hh] [-Rs Rc]   [0 S1]
+            //
+            // Expanding and separating:
+            //
+            //    S0 =  Lc*Rc*ff + Ls*Rc*gg - Ls*Rs*hh
+            //     0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
+            //     0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
+            //    S1 = -Ls*Rs*ff + Lc*Rs*gg + Lc*Rc*hh
+            //
+            ///////////////// First Method //////////////////////////
+            //
+            // Factoring the two zero equations for left cos and sin:
+            //
+            //    [Rs*ff  (Rs*gg + Rc*hh)] [Lc] = [0]
+            //    [(Rc*gg - Rs*hh) -Rc*ff] [Ls]   [0]
+            //
+            // Since [Lc Ls] can't be zero, the determinant must be zero:
+            //
+            //    0 = -Rc*Rs*ff^2 - (Rc*Rs*gg^2 - Rs^2*gg*hh + Rc^2*gg*hh - Rc*Rs*hh^2)
+            //      = Rc*Rs*ff^2 + Rc*Rs*gg^2 - Rs^2*gg*hh + Rc^2*gg*hh - Rc*Rs*hh^2
+            //      = Rc*Rs*(ff^2 + gg^2 - hh^2) + (Rc^2 - Rs^2)*gg*hh
+            //
+            // We're going to use the following double-angle formulas:
+            //
+            //    sin(2x) = 2*cos(x)*sin(x)
+            //    cos(2x) = cos(x) - sin(x)
+            //
+            // In:
+            //
+            //    0 = 2*Rs*CS*(ff^2 + gg^2 - hh^2) + 2*(Rc^2 - Rs^2)*gg*hh
+            //      = sin(2R)*(ff^2 + gg^2 - hh^2) + 2*cos(2R)*gg*hh
+            //
+            // Rearranging, we get our first method which solves for the right angle:
+            //
+            //    sin(2R)*(ff^2 + gg^2 - hh^2) = -2*cos(2R)*gg*hh
+            //    tan(2R) = (-2*gg*hh) / (ff^2 + gg^2 - hh^2)
+            //
+            // Now that we have a value for R, we can solve for L in two ways:
+            //
+            //    0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
+            //    Ls*(Rs*gg + Rc*hh) = -Lc*(Rs*ff)
+            //    tan(L) = -(Rs*ff) / (Rs*gg + Rc*hh)
+            //
+            // Or:
+            //
+            //    0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
+            //    Ls*(Rc*ff) = Lc*(Rc*gg - Rs*hh)
+            //    tan(L) = (Rc*gg - Rs*hh) / (Rc*ff)
+            //
+            ////////////////// Second Method ////////////////////////
+            //
+            // We can also factor those two equations for the right cos and sin:
+            //
+            //    0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
+            //    0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
+            //
+            //    [Ls*hh   (Lc*ff + Ls*gg)] [Rc] = [0]
+            //    [(-Ls*ff + Lc*gg) -Lc*hh] [Rs]   [0]
+            //
+            // Again, the determinant must be zero and using the double angle formulas:
+            //
+            //    0 = -Lc*Ls*hh^2 - (-Lc*Ls*ff^2 + Lc^2*ff*gg - Ls^2*ff*gg + Lc*Ls*gg^2)
+            //      = Lc*Ls*hh^2 - Lc*Ls*ff^2 + Lc^2*ff*gg - Ls^2*ff*gg + Lc*Ls*gg^2
+            //      = Lc*Ls*(-ff^2 + gg^2 + hh^2) + (Lc^2 - Ls^2)*ff*gg
+            //      = sin(2*L)*(-ff^2 + gg^2 + hh^2) + cos(2L)*ff*gg
+            //
+            // Again rearranging, we get our second method for the left angle:
+            //
+            //    2*sin(2L)*(-ff^2 + gg^2 + hh^2) = -2*cos(2L)*ff*gg
+            //    tan(2L) = (-2*ff*gg) / (-ff^2 + gg^2 + hh^2)
+            //
+            // This time we have a value for L, so we can solve for R in two ways:
+            //
+            //    0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
+            //    Rs*(Lc*ff + Ls*gg) = -Rc*(Ls*hh)
+            //    tan(R) = -Ls*hh / (Lc*ff + Ls*gg)
+            //
+            //    0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
+            //    Rs*(Lc*hh) = Rc*(-Ls*ff + Lc*gg)
+            //    tan(R) = (Lc*gg - Ls*ff) / Lc*hh
+            //
+            //////////////////////////////////////////////////////////
+            //
+            // So we have two methods - one which solves for L and one for R.
+            // Each of those two methods has two sub-methods to solve for the
+            // missing piece.  We choose which ones to use based on trying to
+            // avoid catastrophic cancellation in the operands.
+            //
+
+            // Check if it's already diagonal
+            if (gg == 0) return (rsvd2x2){
+                {{ 1, 0 }, { 0, 1 }}, { ff, hh }, {{ 1, 0 }, { 0, 1 }}
+            };
+
+            if (ff == 0) { // shortcut
+                double rr = hypot(gg, hh);
+                double cc = hh/rr;
+                double ss = gg/rr;
+                return (rsvd2x2){
+                    {{ 1, 0 }, { 0, 1 }}, { 0, rr }, {{ cc, -ss }, { ss, cc }}
+                };
+            }
+
+            if (hh == 0) { // shortcut
+                double rr = hypot(ff, gg);
+                double cc = ff/rr;
+                double ss = gg/rr;
+                return (rsvd2x2){
+                    {{ cc, -ss }, { ss, cc }}, { rr, 0 }, {{ 1, 0 }, { 0, 1 }}
+                };
+            }
+
+            double f2 = ff*ff;
+            double g2 = gg*gg;
+            double h2 = hh*hh;
+
+            double Lc, Ls, Rc, Rs;
+            if (f2 > h2) {
+                double R = .5*atan2(-2*gg*hh, f2 + g2 - h2);
+                Rc = cos(R);
+                Rs = sin(R);
+                double L;
+                if (fabs(Rs*gg + Rc*hh) > fabs(Rc*gg - Rs*hh)) {
+                    L = atan2(-Rs*ff, Rs*gg + Rc*hh);
+                } else {
+                    L = atan2(Rc*gg - Rs*hh, Rc*ff);
+                }
+                Lc = cos(L);
+                Ls = sin(L);
+            } else {
+                double L = .5*atan2(-2*ff*gg, h2 + g2 - f2);
+                Lc = cos(L);
+                Ls = sin(L);
+                double R;
+                if (fabs(Lc*ff + Ls*gg) > fabs(Lc*gg - Ls*ff)) {
+                    R = atan2(-Ls*hh, Lc*ff + Ls*gg);
+                } else {
+                    R = atan2(Lc*gg - Ls*ff, Lc*hh);
+                }
+                Rc = cos(R);
+                Rs = sin(R);
+            }
+
+            double S0 =  Lc*Rc*ff + Ls*Rc*gg - Ls*Rs*hh;
+            double S1 = -Ls*Rs*ff + Lc*Rs*gg + Lc*Rc*hh;
+
+            return (rsvd2x2) {
+                {{ Lc, -Ls }, { Ls, Lc }}, { S0, S1 }, {{ Rc, -Rs }, { Rs, Rc }}
+            };
+        }
+    }
+
+    /* XXX
+    template<class type>
+    static inline std::ostream& operator <<(std::ostream& os, const svd2x2t<type>& s) {
+        os << std::setprecision(5);
+        os << "L: [[" << s.L[0][0] << ", " << s.L[0][1] << "][" << s.L[1][0] << ", " << s.L[1][1] << "]]" << std::endl;
+        os << "S: [" << s.S[0] << "; " << s.S[1] << "]" << std::endl;
+        os << "R: [[" << s.R[0][0] << ", " << s.R[0][1] << "][" << s.R[1][0] << ", " << s.R[1][1] << "]]" << std::endl;
+
+        return os;
+    }
+    */
+
+    static inline rsvd2x2 bsvd2x2 (double ff, double gg, double hh) {
+        using namespace internal;
+
+        // Calculate the SVD of a 2x2 real lower bidiagonal matrix
+        // Permute and negate the bidiagonal result if needed
+        rsvd2x2 svd = diagonalize(ff, gg, hh);
+        if (svd.S[0] < 0) {
+            svd.L[0][0] *= -1;
+            svd.L[1][0] *= -1;
+            svd.S[0] *= -1;
+        }
+
+        if (svd.S[1] < 0) {
+            svd.L[0][1] *= -1;
+            svd.L[1][1] *= -1;
+            svd.S[1] *= -1;
+        }
+
+        if (svd.S[0] < svd.S[1]) {
+            swap(svd.L[0][0], svd.L[0][1]);
+            swap(svd.L[1][0], svd.L[1][1]);
+            swap(svd.S[0], svd.S[1]);
+            swap(svd.R[0][0], svd.R[1][0]);
+            swap(svd.R[0][1], svd.R[1][1]);
+        }
+
+        return svd;
+    }
+
+
+    static inline rsvd2x2 svd2x2 (
+        double tt, double uu,
+        double vv, double ww
+    ) {
+        if (uu) {
+            double ff = hypot(tt, uu);
+            double cc = +tt/ff;
+            double ss = -uu/ff;
+            double gg = vv*cc - ww*ss;
+            double hh = vv*ss + ww*cc;
+            rsvd2x2 svd = bsvd2x2(ff, gg, hh);
+            double r00 = +svd.R[0][0]*cc + svd.R[0][1]*ss;
+            double r01 = -svd.R[0][0]*ss + svd.R[0][1]*cc;
+            double r10 = +svd.R[1][0]*cc + svd.R[1][1]*ss;
+            double r11 = -svd.R[1][0]*ss + svd.R[1][1]*cc;
+            svd.R[0][0] = r00; svd.R[0][1] = r01;
+            svd.R[1][0] = r10; svd.R[1][1] = r11;
+            return svd;
+        }
+        // it was already bidiagonal
+        return bsvd2x2(tt, vv, ww);
+    }
+
+    static inline csvd2x2 svd2x2 (
+        cdouble tt, cdouble uu,
+        cdouble vv, cdouble ww
+    ) {
+        double magt = hypot(tt.re, tt.im);
+        double magu = hypot(uu.re, uu.im);
+        double magx = hypot(magt, magu);
+        double angt = atan2(tt.im, tt.re);
+        double angu = atan2(uu.im, uu.re);
+        double angx = atan2(magu, magt);
+        double cosx = cos(angx);
+        double cost = cos(angt);
+        double cosu = cos(angu);
+        double sinx = sin(angx);
+        double sint = sin(angt);
+        double sinu = sin(angu);
+
+        cdouble R00 = +cosx*cdouble(cost, sint);
+        cdouble R01 = +sinx*cdouble(cosu, sinu);
+        cdouble R10 = -sinx*cdouble(cost, sint);
+        cdouble R11 = +cosx*cdouble(cosu, sinu);
+
+        cdouble C10 = vv*conj(R00) + ww*conj(R01);
+        cdouble C11 = vv*conj(R10) + ww*conj(R11);
+
+        double angl = atan2(C10.im, C10.re);
+        cdouble zl = cdouble(cos(angl), sin(angl));
+        cdouble L00 = cdouble(1, 0);
+        cdouble L01 = cdouble(0, 0);
+        cdouble L10 = cdouble(0, 0);
+        cdouble L11 = zl;//cdouble(1, 0);
+        C10 = C10*conj(zl);
+        C11 = C11*conj(zl);
+
+        double angr = atan2(C11.im, C11.re);
+        cdouble zr = cdouble(cos(angr), sin(angr));
+        R10 = R10*zr;
+        R11 = R11*zr;
+
+        double ff = magx;
+        double gg = hypot(C10.re, C10.im);
+        double hh = hypot(C11.re, C11.im);
+        rsvd2x2 svd= bsvd2x2(ff, gg, hh);
+
+        return (csvd2x2){
+            {{svd.L[0][0]*L00 + svd.L[1][0]*L01, svd.L[0][1]*L00 + svd.L[1][1]*L01},
+             {
+                (svd.L[0][0])*L10 + (svd.L[1][0])*L11,
+                (svd.L[0][1])*L10 + (svd.L[1][1])*L11
+            }},
+            { svd.S[0], svd.S[1] },
+            {{
+                (svd.R[0][0])*R00 + (svd.R[0][1])*R10,
+                (svd.R[0][0])*R01 + (svd.R[0][1])*R11
+            },{
+                (svd.R[1][0])*R00 + (svd.R[1][1])*R10,
+                (svd.R[1][0])*R01 + (svd.R[1][1])*R11
+            }}
+        };
+    }
+    
+    //}}}
+    //{{{ SIMD
+ 
+#define define_simdtype(NAME, BASE, COUNT) \
+    typedef BASE NAME __attribute__(       \
+        (vector_size (COUNT*sizeof(BASE))) \
+    )
+
+    // 64 bit SIMD (MMX)
+    define_simdtype( i8x8,    int8_t,  8);
+    define_simdtype(i16x4,   int16_t,  4);
+    define_simdtype(i32x2,   int32_t,  2);
+    define_simdtype( u8x8,   uint8_t,  8);
+    define_simdtype(u16x4,  uint16_t,  4);
+    define_simdtype(u32x2,  uint32_t,  2);
+    define_simdtype(f32x2,     float,  2);
+ 
+    // 128 bit SIMD (SSE)
+    define_simdtype(i8x16,    int8_t, 16);
+    define_simdtype(i16x8,   int16_t,  8);
+    define_simdtype(i32x4,   int32_t,  4);
+    define_simdtype(i64x2,   int64_t,  2);
+    define_simdtype(u8x16,   uint8_t, 16);
+    define_simdtype(u16x8,  uint16_t,  8);
+    define_simdtype(u32x4,  uint32_t,  4);
+    define_simdtype(u64x2,  uint64_t,  2);
+    define_simdtype(f32x4,     float,  4);
+    define_simdtype(f64x2,    double,  2);
+
+    // 256 bit SIMD (AVX)
+    define_simdtype( i8x32,   int8_t, 32);
+    define_simdtype(i16x16,  int16_t, 16);
+    define_simdtype( i32x8,  int32_t,  8);
+    define_simdtype( i64x4,  int64_t,  4);
+    define_simdtype( u8x32,  uint8_t, 32);
+    define_simdtype(u16x16, uint16_t, 16);
+    define_simdtype( u32x8, uint32_t,  8);
+    define_simdtype( u64x4, uint64_t,  4);
+    define_simdtype( f32x8,    float,  8);
+    define_simdtype( f64x4,   double,  4);
+
+    // 512 bit SIMD (AVX-512)
+    define_simdtype( i8x64,   int8_t, 64);
+    define_simdtype(i16x32,  int16_t, 32);
+    define_simdtype(i32x16,  int32_t, 16);
+    define_simdtype( i64x8,  int64_t,  8);
+    define_simdtype( u8x64,  uint8_t, 64);
+    define_simdtype(u16x32, uint16_t, 32);
+    define_simdtype(u32x16, uint32_t, 16);
+    define_simdtype( u64x8, uint64_t,  8);
+    define_simdtype(f32x16,    float, 16);
+    define_simdtype( f64x8,   double,  8);
+
+    // 1024 bit SIMD (Future??)
+    define_simdtype(i8x128,   int8_t, 128);
+    define_simdtype(i16x64,  int16_t,  64);
+    define_simdtype(i32x32,  int32_t,  32);
+    define_simdtype(i64x16,  int64_t,  16);
+    define_simdtype(u8x128,  uint8_t, 128);
+    define_simdtype(u16x64, uint16_t,  64);
+    define_simdtype(u32x32, uint32_t,  32);
+    define_simdtype(u64x16, uint64_t,  16);
+    define_simdtype(f32x32,    float,  32);
+    define_simdtype(f64x16,   double,  16);
+
+#undef define_simdtype
+
+    //}}}
+    }
+    //}}}
+    //}}}
+
+// TODO:
+//
+//  make sure arguments are (const) references when they should be
+//  check() with line numbers
+//  symeigens()
+//  adaptmin()
+//  quasimin()
+//  covarmin()
+//  quickselect()
+//  prng.sample()
+//  prng.shuffle()
+//  upper(string), lower(string)
+//  struct heap<>
+//  drawline(), drawtext(), drawpoint(), drawellipse(), drawimage()
+//  plotframe(), plotline(), plotpoint(), plotellipse(), plotimage()
+//  struct autodiff<>
+//
+
     //{{{ xmheader
     namespace internal {
         // We put all of this stuff in an internal namespace just
@@ -9241,189 +10718,6 @@ namespace xm {
         check(symlink(datapath.data(), detfile.data()) == 0, "symlink '%s'", detfile.data());
     }
     //}}}
-    //{{{ shift2d
-    namespace internal {
-
-        static inline int64 shiftgcd(int64 rot, int64 len) {
-            int64 gcd = len;
-            int64 tmp = rot;
-            while (tmp) {
-                int64 mod = gcd%tmp;
-                gcd = tmp;
-                tmp = mod;
-            }
-            return gcd;
-        }
-
-        template<class type>
-        static inline void hshift(type* data, int64 rows, int64 cols, int64 horz) {
-            horz = horz%cols;
-            if (horz == 0) return;
-            if (horz < 0) horz += cols;
-            int64 gcd = shiftgcd(horz, cols);
-            int64 cyc = cols/gcd - 1;
-
-            for (int64 ii = 0; ii<rows; ii++) {
-                type* ptr = data + ii*cols;
-                for (int64 jj = 0; jj<gcd; jj++) {
-                    long lo = jj;
-                    long hi = jj + horz;
-                    for (int64 kk = 0; kk<cyc; kk++) {
-                        swap(ptr[lo], ptr[hi]);
-                        lo = hi; hi += horz;
-                        if (hi >= cols) hi -= cols;
-                    }
-                }
-            }
-        }
-
-        template<class type>
-        static inline void vshift(type* data, int64 rows, int64 cols, int64 vert) {
-            vert = vert%rows;
-            if (vert == 0) return;
-            if (vert < 0) vert += rows;
-            int64 gcd = shiftgcd(vert, rows);
-            int64 cyc = rows/gcd - 1;
-
-            for (int64 ii = 0; ii<gcd; ii++) {
-                long lo = ii;
-                long hi = ii + vert;
-                for (int64 kk = 0; kk<cyc; kk++) {
-                    for (int64 jj = 0; jj<cols; jj++) {
-                        swap(data[lo*cols + jj], data[hi*cols + jj]);
-                    }
-                    lo = hi; hi += vert;
-                    if (hi >= rows) hi -= rows;
-                }
-            }
-        }
-    }
-
-    // Circularly shifts such that the offset at (ii, jj) will be at (0, 0)
-    template<class type>
-    static inline void shift2d(type* data, int64 rows, int64 cols, int64 ii, int64 jj) {
-        using namespace internal;
-        vshift(data, rows, cols, ii);
-        hshift(data, rows, cols, jj);
-    }
-    //}}}
-    //{{{ timestate
-    struct timestate {
-        timecode tc;
-        statevec sv;
-    };
-
-    static inline bool operator <(const timestate& aa, const timestate& bb) {
-        return (aa.tc - bb.tc) < 0.0;
-    }
-
-    namespace internal {
-
-        // Evaluates an interpolating polynomial:
-        //
-        //      P(t) = a + b*t + c*t^2 + d*t^3 + e*t^4 + f*t^5
-        //
-        //  Such that:
-        //
-        //      P(-1) = plo      P(+1) = phi
-        //     P'(-1) = vlo     P'(+1) = vhi
-        //     P"(-1) = alo     P"(+1) = ahi
-        //
-        static double hermite5(
-            double plo, double vlo, double alo,
-            double phi, double vhi, double ahi,
-            double tt
-        ) {
-            plo *= .0625; vlo *= .0625; alo *= .0625;
-            phi *= .0625; vhi *= .0625; ahi *= .0625;
-
-            double aa =   8*phi +  8*plo -  5*vhi +  5*vlo + 1*ahi + 1*alo;
-            double bb =  15*phi - 15*plo -  7*vhi -  7*vlo + 1*ahi - 1*alo;
-            double cc =                     6*vhi -  6*vlo - 2*ahi - 2*alo;
-            double dd = -10*phi + 10*plo + 10*vhi + 10*vlo - 2*ahi + 2*alo;
-            double ee =                  -  1*vhi +  1*vlo + 1*ahi + 1*alo;
-            double ff =   3*phi -  3*plo -  3*vhi -  3*vlo + 1*ahi - 1*alo;
-
-            return aa + (bb + (cc + (dd + (ee + ff*tt)*tt)*tt)*tt)*tt;
-        }
-
-        // Evaluates an interpolating polynomial:
-        //
-        //      P(t) = a + b*t + c*t^2 + d*t^3
-        //
-        //  Such that:
-        //
-        //      P(-1) = plo      P(+1) = phi
-        //     P'(-1) = vlo     P'(+1) = vhi
-        //
-        static double hermite3(
-            double plo, double vlo,
-            double phi, double vhi,
-            double tt
-        ) {
-            plo *= .25; vlo *= .25;
-            phi *= .25; vhi *= .25;
-
-            double aa =  2*phi + 2*plo - 1*vhi + 1*vlo;
-            double bb =  3*phi - 3*plo - 1*vhi - 1*vlo;
-            double cc =                  1*vhi - 1*vlo;
-            double dd = -1*phi + 1*plo + 1*vhi + 1*vlo;
-
-            return aa + (bb + (cc + dd*tt)*tt)*tt;
-        }
-
-        // This is really just linear interpolation with t in [-1,+1]
-        static double hermite1(double plo, double phi, double tt) {
-            return (plo*(1.0 - tt) + phi*(1.0 + tt))*0.5;
-        }
-
-    }
-
-    static inline statevec interp(
-        const timestate& ts0, const timestate& ts1, const timecode& tc
-    ) {
-        using namespace internal;
-        double range = ts1.tc - ts0.tc;
-        double half = range*.5;
-        double tt = ((tc - ts1.tc) + (tc - ts0.tc)) / range;
-
-        return (statevec){
-            (cartesian){
-                hermite5(
-                    ts0.sv.pos.x, ts0.sv.vel.x*half, ts0.sv.acc.x*half*half,
-                    ts1.sv.pos.x, ts1.sv.vel.x*half, ts1.sv.acc.x*half*half, tt
-                ),
-                hermite5(
-                    ts0.sv.pos.y, ts0.sv.vel.y*half, ts0.sv.acc.y*half*half,
-                    ts1.sv.pos.y, ts1.sv.vel.y*half, ts1.sv.acc.y*half*half, tt
-                ),
-                hermite5(
-                    ts0.sv.pos.z, ts0.sv.vel.z*half, ts0.sv.acc.z*half*half,
-                    ts1.sv.pos.z, ts1.sv.vel.z*half, ts1.sv.acc.z*half*half, tt
-                )
-            },
-            (cartesian){
-                hermite3(
-                    ts0.sv.vel.x, ts0.sv.acc.x*half,
-                    ts1.sv.vel.x, ts1.sv.acc.x*half, tt
-                ),
-                hermite3(
-                    ts0.sv.vel.y, ts0.sv.acc.y*half,
-                    ts1.sv.vel.y, ts1.sv.acc.y*half, tt
-                ),
-                hermite3(
-                    ts0.sv.vel.z, ts0.sv.acc.z*half,
-                    ts1.sv.vel.z, ts1.sv.acc.z*half, tt
-                )
-            },
-            (cartesian){
-                hermite1(ts0.sv.acc.x, ts1.sv.acc.x, tt),
-                hermite1(ts0.sv.acc.y, ts1.sv.acc.y, tt),
-                hermite1(ts0.sv.acc.z, ts1.sv.acc.z, tt)
-            }
-        };
-    }
-    //}}}
     //{{{ ephemeris
 
     struct ephemeris {
@@ -9600,7 +10894,7 @@ namespace xm {
         paths.append(format("%s/sv%d_%04d%02d%02du.tmp", ephdir, (int)veh, dt.year, dt.month, dt.day));
         paths.append(format("%s/sv%d_%04d%02d%02d.prm", ephdir, (int)veh, dt.year, dt.month, dt.day));
         paths.append(format("%s/sv%d_%04d%02d%02d.tmp", ephdir, (int)veh, dt.year, dt.month, dt.day));
-        // These are ATRAA style paths - they make more sense, but are not common outside of ATRAA, so we put them last
+        // These are alternative paths - they make more sense, but are not as common, so we put them last
         paths.append(format("%s/%04d/%02d/sv%d_%04d%02d%02du.prm", ephdir, dt.year, dt.month, (int)veh, dt.year, dt.month, dt.day));
         paths.append(format("%s/%04d/%02d/sv%d_%04d%02d%02du.tmp", ephdir, dt.year, dt.month, (int)veh, dt.year, dt.month, dt.day));
         paths.append(format("%s/%04d/%02d/sv%d_%04d%02d%02d.prm", ephdir, dt.year, dt.month, (int)veh, dt.year, dt.month, dt.day));
@@ -9673,350 +10967,6 @@ namespace xm {
     statevec ephcache::getsv(int64 veh, timecode tc) {
         return geteph(veh, tc).lookup(tc);
     }
-
-    //}}}
-    //{{{ dtedtile
-    namespace internal {
-        static int16_t dtedsignmag(uint16_t xx) {
-#if   __BYTE_ORDER == __LITTLE_ENDIAN
-            byteswap2(&xx);
-#endif
-            int16_t signbit = xx&0x8000;
-            int16_t magbits = xx&0x7FFF;
-            if (signbit) magbits *= -1;
-            return magbits;
-        }
-
-        static int16_t dtedgetbits(const char* data, int64 off, int64 len) {
-            int64 byte = off/8;
-            int64 bit = off%8;
-            int32_t result = 0;
-            memcpy(&result, data + byte, sizeof(int32_t));
-            internal::byteswap4(&result);
-            result <<= bit;
-            result >>= 32 - len;
-            return result;
-        }
-    }
-
-    struct dtedtile {
-        inline dtedtile(const string& path);
-
-        //inline ~dtedtile() = default;
-        inline dtedtile() : lats(0), lons(0) {}
-        //inline dtedtile(const dtedtile&) = default;
-        //inline dtedtile& operator =(const dtedtile&) = default;
-
-        inline double lookup(double fractlat, double fractlon);
-        inline bool isvalid();
-
-        private:
-            // data is stored column major, starting from the lower
-            // left through each latitude, then increasing longitude.
-            int64 lats, lons;
-            vector<int16_t> data;
-    };
-
-    dtedtile::dtedtile(const string& path) {
-        using namespace internal;
-
-        // An empty path is used to indicate the absence of a tile.
-        // This is used by dtedcache to indicate it should use MSL lookup.
-        if (path == "") return;
-
-        int fd = open(path.data(), O_RDONLY);
-        check(fd >= 0, "opening '%s' for reading", path.data());
-        rawfile file(fd);
-        const char* ptr = (const char*)file.mmap();
-
-        if (memcmp(ptr, "UHL", 3) == 0) {
-            // uncompressed data
-            char temp[5] = {};
-            memcpy(temp, ptr + 47, 4);
-            lons = strtol(temp, 0, 10);
-            memcpy(temp, ptr + 51, 4);
-            lats = strtol(temp, 0, 10);
-            data.resize(lats*lons);
-            for (int64 ii = 0; ii<lons; ii++) {
-                const int64 skip = 80 + 648 + 2700 + 8;
-                const int64 offset = skip + ii*(12 + lats*sizeof(int16_t));
-                memcpy(&data[ii*lats], ptr + offset, lats*sizeof(int16_t));
-                for (int64 jj = 0; jj<lats; jj++) {
-                    data[ii*lats + jj] = dtedsignmag(data[ii*lats + jj]);
-                }
-            }
-            return;
-        }
-
-        if (memcmp(ptr, "DTC", 3) == 0) {
-            // compressed data
-            char temp[5] = {};
-            memcpy(temp, ptr + 51, 4);
-            lons = strtol(temp, 0, 10);
-            memcpy(temp, ptr + 55, 4);
-            lats = strtol(temp, 0, 10);
-            data.resize(lats*lons);
-
-            const uint32_t* offset = (const uint32_t*)(ptr + 80 + 648 + 23);
-
-            const int64 blockstart = 80 + 648 + 23 + 400;
-            for (int64 ii = 0; ii<10; ii++) {
-                for (int64 jj = 0; jj<10; jj++) {
-
-                    const char* blockptr = ptr + offset[ii*10 + jj] + blockstart + 4;
-                    const int64 blocklats = lats / 10 + (ii == 9 ? lats%10 : 0);
-                    const int64 blocklons = lons / 10 + (jj == 9 ? lons%10 : 0);
-
-                    int8_t nchunks = *(int8_t*)blockptr;
-                    blockptr += 1;
-
-                    for (int64 kk = 0; kk<blocklons; kk++) {
-                        int16_t* line = &data[jj*lats*(lons/10) + ii*(lats/10) + kk*lats];
-
-                        int64 total = 0;
-
-                        for (int64 nn = 0; nn<nchunks; nn++) {
-                            int64 samples = blocklats/nchunks + (nn == nchunks-1 ? blocklats%nchunks : 0);
-                            uint8_t nbits = *(uint8_t*)(blockptr);
-                            blockptr += 1;
-                            check(nbits == 0xFF || nbits <= 16, "in bounds");
-
-                            if (nbits == 0xFF) {
-                                memcpy(line, blockptr, samples*2);
-                                blockptr += samples*2;
-                            } else {
-                                int16_t accum = *(int16_t*)(blockptr);
-                                blockptr += 2;
-                                int64 bitoff = 0;
-                                for (int64 ss = 0; ss<samples; ss++) {
-                                    line[ss] = accum;
-                                    if (ss != samples-1 && nbits > 0) {
-                                        accum += dtedgetbits(blockptr, bitoff, nbits);
-                                        bitoff += nbits;
-                                    }
-                                }
-                                blockptr += (bitoff + 7)/8;
-                            }
-                            line += samples;
-                            total += samples;
-                        }
-
-                        check(total == blocklats, "sanity %lld %lld", total, blocklats);
-                    }
-                }
-            }
-
-            return;
-        }
-
-        check(false, "unrecognized DTED file format");
-    }
-
-    double dtedtile::lookup(double fractlat, double fractlon) {
-        check(fractlat >= 0.0, "fract lat in bounds: %lf", fractlat);
-        check(fractlon >= 0.0, "fract lon in bounds: %lf", fractlon);
-        check(fractlat <  1.0, "fract lat in bounds: %lf", fractlat);
-        check(fractlon <  1.0, "fract lon in bounds: %lf", fractlon);
-
-        double floatrow = (lats - 1)*fractlat;
-        double floatcol = (lons - 1)*fractlon;
-        int64 wholerow = floor(floatrow);
-        int64 wholecol = floor(floatcol);
-        double fractrow = floatrow - wholerow;
-        double fractcol = floatcol - wholecol;
-
-        //check(wholerow >= 0, "in bounds wholerow %lld < 0", wholerow);
-        //check(wholecol >= 0, "in bounds wholecol %lld < 0", wholecol);
-        //check(wholerow < lats - 1, "in bounds wholerow %lld < %lld", wholerow, lats - 1);
-        //check(wholecol < lons - 1, "in bounds wholecol %lld < %lld", wholecol, lons - 1);
-
-        double bl = data[(wholerow + 0) + lats*(wholecol + 0)];
-        double br = data[(wholerow + 0) + lats*(wholecol + 1)];
-        double tl = data[(wholerow + 1) + lats*(wholecol + 0)];
-        double tr = data[(wholerow + 1) + lats*(wholecol + 1)];
-
-        return (
-            bl*(1.0 - fractrow)*(1.0 - fractcol) +
-            br*(1.0 - fractrow)*(0.0 + fractcol) +
-            tl*(0.0 + fractrow)*(1.0 - fractcol) +
-            tr*(0.0 + fractrow)*(0.0 + fractcol)
-        );
-    }
-
-    bool dtedtile::isvalid() {
-        return data.size() > 0;
-    }
-
-    //}}}
-    //{{{ dtedcache
-    namespace internal {
-        struct latlon {
-            int32_t lat;
-            int32_t lon;
-            bool operator ==(const latlon& other) const {
-                return lat == other.lat && lon == other.lon;
-            }
-        };
-
-        static inline size_t hash(const latlon& ll) {
-            return xm::hash(ll.lat) ^ 5*xm::hash(ll.lon);
-        }
-    }
-
-    struct dtedcache {
-        //inline ~dtedcache() = default;
-        //inline dtedcache(const dtedcache&) = default;
-        //inline dtedcache& operator =(const dtedcache&) = default;
-        inline dtedcache(int64 maxtiles=64);
-
-        inline double lookup(double lat, double lon);
-
-        private:
-            inline string trypath(int32_t lat, int32_t lon);
-            int64 maxsize;
-            int64 counter;
-            struct countdted {
-                int64 count;
-                dtedtile tile;
-            };
-            dict<internal::latlon, countdted> cache;
-
-            inline double getmsl(double lat, double lon);
-
-            // MSL data is stored row-major starting from
-            // 0-lon at the north pole, moving southward per row
-            enum { MSL_LATS = 180*4 + 1, MSL_LONS = 360*4 + 1 };
-            vector<float> msl;
-    };
-
-    dtedcache::dtedcache(int64 maxtiles) : maxsize(maxtiles), counter(0) {
-        using namespace internal;
-
-        // This should be: /full/path/to/WW15MGH.BIN
-        char* dtedmsl = getenv("DTED_MSL");
-        if (!dtedmsl) return;
-
-        int fd = open(dtedmsl, O_RDONLY);
-        check(fd >= 0, "opening '%s' for reading", dtedmsl);
-        rawfile file(fd);
-        check(
-            file.size() >= int64((MSL_LATS*MSL_LONS + 6)*sizeof(float)),
-            "expected size for MSL"
-        );
-        const float* ptr = (const float*)file.mmap();
-        msl.resize(MSL_LATS*MSL_LONS + 6);
-        memcpy(msl.data(), ptr, (MSL_LATS*MSL_LONS + 6)*sizeof(float));
-
-#if __BYTE_ORDER == __BIG_ENDIAN
-        for (auto ii = msl.begin(); ii != msl.end(); ++ii) {
-            byteswap4(&*ii);
-        }
-#endif
-        check(msl[0] == -90, "expected 0");
-        check(msl[1] == +90, "expected 1");
-        check(msl[2] ==   0, "expected 2");
-        check(msl[3] == 360, "expected 3");
-        check(msl[4] == .25, "expected 4");
-        check(msl[5] == .25, "expected 5");
-    }
-
-    string dtedcache::trypath(int32_t lat, int32_t lon) {
-        const char* dteddir = getenv("DTED_DIR");
-        check(dteddir != 0, "DTED_DIR must be set");
-
-        char ns = 'n';
-        char ew = 'e';
-        if (lat < 0) {
-            ns = 's';
-            lat *= -1;
-        }
-        if (lon < 0) {
-            ew = 'w';
-            lon *= -1;
-        }
-
-        list<string> paths;
-        paths.append(format("%s/%c%03d/%c%02d.cdt2", dteddir, ew, lon, ns, lat));
-        paths.append(format("%s/%c%03d/%c%02d.cdt1", dteddir, ew, lon, ns, lat));
-        paths.append(format("%s/%c%03d/%c%02d.dt0",  dteddir, ew, lon, ns, lat));
-
-        for (int64 ii = 0; ii<paths.size(); ii++) {
-            const string& path = paths[ii];
-            struct stat buf;
-            if (stat(path.data(), &buf) == 0) {
-                return path;
-            }
-        }
-
-        return "";
-    }
-
-    inline double dtedcache::lookup(double lat, double lon) {
-        using namespace internal;
-
-        int32_t wholelat = (int32_t)floor(lat);
-        int32_t wholelon = (int32_t)floor(lon);
-        double fractlat = lat - wholelat;
-        double fractlon = lon - wholelon;
-        latlon ll = { wholelat, wholelon };
-
-        if (!cache.haskey(ll)) {
-            if ((int64)cache.size() >= maxsize) {
-                // the oldest will have the lowest count
-                latlon oldest = (latlon){ -1, -1 };
-                int64 lowest = INT64_MAX;
-                for (int64 ii = 0; ii<cache.bins(); ii++) {
-                    if (cache.skip(ii)) continue;
-                    if (cache.val(ii).count < lowest) {
-                        oldest = cache.key(ii);
-                        lowest = cache.val(ii).count;
-                    }
-                }
-                cache.remove(oldest);
-            }
-            cache[ll] = (countdted){ counter, dtedtile(trypath(wholelat, wholelon)) };
-        }
-
-        countdted& dt = cache[ll];
-        dt.count = ++counter;
-        if (dt.tile.isvalid()) {
-            return dt.tile.lookup(fractlat, fractlon);
-        }
-
-        return getmsl(lat, lon);
-    }
-
-    double dtedcache::getmsl(double lat, double lon) {
-        if (msl.size() == 0) return 0.0;
-        if (lat >= +90) return msl[0];
-        if (lat <= -90) return msl[MSL_LATS*MSL_LONS - 1];
-
-        double rowcoord = 90.0 - lat;
-        double colcoord = fmod(lon + 360.0, 360.0);
-        double rowfloat = rowcoord*((MSL_LATS - 1)/180.0);
-        double colfloat = colcoord*((MSL_LONS - 1)/360.0);
-        int64 rowwhole = floor(rowfloat);
-        int64 colwhole = floor(colfloat);
-        check(rowwhole >= 0, "lat in bounds: %lf >= 0", lat);
-        check(colwhole >= 0, "lon in bounds: %lf >= 0", lon);
-        check(rowwhole < MSL_LATS - 1, "lat in bounds: %lf (%lld)", lat, rowwhole);
-        check(colwhole < MSL_LONS - 1, "lon in bounds: %lf (%lld)", lon, colwhole);
-        double rowfract = rowfloat - rowwhole;
-        double colfract = colfloat - colwhole;
-
-        float tl = msl[(rowwhole + 0)*MSL_LONS + (colwhole + 0) + 6];
-        float tr = msl[(rowwhole + 0)*MSL_LONS + (colwhole + 1) + 6];
-        float bl = msl[(rowwhole + 1)*MSL_LONS + (colwhole + 0) + 6];
-        float br = msl[(rowwhole + 1)*MSL_LONS + (colwhole + 1) + 6];
-
-        return (
-            tl*(1.0 - rowfract)*(1.0 - colfract) +
-            tr*(1.0 - rowfract)*(0.0 + colfract) +
-            bl*(0.0 + rowfract)*(1.0 - colfract) +
-            br*(0.0 + rowfract)*(0.0 + colfract)
-        );
-    }
-
 
     //}}}
     //{{{ lighttime
@@ -10185,962 +11135,6 @@ namespace xm {
     }
 
     //}}}
-    //{{{ blocktuner
-
-    // blocktuner uses a 64 bit integer to track phase.  This has more
-    // precision than a 64 bit double, and it does not lose accuracy as the
-    // sequence of data gets large.  A block of 1024 precomputed phasors is
-    // stored so there are no trig calls in the inner loop of the apply method.
-    struct blocktuner {
-        //~blocktuner() = default;
-        //blocktuner() = default;
-        //blocktuner(const blocktuner&) = default;
-        //blocktuner& operator =(const blocktuner&) = default;
-
-        // arguments are digital frequency (cycles per sample),
-        // and phase at the first sample (cycles)
-        inline blocktuner(double dfreq, double phase0=0.0);
-
-        // off - indicates the absolute offset where ptr is in
-        // the tuned data stream.  len is the number of samples
-        inline void apply(cfloat* ptr, int64 off, int64 len);
-
-        private:
-            cfloat block[1024];
-            uint64_t delta;
-    };
-
-
-    blocktuner::blocktuner(double dfreq, double phase0) {
-        dfreq = fmodl(dfreq, 1.0);
-        if (dfreq < 0) dfreq += 1.0;
-        delta = (uint64_t)roundl(dfreq*powl(2.0, +64));
-        for (uint64_t ii = 0; ii<1024; ii++) {
-            uint64_t phase = delta * ii;
-            double angle = 2*M_PI*(phase0 + phase*pow(2.0, -64));
-            block[ii] = cfloat(cos(angle), sin(angle));
-        }
-    }
-
-    void blocktuner::apply(cfloat* ptr, int64 off, int64 len) {
-        // this assumes 2's complement, which should always be true
-        uint64_t phase = delta*(uint64_t)off;
-        while (len > 0) {
-            double angle = 2*M_PI*phase*pow(2.0, -64);
-            cfloat extra = cfloat(cos(angle), sin(angle));
-
-            uint64_t amt = len;
-            if (amt > 1024) amt = 1024;
-            for (uint64_t ii = 0; ii<amt; ii++) {
-                ptr[ii] = ptr[ii] * block[ii] * extra;
-            }
-
-            len -= amt;
-            ptr += amt;
-            phase += amt*delta;
-        }
-    }
-
-    //}}}
-    //{{{ singleton
-
-    template<class atype, class btype>
-    static inline void singleton(
-        complex<atype>* dst, const complex<btype>* src, int64 len,
-        double cycles_lo, double cycles_hi
-    ) {
-        // We're going through a lot of pains here to avoid making
-        // expensive sine and cosine calls in the inner loop.  The
-        // naive trig recurrence is numerically unstable and incurs
-        // O(N) rounding error as it runs, so we don't do that.
-        // Instead, we're using a recurrence from Richard Singleton
-        // that incurs O(sqrt N) error.  For large lengths, that
-        // could still get too large, so we restart the recurrence
-        // after every 1024 samples as necessary.  We also subtract
-        // out integer cycles before converting to radians so that
-        // we aren't evaluating cosines and sines of large numbers.
-        double invlen = 1.0/len;
-        for (int64 jj = 0; jj<len; jj += 1024) {
-            int64 index_lo = jj;
-            int64 index_hi = min(jj + 1024, len);
-            double fract_lo = index_lo*invlen;
-            double fract_hi = index_hi*invlen;
-            double cyc0 = (1.0 - fract_lo)*cycles_lo + fract_lo*cycles_hi;
-            double cyc1 = (1.0 - fract_hi)*cycles_lo + fract_hi*cycles_hi;
-
-            double mid = round(.5*cyc0 + .5*cyc1);
-            double rad0 = 2*M_PI*(cyc0 - mid);
-            double rad1 = 2*M_PI*(cyc1 - mid);
-            double dph = (rad1 - rad0)/(index_hi - index_lo);
-            double cc = cos(rad0);
-            double ss = sin(rad0);
-            double aa = 2*sin(dph/2)*sin(dph/2);
-            double bb = sin(dph);
-
-            for (int64 ii = index_lo; ii<index_hi; ii++) {
-                double re = src[ii].re;
-                double im = src[ii].im;
-                dst[ii].re = re*cc - im*ss;
-                dst[ii].im = im*cc + re*ss;
-                // Singleton's trig recurrence
-                double tc = cc - (aa*cc + bb*ss);
-                double ts = ss + (bb*cc - aa*ss);
-                cc = tc;
-                ss = ts;
-            }
-        }
-    }
-    //XXX: This is the old one - delete it...
-#if 0
-    static inline void singleton_tune(cfloat* dst, const cfloat* src, int64 len, double ph0, double ph1) {
-        // We're going through a lot of pains here to avoid making
-        // expensive sine and cosine calls in the inner loop.  The
-        // naive trig recurrence is numerically unstable and incurs
-        // O(N) rounding error as it runs, so we don't do that.
-        // Instead, we're using a recurrence from Richard Singleton
-        // that incurs O(sqrt N) error.  For large lengths, that
-        // could still get too large, so we restart the recurrence
-        // after every 1024 samples as necessary.  We also subtract
-        // out integer cycles before converting to radians so that
-        // we aren't evaluating cosines and sines of large numbers.
-        double invlen = 1.0/len;
-        for (int64 jj = 0; jj<len; jj += 1024) {
-            int64 index_lo = jj;
-            int64 index_hi = min(jj + 1024, len);
-            double fract_lo = index_lo*invlen;
-            double fract_hi = index_hi*invlen;
-            double cyc0 = (1.0 - fract_lo)*ph0 + fract_lo*ph1;
-            double cyc1 = (1.0 - fract_hi)*ph0 + fract_hi*ph1;
-
-            double mid = round(.5*cyc0 + .5*cyc1);
-            double rad0 = 2*M_PI*(cyc0 - mid);
-            double rad1 = 2*M_PI*(cyc1 - mid);
-            double dph = (rad1 - rad0)/(index_hi - index_lo);
-            double cc = cos(rad0);
-            double ss = sin(rad0);
-            double aa = 2*sin(dph/2)*sin(dph/2);
-            double bb = sin(dph);
-
-            for (int64 ii = index_lo; ii<index_hi; ii++) {
-                dst[ii] = cfloat(cc, ss)*src[ii];
-                /*
-                double re = src[ii].re;
-                double im = src[ii].im;
-                dst[ii].re = re*cc - im*ss;
-                dst[ii].im = im*cc + re*ss;
-                */
-                // Singleton's trig recurrence
-                double tc = cc - (aa*cc + bb*ss);
-                double ts = ss + (bb*cc - aa*ss);
-                cc = tc;
-                ss = ts;
-            }
-        }
-    }
-#endif
-    //}}}
-    //{{{ polyphase
-    struct polyphase {
-
-        //~polyphase() = default;
-        //polyphase() = default;
-        //polyphase(const polyphase&) = default;
-        //polyphase& operator =(const polyphase&) = default;
-
-        inline polyphase(int window, double dwidth, int64 taps);
-
-        inline void resample(
-            cfloat* dst_ptr, int64 dst_len,
-            const cfloat* src_ptr, double src_lo, double src_hi
-        ) const;
-
-        private:
-            enum { COUNT = 1024 };
-            int64 taps;
-            vector<float> bank;
-
-            inline void makefir(float* ptr, double fract, int window, double dwidth);
-            inline cfloat interp(const cfloat* src, double where) const;
-    };
-
-    polyphase::polyphase(int window, double dwidth, int64 taps) : taps(taps), bank(taps*COUNT) {
-        for (int64 ii = 0; ii<COUNT; ii++) {
-            double fract = ii/(double)COUNT;
-            makefir(bank.data() + ii*taps, fract, window, dwidth);
-        }
-    }
-
-    void polyphase::makefir(float* ptr, double fract, int window, double dwidth) {
-        double sum = 0.0;
-        for (int64 jj = 0; jj<taps; jj++) {
-            double xx = jj + 1 - taps/2 - fract;
-            double tap = firwin(window, xx, taps)*sinc(xx*dwidth);
-            ptr[jj] = tap;
-            sum += tap;
-        }
-        double inv = 1.0/sum;
-        for (int64 jj = 0; jj<taps; jj++) {
-            ptr[jj] *= inv;
-        }
-    }
-
-    cfloat polyphase::interp(const cfloat* src, double where) const {
-        double re = 0;
-        double im = 0;
-        int64 fixed = llrint(where*COUNT);
-        int64 index = fixed/COUNT;
-        int64 which = fixed%COUNT;
-        const cfloat* ptr = src + index + 1 - taps/2;
-        const float* filt = bank.data() + taps*which;
-        for (int64 ii = 0; ii<taps; ii++) {
-            re += ptr[ii].re*filt[ii];
-            im += ptr[ii].im*filt[ii];
-        }
-        return cfloat(re, im);
-    }
-
-    void polyphase::resample(
-        cfloat* dst_ptr, int64 dst_len,
-        const cfloat* src_ptr, double src_lo, double src_hi
-    ) const {
-        double df = 1.0/dst_len;
-        for (int64 ii = 0; ii<dst_len; ii++) {
-            double ff = ii*df;
-            dst_ptr[ii] = interp(src_ptr, (1.0 - ff)*src_lo + ff*src_hi);
-        }
-    }
-
-    //}}}
-    //{{{ quadroots
-    struct quadroots {
-        double lo, hi;
-    };
-
-    // Find the real roots of: a*x^2 + b*x + c (if possible).  It returns NaNs
-    // in bad cases.  XXX: Numerically stable, but there is room for
-    // improvement in special cases and error handling....
-    static inline quadroots quadsolve(double aa, double bb, double cc) {
-        double rad = sqrt(bb*bb - 4*aa*cc);
-        quadroots results;
-        if (bb < 0) {
-            double r0 = (2*cc)/(-bb + rad);
-            double r1 = (-bb + rad)/(2*aa);
-            results.lo = fmin(r0, r1);
-            results.hi = fmax(r0, r1);
-        } else {
-            double r0 = (-bb - rad)/(2*aa);
-            double r1 = (2*cc)/(-bb - rad);
-            results.lo = fmin(r0, r1);
-            results.hi = fmax(r0, r1);
-        }
-        return results;
-    }
-
-    // Given 3 consecutive values, find the place where the derivative is zero
-    static inline double quadpeak(double before, double center, double after) {
-        double two_a = (before - 2*center + after);
-        double neg_b = .5*(before - after);
-        return neg_b/two_a;
-    }
-
-    //}}}
-    //{{{ SVD 2x2
-
-    template<class type>
-    struct svd2x2t {
-        type L[2][2];
-        double S[2];
-        type R[2][2];
-    };
-
-    typedef svd2x2t<double> rsvd2x2;
-    typedef svd2x2t<cdouble> csvd2x2;
-
-    namespace internal {
-        static inline rsvd2x2 diagonalize (double ff, double gg, double hh) {
-            // Diagonalize a 2x2 real valued lower bi-diagonal matrix.
-            //
-            // We can always factor an arbitrary 2x2 real or complex matrix
-            // into this special case by using Householder (or Givens)
-            // rotations as shown in the functions below.
-            //
-            // This algorithm is loosely taken from an article titled,
-            // "Accuracy of two SVD algorithms for 2x2 triangular matrices"
-            // published in Applied Mathematic and Computation in 2009.
-            //
-            // We want to find two rotation matrices such that:
-            //
-            //    [ff  0] = [Lc -Ls] [S0 0] [Rc -Rs]
-            //    [gg hh]   [Ls  Lc] [0 S1] [Rs  Rc]
-            //
-            //    Where Lc = cos(L), Ls = sin(L), Rc = cos(R), Rs = sin(R)
-            //
-            // Transposing to invert and rearranging:
-            //
-            //    [ Lc Ls] [ff  0] [ Rc Rs] = [S0 0]
-            //    [-Ls Lc] [gg hh] [-Rs Rc]   [0 S1]
-            //
-            // Expanding the left:
-            //
-            //    [( Lc*ff + Ls*gg) Ls*hh] [ Rc Rs] = [S0 0]
-            //    [(-Ls*ff + Lc*gg) Lc*hh] [-Rs Rc]   [0 S1]
-            //
-            // Expanding and separating:
-            //
-            //    S0 =  Lc*Rc*ff + Ls*Rc*gg - Ls*Rs*hh
-            //     0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
-            //     0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
-            //    S1 = -Ls*Rs*ff + Lc*Rs*gg + Lc*Rc*hh
-            //
-            ///////////////// First Method //////////////////////////
-            //
-            // Factoring the two zero equations for left cos and sin:
-            //
-            //    [Rs*ff  (Rs*gg + Rc*hh)] [Lc] = [0]
-            //    [(Rc*gg - Rs*hh) -Rc*ff] [Ls]   [0]
-            //
-            // Since [Lc Ls] can't be zero, the determinant must be zero:
-            //
-            //    0 = -Rc*Rs*ff^2 - (Rc*Rs*gg^2 - Rs^2*gg*hh + Rc^2*gg*hh - Rc*Rs*hh^2)
-            //      = Rc*Rs*ff^2 + Rc*Rs*gg^2 - Rs^2*gg*hh + Rc^2*gg*hh - Rc*Rs*hh^2
-            //      = Rc*Rs*(ff^2 + gg^2 - hh^2) + (Rc^2 - Rs^2)*gg*hh
-            //
-            // We're going to use the following double-angle formulas:
-            //
-            //    sin(2x) = 2*cos(x)*sin(x)
-            //    cos(2x) = cos(x) - sin(x)
-            //
-            // In:
-            //
-            //    0 = 2*Rs*CS*(ff^2 + gg^2 - hh^2) + 2*(Rc^2 - Rs^2)*gg*hh
-            //      = sin(2R)*(ff^2 + gg^2 - hh^2) + 2*cos(2R)*gg*hh
-            //
-            // Rearranging, we get our first method which solves for the right angle:
-            //
-            //    sin(2R)*(ff^2 + gg^2 - hh^2) = -2*cos(2R)*gg*hh
-            //    tan(2R) = (-2*gg*hh) / (ff^2 + gg^2 - hh^2)
-            //
-            // Now that we have a value for R, we can solve for L in two ways:
-            //
-            //    0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
-            //    Ls*(Rs*gg + Rc*hh) = -Lc*(Rs*ff)
-            //    tan(L) = -(Rs*ff) / (Rs*gg + Rc*hh)
-            //
-            // Or:
-            //
-            //    0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
-            //    Ls*(Rc*ff) = Lc*(Rc*gg - Rs*hh)
-            //    tan(L) = (Rc*gg - Rs*hh) / (Rc*ff)
-            //
-            ////////////////// Second Method ////////////////////////
-            //
-            // We can also factor those two equations for the right cos and sin:
-            //
-            //    0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
-            //    0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
-            //
-            //    [Ls*hh   (Lc*ff + Ls*gg)] [Rc] = [0]
-            //    [(-Ls*ff + Lc*gg) -Lc*hh] [Rs]   [0]
-            //
-            // Again, the determinant must be zero and using the double angle formulas:
-            //
-            //    0 = -Lc*Ls*hh^2 - (-Lc*Ls*ff^2 + Lc^2*ff*gg - Ls^2*ff*gg + Lc*Ls*gg^2)
-            //      = Lc*Ls*hh^2 - Lc*Ls*ff^2 + Lc^2*ff*gg - Ls^2*ff*gg + Lc*Ls*gg^2
-            //      = Lc*Ls*(-ff^2 + gg^2 + hh^2) + (Lc^2 - Ls^2)*ff*gg
-            //      = sin(2*L)*(-ff^2 + gg^2 + hh^2) + cos(2L)*ff*gg
-            //
-            // Again rearranging, we get our second method for the left angle:
-            //
-            //    2*sin(2L)*(-ff^2 + gg^2 + hh^2) = -2*cos(2L)*ff*gg
-            //    tan(2L) = (-2*ff*gg) / (-ff^2 + gg^2 + hh^2)
-            //
-            // This time we have a value for L, so we can solve for R in two ways:
-            //
-            //    0 =  Lc*Rs*ff + Ls*Rs*gg + Ls*Rc*hh
-            //    Rs*(Lc*ff + Ls*gg) = -Rc*(Ls*hh)
-            //    tan(R) = -Ls*hh / (Lc*ff + Ls*gg)
-            //
-            //    0 = -Ls*Rc*ff + Lc*Rc*gg - Lc*Rs*hh
-            //    Rs*(Lc*hh) = Rc*(-Ls*ff + Lc*gg)
-            //    tan(R) = (Lc*gg - Ls*ff) / Lc*hh
-            //
-            //////////////////////////////////////////////////////////
-            //
-            // So we have two methods - one which solves for L and one for R.
-            // Each of those two methods has two sub-methods to solve for the
-            // missing piece.  We choose which ones to use based on trying to
-            // avoid catastrophic cancellation in the operands.
-            //
-
-            // Check if it's already diagonal
-            if (gg == 0) return (rsvd2x2){
-                {{ 1, 0 }, { 0, 1 }}, { ff, hh }, {{ 1, 0 }, { 0, 1 }}
-            };
-
-            if (ff == 0) { // shortcut
-                double rr = hypot(gg, hh);
-                double cc = hh/rr;
-                double ss = gg/rr;
-                return (rsvd2x2){
-                    {{ 1, 0 }, { 0, 1 }}, { 0, rr }, {{ cc, -ss }, { ss, cc }}
-                };
-            }
-
-            if (hh == 0) { // shortcut
-                double rr = hypot(ff, gg);
-                double cc = ff/rr;
-                double ss = gg/rr;
-                return (rsvd2x2){
-                    {{ cc, -ss }, { ss, cc }}, { rr, 0 }, {{ 1, 0 }, { 0, 1 }}
-                };
-            }
-
-            double f2 = ff*ff;
-            double g2 = gg*gg;
-            double h2 = hh*hh;
-
-            double Lc, Ls, Rc, Rs;
-            if (f2 > h2) {
-                double R = .5*atan2(-2*gg*hh, f2 + g2 - h2);
-                Rc = cos(R);
-                Rs = sin(R);
-                double L;
-                if (fabs(Rs*gg + Rc*hh) > fabs(Rc*gg - Rs*hh)) {
-                    L = atan2(-Rs*ff, Rs*gg + Rc*hh);
-                } else {
-                    L = atan2(Rc*gg - Rs*hh, Rc*ff);
-                }
-                Lc = cos(L);
-                Ls = sin(L);
-            } else {
-                double L = .5*atan2(-2*ff*gg, h2 + g2 - f2);
-                Lc = cos(L);
-                Ls = sin(L);
-                double R;
-                if (fabs(Lc*ff + Ls*gg) > fabs(Lc*gg - Ls*ff)) {
-                    R = atan2(-Ls*hh, Lc*ff + Ls*gg);
-                } else {
-                    R = atan2(Lc*gg - Ls*ff, Lc*hh);
-                }
-                Rc = cos(R);
-                Rs = sin(R);
-            }
-
-            double S0 =  Lc*Rc*ff + Ls*Rc*gg - Ls*Rs*hh;
-            double S1 = -Ls*Rs*ff + Lc*Rs*gg + Lc*Rc*hh;
-
-            return (rsvd2x2) {
-                {{ Lc, -Ls }, { Ls, Lc }}, { S0, S1 }, {{ Rc, -Rs }, { Rs, Rc }}
-            };
-        }
-    }
-
-    /* XXX
-    template<class type>
-    static inline std::ostream& operator <<(std::ostream& os, const svd2x2t<type>& s) {
-        os << std::setprecision(5);
-        os << "L: [[" << s.L[0][0] << ", " << s.L[0][1] << "][" << s.L[1][0] << ", " << s.L[1][1] << "]]" << std::endl;
-        os << "S: [" << s.S[0] << "; " << s.S[1] << "]" << std::endl;
-        os << "R: [[" << s.R[0][0] << ", " << s.R[0][1] << "][" << s.R[1][0] << ", " << s.R[1][1] << "]]" << std::endl;
-
-        return os;
-    }
-    */
-
-    static inline rsvd2x2 bsvd2x2 (double ff, double gg, double hh) {
-        using namespace internal;
-
-        // Calculate the SVD of a 2x2 real lower bidiagonal matrix
-        // Permute and negate the bidiagonal result if needed
-        rsvd2x2 svd = diagonalize(ff, gg, hh);
-        if (svd.S[0] < 0) {
-            svd.L[0][0] *= -1;
-            svd.L[1][0] *= -1;
-            svd.S[0] *= -1;
-        }
-
-        if (svd.S[1] < 0) {
-            svd.L[0][1] *= -1;
-            svd.L[1][1] *= -1;
-            svd.S[1] *= -1;
-        }
-
-        if (svd.S[0] < svd.S[1]) {
-            swap(svd.L[0][0], svd.L[0][1]);
-            swap(svd.L[1][0], svd.L[1][1]);
-            swap(svd.S[0], svd.S[1]);
-            swap(svd.R[0][0], svd.R[1][0]);
-            swap(svd.R[0][1], svd.R[1][1]);
-        }
-
-        return svd;
-    }
-
-
-    static inline rsvd2x2 svd2x2 (
-        double tt, double uu,
-        double vv, double ww
-    ) {
-        if (uu) {
-            double ff = hypot(tt, uu);
-            double cc = +tt/ff;
-            double ss = -uu/ff;
-            double gg = vv*cc - ww*ss;
-            double hh = vv*ss + ww*cc;
-            rsvd2x2 svd = bsvd2x2(ff, gg, hh);
-            double r00 = +svd.R[0][0]*cc + svd.R[0][1]*ss;
-            double r01 = -svd.R[0][0]*ss + svd.R[0][1]*cc;
-            double r10 = +svd.R[1][0]*cc + svd.R[1][1]*ss;
-            double r11 = -svd.R[1][0]*ss + svd.R[1][1]*cc;
-            svd.R[0][0] = r00; svd.R[0][1] = r01;
-            svd.R[1][0] = r10; svd.R[1][1] = r11;
-            return svd;
-        }
-        // it was already bidiagonal
-        return bsvd2x2(tt, vv, ww);
-    }
-
-    static inline csvd2x2 svd2x2 (
-        cdouble tt, cdouble uu,
-        cdouble vv, cdouble ww
-    ) {
-        double magt = hypot(tt.re, tt.im);
-        double magu = hypot(uu.re, uu.im);
-        double magx = hypot(magt, magu);
-        double angt = atan2(tt.im, tt.re);
-        double angu = atan2(uu.im, uu.re);
-        double angx = atan2(magu, magt);
-        double cosx = cos(angx);
-        double cost = cos(angt);
-        double cosu = cos(angu);
-        double sinx = sin(angx);
-        double sint = sin(angt);
-        double sinu = sin(angu);
-
-        cdouble R00 = +cosx*cdouble(cost, sint);
-        cdouble R01 = +sinx*cdouble(cosu, sinu);
-        cdouble R10 = -sinx*cdouble(cost, sint);
-        cdouble R11 = +cosx*cdouble(cosu, sinu);
-
-        cdouble C10 = vv*conj(R00) + ww*conj(R01);
-        cdouble C11 = vv*conj(R10) + ww*conj(R11);
-
-        double angl = atan2(C10.im, C10.re);
-        cdouble zl = cdouble(cos(angl), sin(angl));
-        cdouble L00 = cdouble(1, 0);
-        cdouble L01 = cdouble(0, 0);
-        cdouble L10 = cdouble(0, 0);
-        cdouble L11 = zl;//cdouble(1, 0);
-        C10 = C10*conj(zl);
-        C11 = C11*conj(zl);
-
-        double angr = atan2(C11.im, C11.re);
-        cdouble zr = cdouble(cos(angr), sin(angr));
-        R10 = R10*zr;
-        R11 = R11*zr;
-
-        double ff = magx;
-        double gg = hypot(C10.re, C10.im);
-        double hh = hypot(C11.re, C11.im);
-        rsvd2x2 svd= bsvd2x2(ff, gg, hh);
-
-        return (csvd2x2){
-            {{svd.L[0][0]*L00 + svd.L[1][0]*L01, svd.L[0][1]*L00 + svd.L[1][1]*L01},
-             {
-                (svd.L[0][0])*L10 + (svd.L[1][0])*L11,
-                (svd.L[0][1])*L10 + (svd.L[1][1])*L11
-            }},
-            { svd.S[0], svd.S[1] },
-            {{
-                (svd.R[0][0])*R00 + (svd.R[0][1])*R10,
-                (svd.R[0][0])*R01 + (svd.R[0][1])*R11
-            },{
-                (svd.R[1][0])*R00 + (svd.R[1][1])*R10,
-                (svd.R[1][0])*R01 + (svd.R[1][1])*R11
-            }}
-        };
-    }
-    
-    //}}}
-    //{{{ mednoise
-    static inline double mednoise (const cfloat* ptr, ssize_t len) {
-        // XXX: consider doing this with quickselect instead of a histogram
-
-        // Floating point values can have a max exponent of about 38, so ignoring
-        // denormals and infinities, the magsquare exponent can go from about -76
-        // to +76.  That's -760 to +760 dB.  We're doing a histogram of tenths of a
-        // dB, so -8000 to +8000 should cover the range more than adequately.
-        ssize_t histogram[16000] = {0};
-        ssize_t ii;
-
-        for (ii = 0; ii<len; ii++) {
-            double m2 = mag2(ptr[ii]);
-            double db = 10.0*::log10(m2 + 1e-300);
-            double bin = floor(8000.0 + 10.0*db);
-            if (bin < 0) bin = 0;
-            if (bin > 15999) bin = 15999;
-            histogram[(ssize_t)bin]++;
-        }
-
-        ssize_t count = 0;
-        for (ii = 0; ii<16000; ii++) {
-            count += histogram[ii];
-            if (count >= len/2) {
-                double db = (ii + .5 - 8000)/10.0;
-                double median = ::pow(10.0, db/10);
-
-                // Returns linear power after converting the median to mean.
-                // Assumes the original data was complex normal, and so the
-                // the mag squared data is Chi-square with 2 degrees of freedom.
-                return median/::log(2.0);
-            }
-        }
-
-        check(false, "shouldn't get here");
-        return -1;
-    }
-    //}}}
-    //{{{ prng 
-    struct prng {
-        inline ~prng();
-        inline prng();
-        inline prng(const prng& other);
-        inline prng(uint64_t seed);
-        inline prng& operator =(const prng& other);
-        inline void reseed(uint64_t seed);
-
-        inline uint64_t uint64();
-        inline double uniform();
-        inline double uniform(double lo, double hi);
-        inline double normal();
-        inline cdouble cxnormal();
-
-        private:
-            uint64_t state[16];
-            int64 index;
-    };
-
-    prng::~prng() {}
-
-    prng::prng() {
-        reseed(0);
-    }
-
-    prng::prng(const prng& other) : index(other.index) {
-        for (int64 ii = 0; ii<16; ii++) {
-            state[ii] = other.state[ii];
-        }
-    }
-
-    prng::prng(uint64_t seed) {
-        reseed(seed);
-    }
-
-    prng& prng::operator =(const prng& other) {
-        index = other.index;
-        for (int64 ii = 0; ii<16; ii++) {
-            state[ii] = other.state[ii];
-        }
-        return *this;
-    }
-
-    void prng::reseed(uint64_t seed) {
-        while (seed == 0) {
-            struct timeval tv;
-            check(gettimeofday(&tv, 0) == 0, "gettimeofday");
-            seed = (tv.tv_sec*1000000ULL) ^ tv.tv_usec;
-        }
-        // This is 'xorshift64*' by Sebastiano Vigna (public domain).
-        // We're just using it to seed the other generator.
-        for (int64 ii = 0; ii<16; ii++) {
-            seed ^= seed >> 12;
-            seed ^= seed << 25;
-            seed ^= seed >> 27;
-            state[ii] = seed * 2685821657736338717LL;
-        }
-        index = 0;
-    }
-
-    uint64_t prng::uint64() {
-        // This is 'xorshift1024*' by Sebastiano Vigna (public domain).  It's
-        // an improved version of one from George Marsaglia, and should have a
-        // period of 2^1024 - 1, which is long enough for many things.  It does
-        // well on the "BigCrush" suite of tests (better than Mersenne Twister).
-        uint64_t state0 = state[index];
-        index = (index + 1)%16;
-        uint64_t state1 = state[index];
-        state1 ^= state1 << 31;
-        state1 ^= state1 >> 11;
-        state0 ^= state0 >> 30;
-        state[index] = state0 ^ state1;
-        return state[index] * 1181783497276652981LL; 
-    }
-
-    double prng::uniform() {
-        const double scale = pow(2, -63);
-        int64_t value = (int64_t)uint64();
-        return value*scale;
-    }
-
-    double prng::uniform(double lo, double hi) {
-        const double scale = pow(2, -64);
-        double value = scale*uint64();
-        return lo + (hi - lo)*value;
-    }
-
-    double prng::normal() {
-        cdouble zz = cxnormal();
-        return zz.re + zz.im;
-    }
-
-    cdouble prng::cxnormal() {
-        // u0 is in (0, 1], and u1 is in [0, 2pi)
-        const double s0 = 5.42101086242752217e-20;
-        const double u0 = s0*uint64() + s0;
-        const double s1 = 3.40612158008655459e-19;
-        const double u1 = s1*uint64();
-        // Box-Muller transform
-        const double len = ::sqrt(-::log(u0));
-        return cdouble(::cos(u1)*len, ::sin(u1)*len);
-    }
-    //}}}
-    //{{{ shiftreg
-    struct shiftreg {
-        inline shiftreg(
-            uint64_t poly = (1L<<61) | (1L<<60) | (1L<<45) | (1L<<1) | 1,
-            uint64_t seed = 0x196e6a4b093L, bool fibonacci=false
-        );
-
-        inline void shl();
-        inline void shr();
-
-        inline uint64_t val() const;
-        inline bool bit() const;
-
-        private:
-            static uint64_t popcnt(uint64_t poly);
-            static uint64_t gethi(uint64_t poly);
-
-            bool fib;
-            uint64_t poly, hibit, reg;
-    };
-
-    shiftreg::shiftreg(uint64_t poly, uint64_t seed, bool fibonacci) :
-        fib(fibonacci), poly(poly), hibit(gethi(poly)), reg(seed&(hibit - 1))
-    {}
-
-    uint64_t shiftreg::popcnt(uint64_t bits) {
-        return __builtin_popcountl(bits);
-    }
-
-    uint64_t shiftreg::gethi(uint64_t poly) {
-        check(poly != 0, "can't have a zero polynomial");
-        uint64_t hibit = 1;
-        poly >>= 1;
-        while (poly) {
-            hibit <<= 1;
-            poly >>= 1;
-        }
-        return hibit;
-    }
-
-    void shiftreg::shl() {
-        reg <<= 1;
-        if (fib) {
-            if (popcnt(reg&poly)%2) {
-                reg |= 1;
-            }
-            reg &= ~hibit;
-        } else {
-            if (reg&hibit) {
-                reg ^= poly;
-            }
-        }
-    }
-
-    void shiftreg::shr() {
-        if (fib) {
-            if (popcnt(reg&poly)%2) {
-                reg |= hibit;
-            }
-        } else {
-            if (reg&1) {
-                reg ^= poly;
-            }
-        }
-        reg >>= 1;
-    }
-
-    uint64_t shiftreg::val() const {
-        return reg;
-    }
-
-    bool shiftreg::bit() const {
-        return (reg&1) ? true : false;
-    }
-
-    //}}}
-    //{{{ gpsgold
-    struct gpsgold {
-        inline gpsgold(int32_t prn);
-
-        inline void next();
-
-        inline bool bit() const;
-        inline int8_t chip() const;
-
-        private:
-            shiftreg g1;
-            shiftreg g2;
-    };
-
-    gpsgold::gpsgold(int32_t prn) :
-        // See ICD GPS 200, pages 29-30
-        g1((1<<10) | (1<<3) | 1, 0x3FF, true),
-        g2((1<<10) | (1<<9) | (1<<8) | (1<<6) | (1<<3) | (1<<2) | 1, 0x3ff, true)
-    {
-        check(1 <= prn && prn <= 37, "prn must be in range");
-        // see ICD GPS 200, pages 8-9
-        const static int32_t table[38] = {
-            // 0    1    2    3    4    5    6    7    8    9
-               0,   5,   6,   7,   8,  17,  18, 139, 140, 141,
-             251, 252, 254, 255, 256, 257, 258, 469, 470, 471,
-             472, 473, 474, 509, 512, 513, 514, 515, 516, 859,
-             860, 861, 862, 863, 950, 947, 948, 950
-        };
-        const int32_t delay = table[prn];
-        for (int32_t ii = 0; ii<delay; ii++) {
-            g2.shr();
-        }
-    }
-
-    void gpsgold::next() {
-        g1.shl();
-        g2.shl();
-    }
-
-    bool gpsgold::bit() const {
-        return ((g1.val() ^ g2.val()) & 0x200) >> 9;
-    }
-
-    int8_t gpsgold::chip() const {
-        return bit() ? +1 : -1;
-    }
-
-    //}}}
-    //{{{ SIMD
- 
-#define define_simdtype(NAME, BASE, COUNT) \
-    typedef BASE NAME __attribute__(       \
-        (vector_size (COUNT*sizeof(BASE))) \
-    )
-
-    // 64 bit SIMD (MMX)
-    define_simdtype( i8x8,    int8_t,  8);
-    define_simdtype(i16x4,   int16_t,  4);
-    define_simdtype(i32x2,   int32_t,  2);
-    define_simdtype( u8x8,   uint8_t,  8);
-    define_simdtype(u16x4,  uint16_t,  4);
-    define_simdtype(u32x2,  uint32_t,  2);
-    define_simdtype(f32x2,     float,  2);
- 
-    // 128 bit SIMD (SSE)
-    define_simdtype(i8x16,    int8_t, 16);
-    define_simdtype(i16x8,   int16_t,  8);
-    define_simdtype(i32x4,   int32_t,  4);
-    define_simdtype(i64x2,   int64_t,  2);
-    define_simdtype(u8x16,   uint8_t, 16);
-    define_simdtype(u16x8,  uint16_t,  8);
-    define_simdtype(u32x4,  uint32_t,  4);
-    define_simdtype(u64x2,  uint64_t,  2);
-    define_simdtype(f32x4,     float,  4);
-    define_simdtype(f64x2,    double,  2);
-
-    // 256 bit SIMD (AVX)
-    define_simdtype( i8x32,   int8_t, 32);
-    define_simdtype(i16x16,  int16_t, 16);
-    define_simdtype( i32x8,  int32_t,  8);
-    define_simdtype( i64x4,  int64_t,  4);
-    define_simdtype( u8x32,  uint8_t, 32);
-    define_simdtype(u16x16, uint16_t, 16);
-    define_simdtype( u32x8, uint32_t,  8);
-    define_simdtype( u64x4, uint64_t,  4);
-    define_simdtype( f32x8,    float,  8);
-    define_simdtype( f64x4,   double,  4);
-
-    // 512 bit SIMD (AVX-512)
-    define_simdtype( i8x64,   int8_t, 64);
-    define_simdtype(i16x32,  int16_t, 32);
-    define_simdtype(i32x16,  int32_t, 16);
-    define_simdtype( i64x8,  int64_t,  8);
-    define_simdtype( u8x64,  uint8_t, 64);
-    define_simdtype(u16x32, uint16_t, 32);
-    define_simdtype(u32x16, uint32_t, 16);
-    define_simdtype( u64x8, uint64_t,  8);
-    define_simdtype(f32x16,    float, 16);
-    define_simdtype( f64x8,   double,  8);
-
-    // 1024 bit SIMD (Future??)
-    define_simdtype(i8x128,   int8_t, 128);
-    define_simdtype(i16x64,  int16_t,  64);
-    define_simdtype(i32x32,  int32_t,  32);
-    define_simdtype(i64x16,  int64_t,  16);
-    define_simdtype(u8x128,  uint8_t, 128);
-    define_simdtype(u16x64, uint16_t,  64);
-    define_simdtype(u32x32, uint32_t,  32);
-    define_simdtype(u64x16, uint64_t,  16);
-    define_simdtype(f32x32,    float,  32);
-    define_simdtype(f64x16,   double,  16);
-
-#undef define_simdtype
-
-    //}}}
-    //{{{ findzero
-
-    namespace internal {
-        static bool diffsign(double aa, double bb) {
-            return (bool)signbit(aa) != (bool)signbit(bb);
-        }
-    }
-
-    template<class callable>
-    double findzero(callable func, double xlo, double xhi, double tol=0) {
-        using namespace internal;
-        if (xhi < xlo) swap(xlo, xhi);
-        double ylo = func(xlo); if (ylo == 0) return xlo;
-        double yhi = func(xhi); if (yhi == 0) return xhi;
-        check(diffsign(yhi, ylo), "must have opposite signs");
-
-        while (xhi - xlo > tol) {
-            double half = .5*(xhi - xlo);
-            double xmid = xlo + half;
-            if (xmid == xlo || xmid == xhi) return xmid;
-            double ymid = func(xmid); if (ymid == 0) return xmid;
-
-            // We're using a variation of Ridder's method to find an
-            // interpolated point, slightly modified to avoid underflow.
-            double denom = ::hypot(ymid, ::sqrt(::fabs(ylo))*::sqrt(::fabs(yhi)));
-            double xexp = xmid + half*::copysign(1, ylo - yhi)*ymid/denom;
-            check(xlo <= xexp && xexp <= xhi, "in bounds");
-            double yexp = func(xexp); if (yexp == 0) return xexp;
-
-            double xx[4] = { xlo, xmid, xexp, xhi };
-            double yy[4] = { ylo, ymid, yexp, yhi };
-            if (xexp < xmid) { swap(xx[1], xx[2]); swap(yy[1], yy[2]); }
-
-            double best = xhi - xlo;
-            for (int ii = 0; ii<3; ii++) {
-                if (xx[ii+1] - xx[ii+0] < best && diffsign(yy[ii+0], yy[ii+1])) {
-                    xlo = xx[ii+0]; ylo = yy[ii+0];
-                    xhi = xx[ii+1]; yhi = yy[ii+1];
-                    best = xx[ii+1] - xx[ii+0];
-                }
-            }
-        }
-        return xhi + .5*(xhi - xlo);
-    }
-
-    //}}}
 
 }
     
@@ -11292,6 +11286,8 @@ namespace xm {
     type exactsum(const vec<type, size>& vv) {
         return exactsum(vv.data(), vv.size());
     }
+    //}}}
+    //{{{ inner product
 
     /* XXX: is this how we want to do these?
     template<class atype, class btype>

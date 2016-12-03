@@ -28,7 +28,7 @@ static void halfpass(double* muls, int64 nmul, double lofreq) {
         }
         check(nfreq >= nmul, "need more frequencies than multipliers");
 
-        bool got = qrsolve(matrix.data(), nfreq, nmul, wants.data(), 1);
+        bool got = deprecated::qrsolve(matrix.data(), nfreq, nmul, wants.data(), 1);
         check(got == true, "matrix can't be singular");
 
         for (int64 ii = 0; ii<nmul; ii++) {
