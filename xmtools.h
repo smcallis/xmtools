@@ -3891,6 +3891,8 @@ namespace xm {
         static inline void smith_division(
             double aa, double bb, double cc, double dd, double& ee, double& ff
         ) {
+            // XXX: Switch this to using ilogb() and scalbn() to normalize.
+            // See _Cdivd() in http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1124.pdf
             if (fabs(cc) < fabs(dd)) {
                 double rr = cc/dd;
                 double ll = cc*rr + dd;
