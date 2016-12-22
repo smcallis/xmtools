@@ -1,6 +1,7 @@
 
 CXXFLAGS = -std=c++98 -fwrapv -pthread -g -O3 -Wall -Wextra
-LDFLAGS = -lX11 -lm -lrt
+#LDFLAGS = -lX11 -lm -lrt
+LDFLAGS = -lm -lrt
 
 INCLUDES = \
     xmtools.h \
@@ -26,6 +27,7 @@ PROGRAMS = \
     covar \
     eigen \
     hashit \
+    newdict \
 
 all: $(PROGRAMS)
 
