@@ -8,15 +8,18 @@ namespace xm {
         template<class ktype, class vtype>
         struct dictbase {
             virtual ~dictbase() = 0;
-            virtual void insert(const ktype& key, const ktype& val) = 0;
-            //virtual void insert(const ktype& key) = 0;
-            //virtual void remove(const ktype& key) = 0;
-            //virtual bool haskey(const ktype& key) = 0;
-            //virtual vtype& lookup(const ktype& key) = 0;
-            //virtual const vtype& lookup(const ktype& key) const = 0;
-            //virtual void rehash(dictbase<ktype, vtype>* old) = 0;
 
-            virtual void debug() = 0;
+            virtual int64 size() const = 0;
+
+            virtual int64 search(uint64_t code, const ktype& key) const = 0;
+            virtual const ktype& getkey(int64 ii) const = 0;
+            virtual const vtype& getval(int64 ii) const = 0;
+            virtual vtype& getval(int64 ii) = 0;
+
+            virtual void insert(uint64_t code, const ktype& key, const ktype& val) = 0;
+            virtual void remove(uint64_t code, const ktype& key) = 0;
+
+            virtual void debug() const = 0;
         };
 
         template<class ktype, class vtype>
@@ -40,14 +43,23 @@ namespace xm {
         template<class ktype, class vtype, int64 bins>
         struct dictimpl : dictbase<ktype, vtype> {
             ~dictimpl();
-            dictimpl(int64 size);
-            void insert(const ktype& key, const ktype& val);
+            dictimpl();
 
-            void debug();
+            int64 size() const;
+
+            int64 search(uint64_t code, const ktype& key) const;
+            const ktype& getkey(int64 ii) const;
+            const vtype& getval(int64 ii) const;
+            vtype& getval(int64 ii);
+
+            void insert(uint64_t code, const ktype& key, const vtype& val);
+            void remove(uint64_t code, const ktype& key);
+
+            void debug() const;
 
             private:
 
-                int64 size;
+                int64 length;
                 struct {
                     uint64_t code;
                     int64_t offset;
@@ -55,6 +67,73 @@ namespace xm {
 
                 keyval<ktype, vtype> table[0];
         };
+
+        template<class ktype, class vtype, int64 bins>
+        dictimpl<ktype, vtype, bins>::~dictimpl() {
+            for (int64 ii = 0; ii<length; ii++) {
+                table[ii].~keyval<ktype, vtype>();
+            }
+            free(this);
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        int64 dictimpl<ktype, vtype, bins>::size() const {
+            return length;
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        int64 dictimpl<ktype, vtype, bins>::search(
+            uint64_t code, const ktype& key
+        ) const {
+            return -1; // XXX
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        const ktype& dictimpl<ktype, vtype, bins>::getkey(
+            int64 ii
+        ) const {
+            return table[ii].getkey();
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        const vtype& dictimpl<ktype, vtype, bins>::getval(
+            int64 ii
+        ) const {
+            return table[ii].getval();
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        vtype& dictimpl<ktype, vtype, bins>::getval(
+            int64 ii
+        ) {
+            return table[ii].getval();
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        void dictimpl<ktype, vtype, bins>::insert(
+            uint64_t code, const ktype& key, const vtype& val
+        ) {
+            (void)code; (void)key; (void)val; // XXX
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        void dictimpl<ktype, vtype, bins>::remove(
+            uint64_t code, const ktype& key
+        ) {
+            (void)code; (void)key; // XXX
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        void dictimpl<ktype, vtype, bins>::debug() const {
+            fprintf(stderr, "----------------\n");
+            for (int64 ii = 0; ii<bins; ii++) {
+                fprintf(stderr, "%016x : %lld\n", index[ii].code, index[ii].offset);
+            }
+            for (int64 ii = 0; ii<length; ii++) {
+                fprintf(stderr, "key: %10lld, val: %10lld\n", table[ii].getkey(), table[ii].getval());
+            }
+        }
+
     }
     //}}}
 
@@ -107,7 +186,9 @@ namespace xm {
     template<int64 bins>
     internal::dictbase<ktype, vtype>* newdict<ktype, vtype>::init() {
         internal::dictimpl<ktype, vtype, bins>* result = (
-            alloc<internal::dictimpl<ktype, vtype, bins> >()
+            alloc<internal::dictimpl<ktype, vtype, bins> >(
+                3*bins/4*sizeof(internal::keyval<ktype, vtype>)
+            )
         );
         new(result) internal::dictimpl<ktype, vtype, bins>();
         return result;
