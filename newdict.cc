@@ -9,14 +9,16 @@ namespace xm {
         struct dictbase {
             virtual ~dictbase() = 0;
 
-            virtual int64 size() const = 0;
+            virtual int64 getsize() const = 0;
+            virtual int64 getbins() const = 0;
 
-            virtual int64 search(uint64_t code, const ktype& key) const = 0;
+            virtual uint64_t gethash(int64 ii) const = 0;
             virtual const ktype& getkey(int64 ii) const = 0;
             virtual const vtype& getval(int64 ii) const = 0;
             virtual vtype& getval(int64 ii) = 0;
 
             virtual void insert(uint64_t code, const ktype& key, const ktype& val) = 0;
+            virtual int64 search(uint64_t code, const ktype& key) const = 0;
             virtual void remove(uint64_t code, const ktype& key) = 0;
 
             virtual void debug() const = 0;
@@ -24,9 +26,9 @@ namespace xm {
 
         template<class ktype, class vtype>
         struct keyval {
+            int64 bin;
             ktype key;
             vtype val;
-            const ktype& getkey() const { return key; }
             const vtype& getval() const { return val; }
             vtype& getval() { return val; }
         };
@@ -34,8 +36,8 @@ namespace xm {
         static none nothing;
         template<class ktype>
         struct keyval<ktype, none> {
+            int64 bin;
             ktype key;
-            const ktype& getkey() const { return key; }
             const none& getval() const { return nothing; }
             none& getval() { return nothing; }
         };
@@ -45,67 +47,68 @@ namespace xm {
             ~dictimpl();
             dictimpl();
 
-            int64 size() const;
+            int64 getsize() const;
+            int64 getbins() const;
 
-            int64 search(uint64_t code, const ktype& key) const;
+            uint64_t gethash(int64 ii) const;
             const ktype& getkey(int64 ii) const;
             const vtype& getval(int64 ii) const;
-            vtype& getval(int64 ii);
+                  vtype& getval(int64 ii);
 
             void insert(uint64_t code, const ktype& key, const vtype& val);
+            int64 search(uint64_t code, const ktype& key) const;
             void remove(uint64_t code, const ktype& key);
 
             void debug() const;
 
             private:
 
-                int64 length;
+                int64 size;
                 struct {
                     uint64_t code;
                     int64_t offset;
                 } index[bins];
-
-                keyval<ktype, vtype> table[0];
+                union {
+                    // these are intentionally not constructed
+                    keyval<ktype, vtype> table[3*bins/4];
+                };
         };
 
         template<class ktype, class vtype, int64 bins>
         dictimpl<ktype, vtype, bins>::~dictimpl() {
-            for (int64 ii = 0; ii<length; ii++) {
+            for (int64 ii = 0; ii<size; ii++) {
                 table[ii].~keyval<ktype, vtype>();
             }
             free(this);
         }
 
         template<class ktype, class vtype, int64 bins>
-        int64 dictimpl<ktype, vtype, bins>::size() const {
-            return length;
+        int64 dictimpl<ktype, vtype, bins>::getsize() const {
+            return size;
         }
 
         template<class ktype, class vtype, int64 bins>
-        int64 dictimpl<ktype, vtype, bins>::search(
-            uint64_t code, const ktype& key
-        ) const {
-            return -1; // XXX
+        int64 dictimpl<ktype, vtype, bins>::getbins() const {
+            return bins;
         }
 
         template<class ktype, class vtype, int64 bins>
-        const ktype& dictimpl<ktype, vtype, bins>::getkey(
-            int64 ii
-        ) const {
-            return table[ii].getkey();
+        uint64_t dictimpl<ktype, vtype, bins>::gethash(int64 ii) const {
+            return index[table[ii].bin].code;
         }
 
         template<class ktype, class vtype, int64 bins>
-        const vtype& dictimpl<ktype, vtype, bins>::getval(
-            int64 ii
-        ) const {
+        const ktype& dictimpl<ktype, vtype, bins>::getkey(int64 ii) const {
+            return table[ii].key;
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        const vtype& dictimpl<ktype, vtype, bins>::getval(int64 ii) const {
             return table[ii].getval();
         }
 
         template<class ktype, class vtype, int64 bins>
-        vtype& dictimpl<ktype, vtype, bins>::getval(
-            int64 ii
-        ) {
+        vtype& dictimpl<ktype, vtype, bins>::getval(int64 ii) {
             return table[ii].getval();
         }
 
@@ -114,6 +117,13 @@ namespace xm {
             uint64_t code, const ktype& key, const vtype& val
         ) {
             (void)code; (void)key; (void)val; // XXX
+        }
+
+        template<class ktype, class vtype, int64 bins>
+        int64 dictimpl<ktype, vtype, bins>::search(
+            uint64_t code, const ktype& key
+        ) const {
+            return -1; // XXX
         }
 
         template<class ktype, class vtype, int64 bins>
@@ -129,7 +139,7 @@ namespace xm {
             for (int64 ii = 0; ii<bins; ii++) {
                 fprintf(stderr, "%016x : %lld\n", index[ii].code, index[ii].offset);
             }
-            for (int64 ii = 0; ii<length; ii++) {
+            for (int64 ii = 0; ii<size; ii++) {
                 fprintf(stderr, "key: %10lld, val: %10lld\n", table[ii].getkey(), table[ii].getval());
             }
         }
@@ -168,9 +178,7 @@ namespace xm {
         vtype& val(int64 bin);
 
         private:
-            template<int64 bins>
-            internal::dictbase<ktype, vtype>* init();
-            internal::dictbase<ktype, vtype>* create(int64 size);
+            static internal::dictbase<ktype, vtype>* create(int64 size);
             internal::dictbase<ktype, vtype>* storage;
     };
 
@@ -183,87 +191,65 @@ namespace xm {
     newdict<ktype, vtype>::newdict() : storage(0) {}
 
     template<class ktype, class vtype>
-    template<int64 bins>
-    internal::dictbase<ktype, vtype>* newdict<ktype, vtype>::init() {
-        internal::dictimpl<ktype, vtype, bins>* result = (
-            alloc<internal::dictimpl<ktype, vtype, bins> >(
-                3*bins/4*sizeof(internal::keyval<ktype, vtype>)
-            )
-        );
-        new(result) internal::dictimpl<ktype, vtype, bins>();
-        return result;
-    }
-
-    template<class ktype, class vtype>
     internal::dictbase<ktype, vtype>* newdict<ktype, vtype>::create(int64 size) {
-        check(size >= 0, "must have positive size (%lld)", size);
-        int64 bins = 4;
-        while (3*bins/4 < size) bins *= 2;
-        switch (bins) {
-            case                   4: return init<                  4>();
-            case                   8: return init<                  8>();
-            case                  16: return init<                 16>();
-            case                  32: return init<                 32>();
-            case                  64: return init<                 64>();
-            case                 128: return init<                128>();
-            case                 256: return init<                256>();
-            case                 512: return init<                512>();
-            case                1024: return init<               1024>();
-            case                2048: return init<               2048>();
-            case                4096: return init<               4096>();
-            case                8192: return init<               8192>();
-            case               16384: return init<              16384>();
-            case               32768: return init<              32768>();
-            case               65536: return init<              65536>();
-            case              131072: return init<             131072>();
-            case              262144: return init<             262144>();
-            case              524288: return init<             524288>();
-            case             1048576: return init<            1048576>();
-            case             2097152: return init<            2097152>();
-            case             4194304: return init<            4194304>();
-            case             8388608: return init<            8388608>();
-            case            16777216: return init<           16777216>();
-            case            33554432: return init<           33554432>();
-            case            67108864: return init<           67108864>();
-            case           134217728: return init<          134217728>();
-            case           268435456: return init<          268435456>();
-            case           536870912: return init<          536870912>();
-            case          1073741824: return init<         1073741824>();
-            case          2147483648: return init<         2147483648>();
-            case          4294967296: return init<         4294967296>();
-            case          8589934592: return init<         8589934592>();
-            case         17179869184: return init<        17179869184>();
-            case         34359738368: return init<        34359738368>();
-            case         68719476736: return init<        68719476736>();
-            case        137438953472: return init<       137438953472>();
-            case        274877906944: return init<       274877906944>();
-            case        549755813888: return init<       549755813888>();
-            case       1099511627776: return init<      1099511627776>();
-            case       2199023255552: return init<      2199023255552>();
-            case       4398046511104: return init<      4398046511104>();
-            case       8796093022208: return init<      8796093022208>();
-            case      17592186044416: return init<     17592186044416>();
-            case      35184372088832: return init<     35184372088832>();
-            case      70368744177664: return init<     70368744177664>();
-            case     140737488355328: return init<    140737488355328>();
-            case     281474976710656: return init<    281474976710656>();
-            case     562949953421312: return init<    562949953421312>();
-            case    1125899906842624: return init<   1125899906842624>();
-            case    2251799813685248: return init<   2251799813685248>();
-            case    4503599627370496: return init<   4503599627370496>();
-            case    9007199254740992: return init<   9007199254740992>();
-            case   18014398509481984: return init<  18014398509481984>();
-            case   36028797018963968: return init<  36028797018963968>();
-            case   72057594037927936: return init<  72057594037927936>();
-            case  144115188075855872: return init< 144115188075855872>();
-            case  288230376151711744: return init< 288230376151711744>();
-            case  576460752303423488: return init< 576460752303423488>();
-            case 1152921504606846976: return init<1152921504606846976>();
-            case 2305843009213693952: return init<2305843009213693952>();
-            case 4611686018427387904: return init<4611686018427387904>();
+        using namespace internal;
+        switch (size) {
+            case 1ULL<< 2: return new dictimpl<ktype, vtype, 1ULL<< 2>();
+            case 1ULL<< 3: return new dictimpl<ktype, vtype, 1ULL<< 3>();
+            case 1ULL<< 4: return new dictimpl<ktype, vtype, 1ULL<< 4>();
+            case 1ULL<< 6: return new dictimpl<ktype, vtype, 1ULL<< 6>();
+            case 1ULL<< 7: return new dictimpl<ktype, vtype, 1ULL<< 7>();
+            case 1ULL<< 8: return new dictimpl<ktype, vtype, 1ULL<< 8>();
+            case 1ULL<< 9: return new dictimpl<ktype, vtype, 1ULL<< 9>();
+            case 1ULL<<10: return new dictimpl<ktype, vtype, 1ULL<<10>();
+            case 1ULL<<11: return new dictimpl<ktype, vtype, 1ULL<<11>();
+            case 1ULL<<12: return new dictimpl<ktype, vtype, 1ULL<<12>();
+            case 1ULL<<13: return new dictimpl<ktype, vtype, 1ULL<<13>();
+            case 1ULL<<14: return new dictimpl<ktype, vtype, 1ULL<<14>();
+            case 1ULL<<16: return new dictimpl<ktype, vtype, 1ULL<<16>();
+            case 1ULL<<17: return new dictimpl<ktype, vtype, 1ULL<<17>();
+            case 1ULL<<18: return new dictimpl<ktype, vtype, 1ULL<<18>();
+            case 1ULL<<19: return new dictimpl<ktype, vtype, 1ULL<<19>();
+            case 1ULL<<20: return new dictimpl<ktype, vtype, 1ULL<<20>();
+            case 1ULL<<21: return new dictimpl<ktype, vtype, 1ULL<<21>();
+            case 1ULL<<22: return new dictimpl<ktype, vtype, 1ULL<<22>();
+            case 1ULL<<23: return new dictimpl<ktype, vtype, 1ULL<<23>();
+            case 1ULL<<24: return new dictimpl<ktype, vtype, 1ULL<<24>();
+            case 1ULL<<26: return new dictimpl<ktype, vtype, 1ULL<<26>();
+            case 1ULL<<27: return new dictimpl<ktype, vtype, 1ULL<<27>();
+            case 1ULL<<28: return new dictimpl<ktype, vtype, 1ULL<<28>();
+            case 1ULL<<29: return new dictimpl<ktype, vtype, 1ULL<<29>();
+            case 1ULL<<30: return new dictimpl<ktype, vtype, 1ULL<<30>();
+            case 1ULL<<31: return new dictimpl<ktype, vtype, 1ULL<<31>();
+            case 1ULL<<32: return new dictimpl<ktype, vtype, 1ULL<<32>();
+            case 1ULL<<33: return new dictimpl<ktype, vtype, 1ULL<<33>();
+            case 1ULL<<34: return new dictimpl<ktype, vtype, 1ULL<<34>();
+            case 1ULL<<36: return new dictimpl<ktype, vtype, 1ULL<<36>();
+            case 1ULL<<37: return new dictimpl<ktype, vtype, 1ULL<<37>();
+            case 1ULL<<38: return new dictimpl<ktype, vtype, 1ULL<<38>();
+            case 1ULL<<39: return new dictimpl<ktype, vtype, 1ULL<<39>();
+            case 1ULL<<40: return new dictimpl<ktype, vtype, 1ULL<<40>();
+            case 1ULL<<41: return new dictimpl<ktype, vtype, 1ULL<<41>();
+            case 1ULL<<42: return new dictimpl<ktype, vtype, 1ULL<<42>();
+            case 1ULL<<43: return new dictimpl<ktype, vtype, 1ULL<<43>();
+            case 1ULL<<44: return new dictimpl<ktype, vtype, 1ULL<<44>();
+            case 1ULL<<46: return new dictimpl<ktype, vtype, 1ULL<<46>();
+            case 1ULL<<47: return new dictimpl<ktype, vtype, 1ULL<<47>();
+            case 1ULL<<48: return new dictimpl<ktype, vtype, 1ULL<<48>();
+            case 1ULL<<49: return new dictimpl<ktype, vtype, 1ULL<<49>();
+            case 1ULL<<50: return new dictimpl<ktype, vtype, 1ULL<<50>();
+            case 1ULL<<51: return new dictimpl<ktype, vtype, 1ULL<<51>();
+            case 1ULL<<52: return new dictimpl<ktype, vtype, 1ULL<<52>();
+            case 1ULL<<53: return new dictimpl<ktype, vtype, 1ULL<<53>();
+            case 1ULL<<54: return new dictimpl<ktype, vtype, 1ULL<<54>();
+            case 1ULL<<56: return new dictimpl<ktype, vtype, 1ULL<<56>();
+            case 1ULL<<57: return new dictimpl<ktype, vtype, 1ULL<<57>();
+            case 1ULL<<58: return new dictimpl<ktype, vtype, 1ULL<<58>();
+            case 1ULL<<59: return new dictimpl<ktype, vtype, 1ULL<<59>();
+            case 1ULL<<60: return new dictimpl<ktype, vtype, 1ULL<<60>();
             default: break;
         }
-        check(false, "internal error bins: %lld\n", bins);
+        check(false, "internal error bins: %lld\n", size);
         return 0;
     }
 
