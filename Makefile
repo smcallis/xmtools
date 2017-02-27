@@ -1,5 +1,5 @@
 
-CXXFLAGS = -std=c++98 -fwrapv -pthread -g -O3 -Wall -Wextra
+CXXFLAGS = -std=c++98 -fwrapv -pthread -g -O3 -Wall -Wextra -Wfatal-errors
 #LDFLAGS = -lX11 -lm -lrt
 LDFLAGS = -lm -lrt
 

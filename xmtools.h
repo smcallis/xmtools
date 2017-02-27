@@ -3767,7 +3767,7 @@ namespace xm {
     //}}}
 
     //}}}
-    //{{{ scalar scalar ops 
+    //{{{ binary scalar ops 
 
     //{{{ binary == 
     template<class atype, class btype>
