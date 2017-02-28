@@ -602,7 +602,7 @@ namespace xm {
         return ts.tv_sec + 1e-9*ts.tv_nsec;
     }
     //}}}
-    //{{{ Basic Containers:              list, dict, shared 
+    //{{{ Basic Containers:             list, dict, shared 
     //{{{ list 
     template<class type>
     struct list {
@@ -963,9 +963,457 @@ namespace xm {
         swap(flip.storage, flop.storage);
     }
     //}}}
-    //{{{ dict 
+    //{{{ dict
     // A sentinel type for dict sets with only keys (no vals)
     struct none {};
+
+    //{{{ internal
+    namespace internal {
+
+        //{{{ bucket
+
+        template<class ktype, class vtype>
+        struct bucket {
+            uint64_t index;
+            uint64_t code;
+            ktype key;
+            vtype val;
+
+            const vtype& getval() const;
+            vtype& getval();
+        };
+
+        template<class ktype, class vtype>
+        const vtype& bucket<ktype, vtype>::getval() const {
+            return val;
+        }
+
+        template<class ktype, class vtype>
+        vtype& bucket<ktype, vtype>::getval() {
+            return val;
+        }
+
+        template<class ktype>
+        struct bucket<ktype, none> {
+            // specialized for vtype none
+            uint64_t index;
+            uint64_t code;
+            ktype key;
+
+            const none& getval() const;
+            none& getval();
+        };
+
+        template<class ktype>
+        const none& bucket<ktype, none>::getval() const {
+            static none nil;
+            return nil;
+        }
+
+        template<class ktype>
+        none& bucket<ktype, none>::getval() {
+            static none nil;
+            return nil;
+        }
+
+        //}}}
+        //{{{ dictbase
+        template<class ktype, class vtype>
+        struct dictbase {
+            virtual ~dictbase() {};
+            
+            virtual int64 bins() const = 0;
+            virtual int64 size() const = 0;
+
+            virtual const bucket<ktype, vtype>* buckets() const = 0;
+            virtual bucket<ktype, vtype>* buckets() = 0;
+
+            virtual vtype& inswap(uint64_t code, ktype& key, vtype& val) = 0;
+            virtual bucket<ktype, vtype>* locate(uint64_t code, const ktype& key) = 0;
+            virtual void reject(uint64_t code, const ktype& key) = 0;
+
+            virtual void debug() const = 0;
+            virtual void test() const = 0;
+        };
+        //}}}
+        //{{{ dictimpl
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        struct dictimpl : dictbase<ktype, vtype> {
+            dictimpl();
+            ~dictimpl();
+            
+            int64 bins() const;
+            int64 size() const;
+
+            const bucket<ktype, vtype>* buckets() const;
+            bucket<ktype, vtype>* buckets();
+
+            vtype& inswap(uint64_t code, ktype& key, vtype& val);
+            bucket<ktype, vtype>* locate(uint64_t code, const ktype& key);
+            void reject(uint64_t code, const ktype& key);
+
+            void debug() const;
+            void test() const;
+            private:
+                dictimpl(const dictimpl<ktype, vtype, ttype, bsize>&); // = delete
+                void operator =(const dictimpl<ktype, vtype, ttype, bsize>&); // = delete
+
+                // appends key:val to the store, then updates table and count
+                vtype& insert(int64 tspot, uint64_t code, ktype& key, vtype& val);
+
+                // shuffles the table to make room at the location
+                void robinhood(int64 tspot);
+
+                // shuffles the table to occupy a recently removed hole
+                void backshift(int64 tspot);
+            
+                int64 count;
+                static const ttype sentinel = (ttype)-1ULL;
+                struct { ttype index, trunc; } table[bsize];
+                // placed in a union so they are not constructed
+                union { bucket<ktype, vtype> store[3*bsize/4]; };
+        };
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        dictimpl<ktype, vtype, ttype, bsize>::dictimpl() : count(0) {
+            for (int64 ii = 0; ii<bsize; ii++) {
+                table[ii].index = sentinel;
+            }
+        }
+
+        template<class ktype, class vtype>
+        void destruct(bucket<ktype, vtype>* store, int64 count) {
+            for (int64 ii = 0; ii<count; ii++) {
+                store[ii].key.~ktype();
+                store[ii].val.~vtype();
+            }
+        }
+
+        template<class ktype>
+        void destruct(bucket<ktype, none>* store, int64 count) {
+            for (int64 ii = 0; ii<count; ii++) {
+                store[ii].key.~ktype();
+            }
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        dictimpl<ktype, vtype, ttype, bsize>::~dictimpl() {
+            destruct(store, count);
+        }
+        
+        
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        int64 dictimpl<ktype, vtype, ttype, bsize>::bins() const {
+            return bsize;
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        int64 dictimpl<ktype, vtype, ttype, bsize>::size() const {
+            return count;
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        const bucket<ktype, vtype>* dictimpl<ktype, vtype, ttype, bsize>::buckets() const {
+            return store;
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        bucket<ktype, vtype>* dictimpl<ktype, vtype, ttype, bsize>::buckets() {
+            return store;
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        vtype& dictimpl<ktype, vtype, ttype, bsize>::inswap(
+            uint64_t code, ktype& key, vtype& val
+        ) {
+            ttype truncode = code%bsize;
+            int64 tspot = code%bsize;
+            for (int64 newcost = 0; newcost<bsize; newcost++) {
+                if (table[tspot].index == sentinel) {
+                    // found an empty spot
+                    return insert(tspot, code, key, val);
+                }
+
+                if (table[tspot].trunc == truncode) {
+                    // the truncated hash codes match, check the store
+                    bucket<ktype, vtype>& occupant = store[table[tspot].index];
+                    if (occupant.code == code && occupant.key == key) {
+                        // matching key, replace val
+                        xm::swap(occupant.getval(), val);
+                        return occupant.getval();
+                    }
+                }
+
+                int64 oldcost = (tspot - table[tspot].trunc)%bsize;
+                if (newcost >= oldcost) {
+                    // we've searched far enough that we will not
+                    // find our key, and we can steal this spot
+                    robinhood(tspot);
+                    return insert(tspot, code, key, val);
+                }
+                tspot = (tspot + 1)%bsize;
+            }
+            check(false, "should never get here");
+            return store[0].getval(); // this is invalid
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        vtype& dictimpl<ktype, vtype, ttype, bsize>::insert(
+            int64 tspot, uint64_t code, ktype& key, vtype& val
+        ) {
+            ttype truncode = code%bsize;
+            table[tspot].index = (ttype)count;
+            table[tspot].trunc = truncode;
+            store[count].index = tspot;
+            store[count].code = code;
+            new(&store[count].key) ktype;
+            new(&store[count].getval()) vtype;
+            xm::swap(store[count].key, key);
+            xm::swap(store[count].getval(), val);
+            return store[count++].getval();
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        void dictimpl<ktype, vtype, ttype, bsize>::robinhood(int64 tspot) {
+            ttype oldtrunc = table[tspot].trunc;
+            ttype oldindex = table[tspot].index;
+            int64 oldcost = (tspot - oldtrunc)%bsize;
+
+            for (int64 ii = 0; ii<bsize; ii++) {
+                tspot = (tspot + 1)%bsize;
+                ttype& newtrunc = table[tspot].trunc;
+                ttype& newindex = table[tspot].index;
+                if (newindex == sentinel) {
+                    store[oldindex].index = tspot;
+                    newtrunc = oldtrunc;
+                    newindex = oldindex;
+                    return;
+                }
+                ++oldcost;
+                int64 newcost = (tspot - newtrunc)%bsize;
+                if (oldcost >= newcost) {
+                    store[oldindex].index = tspot;
+                    xm::swap(oldtrunc, newtrunc);
+                    xm::swap(oldindex, newindex);
+                    xm::swap(oldcost, newcost);
+                }
+            }
+            check(false, "should never get here");
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        bucket<ktype, vtype>* dictimpl<ktype, vtype, ttype, bsize>::locate(
+            uint64_t code, const ktype& key
+        ) {
+            ttype truncode = code%bsize;
+            int64 tspot = code%bsize;
+            for (int64 newcost = 0; newcost<bsize; newcost++) {
+                if (table[tspot].index == sentinel) {
+                    // it is not in the table
+                    return 0;
+                }
+                
+                if (table[tspot].trunc == truncode) {
+                    // the truncated hash codes match, check the store
+                    bucket<ktype, vtype>& occupant = store[table[tspot].index];
+                    if (occupant.code == code && occupant.key == key) {
+                        // matching key, return pointer to val
+                        return &occupant;
+                    }
+                }
+
+                int64 oldcost = (tspot - table[tspot].trunc)%bsize;
+                if (newcost > oldcost) {
+                    // we won't find it after this point
+                    return 0;
+                }
+                tspot = (tspot + 1)%bsize;
+            }
+
+            check(false, "should never get here");
+            return 0;
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        void dictimpl<ktype, vtype, ttype, bsize>::reject(
+            uint64_t code, const ktype& key
+        ) {
+            (void)code; (void)key;
+            bucket<ktype, vtype>* found = locate(code, key);
+            if (!found) return;
+            --count;
+            int64 tspot = found->index;
+            int64 sspot = table[tspot].index;
+            // swap/move the last store item to sspot
+            store[sspot].index = store[count].index;
+            store[sspot].code = store[count].code;
+            xm::swap(found->key, store[count].key);
+            xm::swap(found->getval(), store[count].getval());
+            table[store[sspot].index].index = sspot;
+
+            // destruct the items we moved to the end
+            store[count].key.~ktype();
+            store[count].getval().~vtype();
+
+            backshift(tspot);
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        void dictimpl<ktype, vtype, ttype, bsize>::backshift(int64 tspot) {
+            for (int64 ii = 0; ii<bsize; ii++) {
+                ttype next = (tspot + 1)%bsize;
+                if (table[next].index == sentinel) {
+                    table[tspot].index = sentinel;
+                    return;
+                }
+                int64 cost = (next - table[next].trunc)%bsize;
+                if (cost == 0) {
+                    table[tspot].index = sentinel;
+                    return;
+                }
+                table[tspot].index = table[next].index;
+                table[tspot].trunc = table[next].trunc;
+                store[table[tspot].index].index = tspot;
+
+                tspot = next;
+            }
+            check(false, "should never get here");
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        void dictimpl<ktype, vtype, ttype, bsize>::debug() const {
+            for (int64 row = 0; row<bsize/4; row++) {
+                for (int64 col = 0; col<4; col++) {
+                    int64 ii = row + col*bsize/4;
+                    int64 cost = (ii - table[ii].trunc)%bsize;
+                    if (table[ii].index == sentinel) {
+                        printf("%-3lld =========================== | ", ii);
+                    } else {
+                        printf(
+                            "%-3lld wnt: %3lld, ind: %3lld, cst: %2lld | ",
+                            ii, (int64)table[ii].trunc, (int64)table[ii].index, cost
+                        );
+                    }
+                }
+                printf("\n");
+            }
+            /*
+            printf("\n---\n");
+            for (int64 ii = 0; ii<count; ii++) {
+                printf(
+                    "index: %4lld, key: %4lld, val: %4lld\n",
+                    ii, (int64)store[ii].key, (int64)store[ii].val
+                );
+                if (ii%4 == 3) printf("\n");
+            }
+            */
+            printf("\n===========================\n");
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        void dictimpl<ktype, vtype, ttype, bsize>::test() const {
+            for (int64 ii = 0; ii<count; ii++) {
+                check(
+                    table[store[ii].index].index == ii,
+                    "table matches store"
+                );
+            }
+            int64 used = 0;
+            for (int64 ii = 0; ii<bsize; ii++) {
+                if (table[ii].index != sentinel) used++;
+            }
+            check(used == count, "table count equals store count");
+            for (int64 ii = 0; ii<bsize; ii++) {
+                if (table[ii].index != sentinel) {
+                    check(
+                        store[table[ii].index].index == ii,
+                        "store matches table"
+                    );
+                }
+            }
+            for (int64 ii = 0; ii<bsize; ii++) {
+                ttype curr = ((ttype)ii + 0)%bsize;
+                ttype next = ((ttype)ii + 1)%bsize;
+                int64 currcost = (curr - table[curr].trunc)%bsize;
+                int64 nextcost = (next - table[next].trunc)%bsize;
+                if (table[curr].index == sentinel) currcost = 0;
+                if (table[next].index == sentinel) nextcost = 0;
+                check(nextcost <= currcost + 1, "costs correct");
+            }
+        }
+        //}}}
+        //{{{ makedict
+        template<class ktype, class vtype>
+        dictbase<ktype, vtype>* makedict(uint64_t size) {
+            switch (size) {
+                case 1ULL<< 2: return new dictimpl<ktype, vtype,  uint8_t, 1ULL<< 2>();
+                case 1ULL<< 3: return new dictimpl<ktype, vtype,  uint8_t, 1ULL<< 3>();
+                case 1ULL<< 4: return new dictimpl<ktype, vtype,  uint8_t, 1ULL<< 4>();
+                case 1ULL<< 5: return new dictimpl<ktype, vtype,  uint8_t, 1ULL<< 5>();
+                case 1ULL<< 6: return new dictimpl<ktype, vtype,  uint8_t, 1ULL<< 6>();
+                case 1ULL<< 7: return new dictimpl<ktype, vtype,  uint8_t, 1ULL<< 7>();
+                case 1ULL<< 8: return new dictimpl<ktype, vtype,  uint8_t, 1ULL<< 8>();
+                case 1ULL<< 9: return new dictimpl<ktype, vtype, uint16_t, 1ULL<< 9>();
+                case 1ULL<<10: return new dictimpl<ktype, vtype, uint16_t, 1ULL<<10>();
+                case 1ULL<<11: return new dictimpl<ktype, vtype, uint16_t, 1ULL<<11>();
+                case 1ULL<<12: return new dictimpl<ktype, vtype, uint16_t, 1ULL<<12>();
+                case 1ULL<<13: return new dictimpl<ktype, vtype, uint16_t, 1ULL<<13>();
+                case 1ULL<<14: return new dictimpl<ktype, vtype, uint16_t, 1ULL<<14>();
+                case 1ULL<<15: return new dictimpl<ktype, vtype, uint16_t, 1ULL<<15>();
+                case 1ULL<<16: return new dictimpl<ktype, vtype, uint16_t, 1ULL<<16>();
+                case 1ULL<<17: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<17>();
+                case 1ULL<<18: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<18>();
+                case 1ULL<<19: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<19>();
+                case 1ULL<<20: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<20>();
+                case 1ULL<<21: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<21>();
+                case 1ULL<<22: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<22>();
+                case 1ULL<<23: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<23>();
+                case 1ULL<<24: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<24>();
+                case 1ULL<<25: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<25>();
+                case 1ULL<<26: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<26>();
+                case 1ULL<<27: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<27>();
+                case 1ULL<<28: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<28>();
+                case 1ULL<<29: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<29>();
+                case 1ULL<<30: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<30>();
+                case 1ULL<<31: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<31>();
+                case 1ULL<<32: return new dictimpl<ktype, vtype, uint32_t, 1ULL<<32>();
+                case 1ULL<<33: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<33>();
+                case 1ULL<<34: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<34>();
+                case 1ULL<<35: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<35>();
+                case 1ULL<<36: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<36>();
+                case 1ULL<<37: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<37>();
+                case 1ULL<<38: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<38>();
+                case 1ULL<<39: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<39>();
+                case 1ULL<<40: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<40>();
+                case 1ULL<<41: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<41>();
+                case 1ULL<<42: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<42>();
+                case 1ULL<<43: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<43>();
+                case 1ULL<<44: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<44>();
+                case 1ULL<<45: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<45>();
+                case 1ULL<<46: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<46>();
+                case 1ULL<<47: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<47>();
+                case 1ULL<<48: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<48>();
+                case 1ULL<<49: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<49>();
+                case 1ULL<<50: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<50>();
+                case 1ULL<<51: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<51>();
+                case 1ULL<<52: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<52>();
+                case 1ULL<<53: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<53>();
+                case 1ULL<<54: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<54>();
+                case 1ULL<<55: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<55>();
+                case 1ULL<<56: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<56>();
+                case 1ULL<<57: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<57>();
+                case 1ULL<<58: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<58>();
+                case 1ULL<<59: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<59>();
+                case 1ULL<<60: return new dictimpl<ktype, vtype, uint64_t, 1ULL<<60>();
+                default: break;
+            }
+            check(false, "internal error bins: %lld\n", (int64)size);
+            return 0;
+        }
+        //}}}
+
+    }
+    //}}}
 
     template<class ktype, class vtype=none>
     struct dict {
@@ -987,478 +1435,280 @@ namespace xm {
 
         vtype& operator [](const ktype& key);
 
-        void insert(const ktype& key);
         void insert(const ktype& key, const vtype& val);
+        void insert(const ktype& key); // val is default
         void remove(const ktype& key);
         bool haskey(const ktype& key) const;
+        const vtype* lookup(const ktype& key) const;
+        vtype* lookup(const ktype& key);
 
         void reserve(int64 count);
         void shrink();
         void clear();
         int64 size() const;
 
-        list<ktype> keys() const;
-        list<vtype> vals() const;
-
-        // Iterating through all keys and vals:
-        //
-        //    for (int64 ii = 0; ii<dd.bins(); ii++) {
-        //        // must skip empty bins
-        //        if (dd.skip(ii)) continue;
-        //
-        //        foo(dd.key(ii));
-        //        bar(dd.val(ii));
-        //
-        //        // can also assign to dd.val(ii)
-        //        dd.val(ii) = hmm;    
-        //    }
-        //
-        int64 bins() const;
-        bool skip(int64 index) const;
         const ktype& key(int64 index) const;
         const vtype& val(int64 index) const;
         vtype& val(int64 index);
 
-        void debug() const;
+        list<ktype> keys() const;
+        list<vtype> vals() const;
 
+        void debug() const { if (storage) storage->debug(); }
+        void test() const { if (storage) storage->test(); }
         private:
-            // general purpose implemenation
-            template<class keytype, class valtype>
-            struct keyval {
-                size_t code;
-                keytype key_;
-                valtype val_;
-                keytype& getkey() { return key_; }
-                valtype& getval() { return val_; }
-                const keytype& getkey() const { return key_; }
-                const valtype& getval() const { return val_; }
-                void setval(const valtype& vv) { val_ = vv; }
-                keyval() {}
-                keyval(
-                    size_t cc,
-                    const keytype& kk, 
-                    const valtype& vv
-                ) : code(cc), key_(kk), val_(vv) {}
-                ~keyval() { code = 0; }
-            };
+            // updates or inserts key:val and returns
+            // reference to val (this may resize and rehash)
+            vtype& inject(uint64_t code, ktype key, vtype val);
 
-            // specialization for vtype none
-            template<class keytype>
-            struct keyval<keytype, none> {
-                size_t code;
-                keytype key_;
-                keytype& getkey() { return key_; }
-                none& getval() {
-                    static none nil;
-                    return nil;
-                }
-                const keytype& getkey() const { return key_; }
-                const none& getval() const {
-                    static none nil;
-                    return nil;
-                }
-                void setval(const none& vv) { (void)vv; }
-                keyval() {}
-                keyval(
-                    size_t cc,
-                    const keytype& kk, 
-                    const none&
-                ) : code(cc), key_(kk) {}
-                ~keyval() { code = 0; }
-            };
+            // makes a new storage of the requested size
+            // and moves all elements to the new storage
+            // (callers must ensure it is big enough)
+            void rehash(int64 bins);
 
-            template<class keytype, class valtype>
-            static void trade(keyval<keytype, valtype>& flip, keyval<keytype, valtype>& flop) {
-                swap(flip.code, flop.code);
-                swap(flip.key_, flop.key_);
-                swap(flip.val_, flop.val_);
-            }
-
-            template<class keytype>
-            static void trade(keyval<keytype, none>& flip, keyval<keytype, none>& flop) {
-                swap(flip.code, flop.code);
-                swap(flip.key_, flop.key_);
-            }
-
-            enum { HIGHBIT = (((size_t)1) << (8*sizeof(size_t) - 1)) };
+            // replaces current storage and copies other
             template<class kk, class vv>
-            void assign(const dict<kk, vv>& other);
-
-            void rehash(const int64 capacity);
-            int64 inject(const ktype& key, const vtype* ptr, size_t hh);
-            // using Robin Hood collision resolution, searching, and backshifting
-            void robinhood(
-                int64 index, keyval<ktype, vtype>& kv, int64 cost
-            );
-            int64 search(const ktype& key, size_t hh) const;
-            void backshift(int64 index);
+            void assign(internal::dictbase<kk, vv>* other);
 
             template<class kk, class vv> friend struct dict;
-            //template<class kk, class vv> friend struct iter;
             template<class kk, class vv> friend void swap(
                 dict<kk, vv>& flip, dict<kk, vv>&flop
             );
 
-            struct implementation {
-                int64 quantity, capacity;
-                keyval<ktype, vtype> bucket[1];
-            } *storage;
+            internal::dictbase<ktype, vtype>* storage;
     };
 
     template<class ktype, class vtype>
-    dict<ktype, vtype>::~dict() { clear(); }
+    dict<ktype, vtype>::~dict() {
+        if (storage) delete storage;
+    }
 
     template<class ktype, class vtype>
     dict<ktype, vtype>::dict() : storage(0) {}
 
     template<class ktype, class vtype>
-    dict<ktype, vtype>::dict(const dict<ktype, vtype>& other) : storage(0) {
-        assign(other);
-    }
+    dict<ktype, vtype>::dict(
+        const dict<ktype, vtype>& other
+    ) : storage(0) { assign(other.storage); }
 
     template<class ktype, class vtype>
     template<class kk, class vv>
-    dict<ktype, vtype>::dict(const dict<kk, vv>& other) : storage(0) {
-        assign(other);
-    }
+    dict<ktype, vtype>::dict(
+        const dict<kk, vv>& other
+    ) : storage(0) { assign(other.storage); }
 
     template<class ktype, class vtype>
     dict<ktype, vtype>& dict<ktype, vtype>::operator =(
         const dict<ktype, vtype>& other
-    ) {
-        if (this == &other) return *this;
-        clear();
-        assign(other);
-    }
+    ) { assign(other.storage); }
 
     template<class ktype, class vtype>
     template<class kk, class vv>
     dict<ktype, vtype>& dict<ktype, vtype>::operator =(
         const dict<kk, vv>& other
+    ) { assign(other.storage); }
+
+    template<class ktype, class vtype>
+    vtype& dict<ktype, vtype>::operator [](
+        const ktype& key
     ) {
-        clear();
-        assign(other);
+        using namespace internal;
+        uint64_t code = hash(key);
+        if (!storage) {
+            storage = makedict<ktype, vtype>(4);
+            ktype kk = key;
+            vtype vv;
+            return storage->inswap(code, kk, vv);
+        }
+        const bucket<ktype, vtype>* result = storage->locate(code, key);
+        if (!result) {
+            return inject(code, key, vtype());
+        }
+        return (vtype&)result->getval();
     }
 
     template<class ktype, class vtype>
-    vtype& dict<ktype, vtype>::operator [](const ktype& key) {
-        if (!storage) rehash(4);
-        size_t hh = hash(key) | HIGHBIT;
-        int64 index = search(key, hh);
-        if (index < 0) index = inject(key, 0, hh);
-        return storage->bucket[index].getval();
+    void dict<ktype, vtype>::insert(
+        const ktype& key, const vtype& val
+    ) { inject(hash(key), key, val); }
+
+    template<class ktype, class vtype>
+    void dict<ktype, vtype>::insert(
+        const ktype& key
+    ) { inject(hash(key), key, vtype()); }
+
+    template<class ktype, class vtype>
+    void dict<ktype, vtype>::remove(
+        const ktype& key
+    ) {
+        if (storage) {
+            storage->reject(hash(key), key);
+        }
     }
 
     template<class ktype, class vtype>
-    void dict<ktype, vtype>::insert(const ktype& key) {
-        size_t hh = hash(key) | HIGHBIT;
-        inject(key, 0, hh);
+    bool dict<ktype, vtype>::haskey(
+        const ktype& key
+    ) const {
+        return 0 != lookup(key);
     }
 
     template<class ktype, class vtype>
-    void dict<ktype, vtype>::insert(const ktype& key, const vtype& val) {
-        size_t hh = hash(key) | HIGHBIT;
-        inject(key, &val, hh);
+    const vtype* dict<ktype, vtype>::lookup(
+        const ktype& key
+    ) const {
+        if (!storage) return 0;
+        internal::bucket<ktype, vtype>* result = (
+            storage->locate(hash(key), key)
+        );
+        return result ? &result->val : 0;
     }
 
     template<class ktype, class vtype>
-    void dict<ktype, vtype>::remove(const ktype& key) {
-        if (!storage) return;
-        size_t hh = hash(key) | HIGHBIT;
-        int64 index = search(key, hh);
-        if (index >= 0) backshift(index);
+    vtype* dict<ktype, vtype>::lookup(
+        const ktype& key
+    ) {
+        return (vtype*)lookup(key);
     }
 
     template<class ktype, class vtype>
-    bool dict<ktype, vtype>::haskey(const ktype& key) const {
-        if (!storage) return false;
-        size_t hh = hash(key) | HIGHBIT;
-        return search(key, hh) >= 0;
+    void dict<ktype, vtype>::reserve(
+        int64 count
+    ) {
+        int64 len = max(size(), count);
+        if (len == 0) {
+            if (storage) {
+                delete storage;
+                storage = 0;
+            }
+            return;
+        }
+        int64 bins = 4;
+        while (3*bins/4 < len) {
+            bins *= 2;
+        }
+        if (!storage || bins != storage->bins()) {
+            rehash(bins);
+        }
     }
-
-    template<class ktype, class vtype>
-    void dict<ktype, vtype>::reserve(int64 count) {
-        check(count > 0, "must reserve a positive count: %lld", count);
-        int64 newsize = 4;
-        while (3*newsize/4 < count) newsize *= 2;
-        if (!storage || storage->capacity < newsize) rehash(newsize);
-    }
-
+    
     template<class ktype, class vtype>
     void dict<ktype, vtype>::shrink() {
-        if (!storage) return;
-        const int64 len = storage->quantity;
-        if (storage->quantity == 0) {
-            delete storage;
-            storage = 0;
-        } else {
-            int64 newsize = 4;
-            while (3*newsize/4 < len) newsize *= 2;
-            if (newsize == storage->capacity) return;
-            rehash(newsize);
-        }
+        reserve(0);
     }
 
     template<class ktype, class vtype>
     void dict<ktype, vtype>::clear() {
         if (storage) {
-            const int64 len = storage->capacity;
-            for (int64 ii = 0; ii<len; ii++) {
-                if (storage->bucket[ii].code) {
-                    storage->bucket[ii].~keyval<ktype, vtype>();
-                }
-            }
-            free(storage);
+            delete storage;
             storage = 0;
         }
     }
 
     template<class ktype, class vtype>
     int64 dict<ktype, vtype>::size() const {
-        return storage ? storage->quantity : 0;
+        return storage ? storage->size() : 0;
+    }
+
+    template<class ktype, class vtype>
+    const ktype& dict<ktype, vtype>::key(int64 index) const {
+        return storage->buckets()[index].key;
+    }
+
+    template<class ktype, class vtype>
+    const vtype& dict<ktype, vtype>::val(int64 index) const {
+        return storage->buckets()[index].getval();
+    }
+
+    template<class ktype, class vtype>
+    vtype& dict<ktype, vtype>::val(int64 index) {
+        return storage->buckets()[index].getval();
     }
 
     template<class ktype, class vtype>
     list<ktype> dict<ktype, vtype>::keys() const {
+        using namespace internal;
         list<ktype> result;
-        if (storage) {
-            const int64 len = storage->capacity;
-            result.reserve(storage->quantity);
-            for (int64 ii = 0; ii<len; ii++) {
-                if (storage->bucket[ii].code) {
-                    result.append(storage->bucket[ii].getkey());
-                }
-            }
+        int64 len = size();
+        if (!len) return result;
+        const bucket<ktype, vtype>* buckets = storage->buckets();
+        result.reserve(len);
+        for (int64 ii = 0; ii<len; ii++) {
+            result.append(buckets[ii].key);
         }
         return result;
     }
 
     template<class ktype, class vtype>
     list<vtype> dict<ktype, vtype>::vals() const {
+        using namespace internal;
         list<vtype> result;
-        if (storage) {
-            const int64 len = storage->capacity;
-            result.reserve(storage->quantity);
-            for (int64 ii = 0; ii<len; ii++) {
-                if (storage->bucket[ii].code) {
-                    result.append(storage->bucket[ii].getval());
-                }
-            }
+        int64 len = size();
+        if (!len) return result;
+        const bucket<ktype, vtype>* buckets = storage->buckets();
+        result.reserve(len);
+        for (int64 ii = 0; ii<len; ii++) {
+            result.append(buckets[ii].getval());
         }
         return result;
     }
 
     template<class ktype, class vtype>
-    int64 dict<ktype, vtype>::bins() const {
-        return storage ? storage->capacity : 0;
-    }
-
-    template<class ktype, class vtype>
-    bool dict<ktype, vtype>::skip(int64 index) const {
-        return storage->bucket[index].code == 0;
-    }
-
-    template<class ktype, class vtype>
-    const ktype& dict<ktype, vtype>::key(int64 index) const {
-        return storage->bucket[index].getkey();
-    }
-
-    template<class ktype, class vtype>
-    const vtype& dict<ktype, vtype>::val(int64 index) const {
-        return storage->bucket[index].getval();
-    }
-
-    template<class ktype, class vtype>
-    vtype& dict<ktype, vtype>::val(int64 index) {
-        return storage->bucket[index].getval();
-    }
-
-    template<class ktype, class vtype>
-    void dict<ktype, vtype>::debug() const {
-        if (storage) {
-            printf("quantity: %lld, capacity: %lld\n", storage->quantity, storage->capacity);
-            for (int64 ii = 0; ii<storage->capacity/4; ii++) {
-                for (int64 jj = 0; jj<4; jj++) {
-                    int64 kk = jj*storage->capacity/4 + ii;
-                    if (storage->bucket[kk].code) {
-                        int64 want = storage->bucket[kk].code & (storage->capacity - 1);
-                        int64 cost = kk - want;
-                        if (cost < 0) cost += storage->capacity;
-                        printf(
-                            "%3lld: [%16zx (%3lld): %8ld -> %-8ld], ",
-                            kk, storage->bucket[kk].code, cost,
-                            storage->bucket[kk].getkey(),
-                            storage->bucket[kk].getval()
-                        );
-                    } else {
-                        printf("%3lld: ----------------------------------------------, ", kk);
-                    }
-                }
-                printf("\n");
-            }
-        } else {
-            printf("empty\n");
+    vtype& dict<ktype, vtype>::inject(
+        uint64_t code, ktype key, vtype val
+    ) {
+        int64 next_size = size() + 1; // assume key not there
+        int64 curr_bins = storage ? storage->bins() : 0;
+        int64 next_bins = max(curr_bins, 4);
+        while (3*next_bins/4 < next_size) {
+            next_bins *= 2;
         }
+        if (next_bins != curr_bins) rehash(next_bins);
+        return storage->inswap(code, key, val);
+    }
+
+    template<class ktype, class vtype>
+    void dict<ktype, vtype>::rehash(int64 bins) {
+        using namespace internal;
+        dictbase<ktype, vtype>* oldstore = storage;
+        storage = makedict<ktype, vtype>(bins);
+        if (!oldstore) return;
+        int64 len = oldstore->size();
+        bucket<ktype, vtype>* buckets = oldstore->buckets();
+        for (int64 ii = 0; ii<len; ii++) {
+            storage->inswap(
+                buckets[ii].code,
+                buckets[ii].key,
+                buckets[ii].getval()
+            );
+        }
+        delete oldstore;
     }
 
     template<class ktype, class vtype>
     template<class kk, class vv>
-    void dict<ktype, vtype>::assign(const dict<kk, vv>& other) {
-        if (other.storage) {
-            int64 cap = other.storage->capacity;
-            storage = alloc<implementation>((cap - 1)*sizeof(keyval<ktype, vtype>));
-            storage->capacity = cap;
-            for (int64 ii = 0; ii<cap; ii++) {
-                storage->bucket[ii].code = 0;
-            }
-            for (int64 ii = 0; ii<cap; ii++) {
-                if (other.storage->bucket[ii].code) {
-                    keyval<ktype, vtype> kv(0,
-                        other.storage->bucket[ii].getkey(),
-                        other.storage->bucket[ii].getval()
-                    );
-                    // XXX: should copy the old hash code if we have the same keytype
-                    kv.code = hash(kv.getkey()) | HIGHBIT;
-                    int64 newspot = kv.code&(cap-1);
-                    robinhood(newspot, kv, 0);
-                }
-            }
-            storage->quantity = other.storage->quantity;
-        }
-    }
-
-    template<class ktype, class vtype>
-    void dict<ktype, vtype>::rehash(int64 capacity) {
-        implementation* old = storage;
-        storage = alloc<implementation>((capacity - 1)*sizeof(keyval<ktype, vtype>));
-        storage->capacity = capacity;
-        for (int64 ii = 0; ii<capacity; ++ii) {
-            storage->bucket[ii].code = 0;
-        }
-        if (old) {
-            storage->quantity = old->quantity;
-            const int64 cap = old->capacity;
-            for (int64 ii = 0; ii<cap; ii++) {
-                if (old->bucket[ii].code) {
-                    int64 newspot = old->bucket[ii].code&(capacity - 1);
-                    robinhood(newspot, old->bucket[ii], 0);
-                    old->bucket[ii].~keyval<ktype, vtype>();
-                }
-            }
-            free(old);
-        } else {
-            storage->quantity = 0;
-        }
-    }
-
-    template<class ktype, class vtype>
-    int64 dict<ktype, vtype>::inject(const ktype& key, const vtype* ptr, size_t hh) {
-        if (!storage || storage->quantity >= 3*storage->capacity/4) {
-            rehash(storage ? 2*storage->capacity : 4);
-        }
-        const int64 cap = storage->capacity;
-        for (int64 probe = 0; probe<cap; probe++) {
-            size_t xx = (probe + hh)&(cap - 1);
-            if (!storage->bucket[xx].code) {
-                // we found an empty bucket to place our key and val
-                if (ptr) {
-                    new(storage->bucket + xx) keyval<ktype, vtype>(hh, key, *ptr);
-                } else {
-                    new(storage->bucket + xx) keyval<ktype, vtype>(hh, key, vtype());
-                }
-                ++storage->quantity;
-                return xx;
-            }
-            if (storage->bucket[xx].code == hh) {
-                // matching hash value, need to check the key
-                if (storage->bucket[xx].getkey() == key) {
-                    // we found the same key, so replace the val
-                    storage->bucket[xx].setval(ptr ? *ptr : vtype());
-                    return xx;
-                }
-            }
-            // someone is in our spot, maybe we should move them
-            int64 oldcost = xx - (storage->bucket[xx].code&(cap - 1));
-            if (oldcost < 0) oldcost += cap;
-            if (probe > oldcost) {
-                keyval<ktype, vtype> kv(hh, key, ptr ? *ptr : vtype());
-                trade(kv, storage->bucket[xx]);
-                ++storage->quantity;
-                robinhood(xx + 1, kv, oldcost + 1);
-                return xx;
-            }
-            // their cost is greater than ours, keep probing
-        }
-        check(false, "should never get here");
-        return -1;
-    }
-
-    template<class ktype, class vtype>
-    void dict<ktype, vtype>::robinhood(
-        int64 probe, keyval<ktype, vtype>& kv, int64 cost
+    void dict<ktype, vtype>::assign(
+        internal::dictbase<kk, vv>* other
     ) {
-        const int64 cap = storage->capacity;
-        for (;; ++probe) {
-            int64 xx = probe&(cap - 1);
-            if (!storage->bucket[xx].code) {
-                new(storage->bucket + xx) keyval<ktype, vtype>();
-                trade(kv, storage->bucket[xx]);
-                return;
-            }
-            // compare costs to see who has to keep moving
-            int64 oldcost = xx - (storage->bucket[xx].code&(cap - 1));
-            if (oldcost < 0) oldcost += cap;
-            if (cost >= oldcost) {
-                // place the current one here, but keep going
-                trade(kv, storage->bucket[xx]);
-                cost = oldcost;
-            } else {
-                ++cost;
-            }
-            // swap or not, keep probing for an empty bin
+        // XXX: There're lots of opportunities for optimization in here.  We
+        // could re-use our existing storage if it is large enough.  We could
+        // make storage only as big as it needs to be.  We could re-use the
+        // hash code if the keys are the same type.
+        using namespace internal;
+        if (storage) {
+            delete storage;
+            storage = 0;
         }
-    }
-
-    template<class ktype, class vtype>
-    int64 dict<ktype, vtype>::search(const ktype& key, size_t hh) const {
-        const int64 cap = storage->capacity;
-        for (int64 probe = 0; probe<cap; probe++) {
-            int64 xx = (probe + hh)&(cap - 1);
-            if (!storage->bucket[xx].code) return -1;
-            if (storage->bucket[xx].code == hh) {
-                if (storage->bucket[xx].getkey() == key) return xx;
+        if (other) {
+            storage = makedict<ktype, vtype>(other.bins());
+            int64 len = other.size();
+            bucket<kk, vv>* buckets = other->buckets();
+            for (int64 ii = 0; ii<len; ii++) {
+                ktype key = ktype(buckets[ii].key);
+                vtype val = vtyle(buckets[ii].val);
+                storage.inswap(hash(key), key, val);
             }
-            int64 cost = xx - (storage->bucket[xx].code&(cap - 1));
-            if (cost < 0) cost += cap;
-            // we can't be past a higher cost point
-            if (probe > cost) return -1;
         }
-        check(false, "should never get here");
-        return -1;
-    }
-
-    template<class ktype, class vtype>
-    void dict<ktype, vtype>::backshift(int64 index) {
-        const int64 cap = storage->capacity;
-        for (int64 ii = 0; ii<cap; ii++) {
-            int64 next = (index + 1)&(cap - 1);
-            if (!storage->bucket[next].code) {
-                // nobody next to us to shift back
-                break;
-            }
-            int64 cost = next - (storage->bucket[next].code&(cap - 1));
-            if (cost < 0) cost += cap;
-            if (cost == 0) {
-                // the next guy is happy where he's at
-                break;
-            }
-            // shuffle the next guy back, and pickup from there
-            trade(storage->bucket[index], storage->bucket[next]);
-            index = next;
-        }
-
-        storage->bucket[index].~keyval<ktype, vtype>();
-        --storage->quantity;
     }
 
     template<class ktype, class vtype>
@@ -7742,6 +7992,7 @@ namespace xm {
     //}}}
     //{{{ Light Time:                    lightfwd, lightrev 
     //}}}
+#if 0 // working through dict changes
     //{{{ DTED Processing:               dtedtile, dtedcache 
     //{{{ dtedtile
     namespace internal {
@@ -8032,8 +8283,7 @@ namespace xm {
                 // the oldest will have the lowest count
                 latlon oldest = (latlon){ -1, -1 };
                 int64 lowest = INT64_MAX;
-                for (int64 ii = 0; ii<cache.bins(); ii++) {
-                    if (cache.skip(ii)) continue;
+                for (int64 ii = 0; ii<cache.size(); ii++) {
                     if (cache.val(ii).count < lowest) {
                         oldest = cache.key(ii);
                         lowest = cache.val(ii).count;
@@ -8087,6 +8337,7 @@ namespace xm {
 
     //}}}
     //}}}
+#endif
     //{{{ Graphical Windows:             graphics, pixel, message, runwin 
     //}}}
     //{{{ Drawing Functions:             drawline, fillrect, drawtext 
@@ -10850,6 +11101,7 @@ namespace xm {
     }
 
     //}}}
+#if 0 // working through dict changes
     //{{{ ephcache
     namespace internal {
         struct vehday {
@@ -10925,9 +11177,7 @@ namespace xm {
                 // the oldest one will have the lowest count
                 vehday oldest = (vehday){-1,-1};
                 int64 lowest = INT64_MAX;
-                for (int64 ii = 0; ii<cache.bins(); ii++) {
-                    if (cache.skip(ii)) continue;
-
+                for (int64 ii = 0; ii<cache.size(); ii++) {
                     if (cache.val(ii).count < lowest) {
                         oldest = cache.key(ii);
                         lowest = cache.val(ii).count;
@@ -10950,6 +11200,7 @@ namespace xm {
     }
 
     //}}}
+#endif
     //{{{ lighttime
     namespace internal {
 

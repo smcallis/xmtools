@@ -11,8 +11,7 @@ int main() {
 
     fprintf(stderr, "and then this\n");
     dict<int64> two;
-    for (int64 ii = 0; ii<one.bins(); ii++) {
-        if (one.skip(ii)) continue;
+    for (int64 ii = 0; ii<one.size(); ii++) {
         two.insert(one.key(ii));
     }
     fprintf(stderr, "all done\n");
