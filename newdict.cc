@@ -460,6 +460,8 @@ namespace xm {
         void insert(const ktype& key); // val is default
         void remove(const ktype& key);
         bool haskey(const ktype& key) const;
+        const vtype* lookup(const ktype& key) const;
+        vtype* lookup(const ktype& key);
 
         void reserve(int64 count);
         void shrink();
@@ -488,6 +490,11 @@ namespace xm {
             // replaces current storage and copies other
             template<class kk, class vv>
             void assign(internal::dictbase<kk, vv>* other);
+
+            template<class kk, class vv> friend struct newdict;
+            template<class kk, class vv> friend void swap(
+                newdict<kk, vv>& flip, dict<kk, vv>&flop
+            );
 
             internal::dictbase<ktype, vtype>* storage;
     };
@@ -564,8 +571,22 @@ namespace xm {
     bool newdict<ktype, vtype>::haskey(
         const ktype& key
     ) const {
+        return 0 != lookup(key);
+    }
+
+    template<class ktype, class vtype>
+    const vtype* newdict<ktype, vtype>::lookup(
+        const ktype& key
+    ) const {
         if (!storage) return false;
         return 0 != storage->locate(hash(key), key);
+    }
+
+    template<class ktype, class vtype>
+    vtype* newdict<ktype, vtype>::lookup(
+        const ktype& key
+    ) {
+        return (vtype*)storage->lookup(key);
     }
 
     template<class ktype, class vtype>
@@ -707,6 +728,12 @@ namespace xm {
             }
         }
     }
+
+    template<class ktype, class vtype>
+    void swap(newdict<ktype, vtype>& flip, newdict<ktype, vtype>& flop) {
+        swap(flip.storage, flop.storage);
+    }
+
     //}}}
 
 
