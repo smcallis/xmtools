@@ -63,13 +63,14 @@ namespace xm {
             virtual bucket<ktype, vtype>* buckets() = 0;
 
             virtual vtype& inswap(uint64_t code, ktype& key, vtype& val) = 0;
-            virtual const vtype* locate(uint64_t code, const ktype& key) const = 0;
+            virtual bucket<ktype, vtype>* locate(uint64_t code, const ktype& key) = 0;
             virtual void reject(uint64_t code, const ktype& key) = 0;
 
             virtual void debug() const = 0;
+            virtual void test() const = 0;
         };
         //}}}
-
+        //{{{ dictimpl
         template<class ktype, class vtype, class ttype, uint64_t bsize>
         struct dictimpl : dictbase<ktype, vtype> {
             dictimpl();
@@ -82,21 +83,26 @@ namespace xm {
             bucket<ktype, vtype>* buckets();
 
             vtype& inswap(uint64_t code, ktype& key, vtype& val);
-            const vtype* locate(uint64_t code, const ktype& key) const;
+            bucket<ktype, vtype>* locate(uint64_t code, const ktype& key);
             void reject(uint64_t code, const ktype& key);
 
             void debug() const;
+            void test() const;
             private:
                 dictimpl(const dictimpl<ktype, vtype, ttype, bsize>&); // = delete
                 void operator =(const dictimpl<ktype, vtype, ttype, bsize>&); // = delete
 
                 // appends key:val to the store, then updates table and count
-                vtype& insert(int64 probe, uint64_t code, ktype& key, vtype& val);
+                vtype& insert(int64 tspot, uint64_t code, ktype& key, vtype& val);
 
-                // shuffles the table to make room at the probe location
-                void robinhood(int64 probe);
+                // shuffles the table to make room at the location
+                void robinhood(int64 tspot);
+
+                // shuffles the table to occupy a recently removed hole
+                void backshift(int64 tspot);
             
                 int64 count;
+                static const ttype sentinel = (ttype)-1ULL;
                 struct { ttype index, trunc; } table[bsize];
                 // placed in a union so they are not constructed
                 union { bucket<ktype, vtype> store[3*bsize/4]; };
@@ -104,7 +110,6 @@ namespace xm {
 
         template<class ktype, class vtype, class ttype, uint64_t bsize>
         dictimpl<ktype, vtype, ttype, bsize>::dictimpl() : count(0) {
-            const ttype sentinel = (ttype)-1ULL;
             for (int64 ii = 0; ii<bsize; ii++) {
                 table[ii].index = sentinel;
             }
@@ -113,7 +118,8 @@ namespace xm {
         template<class ktype, class vtype, class ttype, uint64_t bsize>
         dictimpl<ktype, vtype, ttype, bsize>::~dictimpl() {
             for (int64 ii = 0; ii<count; ii++) {
-                store[ii].~bucket<ktype, vtype>();
+                store[ii].key.~ktype();
+                store[ii].val.~vtype();
             }
         }
         
@@ -141,18 +147,17 @@ namespace xm {
         vtype& dictimpl<ktype, vtype, ttype, bsize>::inswap(
             uint64_t code, ktype& key, vtype& val
         ) {
-            const ttype sentinel = (ttype)-1ULL;
             ttype truncode = code%bsize;
-            int64 probe = code%bsize;
+            int64 tspot = code%bsize;
             for (int64 newcost = 0; newcost<bsize; newcost++) {
-                if (table[probe].index == sentinel) {
+                if (table[tspot].index == sentinel) {
                     // found an empty spot
-                    return insert(probe, code, key, val);
+                    return insert(tspot, code, key, val);
                 }
 
-                if (table[probe].trunc == truncode) {
+                if (table[tspot].trunc == truncode) {
                     // the truncated hash codes match, check the store
-                    bucket<ktype, vtype>& occupant = store[table[probe].index];
+                    bucket<ktype, vtype>& occupant = store[table[tspot].index];
                     if (occupant.code == code && occupant.key == key) {
                         // matching key, replace val
                         xm::swap(occupant.val, val);
@@ -160,14 +165,14 @@ namespace xm {
                     }
                 }
 
-                int64 oldcost = (probe - table[probe].trunc)%bsize;
+                int64 oldcost = (tspot - table[tspot].trunc)%bsize;
                 if (newcost >= oldcost) {
                     // we've searched far enough that we will not
                     // find our key, and we can steal this spot
-                    robinhood(probe);
-                    return insert(probe, code, key, val);
+                    robinhood(tspot);
+                    return insert(tspot, code, key, val);
                 }
-                probe = (probe + 1)%bsize;
+                tspot = (tspot + 1)%bsize;
             }
             check(false, "should never get here");
             return store[0].val; // this is invalid
@@ -175,11 +180,12 @@ namespace xm {
 
         template<class ktype, class vtype, class ttype, uint64_t bsize>
         vtype& dictimpl<ktype, vtype, ttype, bsize>::insert(
-            int64 probe, uint64_t code, ktype& key, vtype& val
+            int64 tspot, uint64_t code, ktype& key, vtype& val
         ) {
             ttype truncode = code%bsize;
-            table[probe].index = (ttype)count;
-            table[probe].trunc = truncode;
+            table[tspot].index = (ttype)count;
+            table[tspot].trunc = truncode;
+            store[count].index = tspot;
             store[count].code = code;
             new(&store[count].key) ktype;
             new(&store[count].val) vtype;
@@ -189,26 +195,25 @@ namespace xm {
         }
 
         template<class ktype, class vtype, class ttype, uint64_t bsize>
-        void dictimpl<ktype, vtype, ttype, bsize>::robinhood(int64 probe) {
-            const ttype sentinel = (ttype)-1ULL;
-            ttype oldtrunc = table[probe].trunc;
-            ttype oldindex = table[probe].index;
-            int64 oldcost = (probe - oldtrunc)%bsize;
+        void dictimpl<ktype, vtype, ttype, bsize>::robinhood(int64 tspot) {
+            ttype oldtrunc = table[tspot].trunc;
+            ttype oldindex = table[tspot].index;
+            int64 oldcost = (tspot - oldtrunc)%bsize;
 
             for (int64 ii = 0; ii<bsize; ii++) {
-                probe = (probe + 1)%bsize;
-                ttype& newtrunc = table[probe].trunc;
-                ttype& newindex = table[probe].index;
+                tspot = (tspot + 1)%bsize;
+                ttype& newtrunc = table[tspot].trunc;
+                ttype& newindex = table[tspot].index;
                 if (newindex == sentinel) {
-                    // XXX: update store[probe].index;
+                    store[oldindex].index = tspot;
                     newtrunc = oldtrunc;
                     newindex = oldindex;
                     return;
                 }
                 ++oldcost;
-                int64 newcost = (probe - newtrunc)%bsize;
+                int64 newcost = (tspot - newtrunc)%bsize;
                 if (oldcost >= newcost) {
-                    // XXX: update store[probe].index;
+                    store[oldindex].index = tspot;
                     xm::swap(oldtrunc, newtrunc);
                     xm::swap(oldindex, newindex);
                     xm::swap(oldcost, newcost);
@@ -218,33 +223,32 @@ namespace xm {
         }
 
         template<class ktype, class vtype, class ttype, uint64_t bsize>
-        const vtype* dictimpl<ktype, vtype, ttype, bsize>::locate(
+        bucket<ktype, vtype>* dictimpl<ktype, vtype, ttype, bsize>::locate(
             uint64_t code, const ktype& key
-        ) const {
-            const ttype sentinel = (ttype)-1ULL;
+        ) {
             ttype truncode = code%bsize;
-            int64 probe = code%bsize;
+            int64 tspot = code%bsize;
             for (int64 newcost = 0; newcost<bsize; newcost++) {
-                if (table[probe].index == sentinel) {
+                if (table[tspot].index == sentinel) {
                     // it is not in the table
                     return 0;
                 }
                 
-                if (table[probe].trunc == truncode) {
+                if (table[tspot].trunc == truncode) {
                     // the truncated hash codes match, check the store
-                    const bucket<ktype, vtype>& occupant = store[table[probe].index];
+                    bucket<ktype, vtype>& occupant = store[table[tspot].index];
                     if (occupant.code == code && occupant.key == key) {
                         // matching key, return pointer to val
-                        return &occupant.val;
+                        return &occupant;
                     }
                 }
 
-                int64 oldcost = (probe - table[probe].trunc)%bsize;
+                int64 oldcost = (tspot - table[tspot].trunc)%bsize;
                 if (newcost > oldcost) {
                     // we won't find it after this point
                     return 0;
                 }
-                probe = (probe + 1)%bsize;
+                tspot = (tspot + 1)%bsize;
             }
 
             check(false, "should never get here");
@@ -256,11 +260,49 @@ namespace xm {
             uint64_t code, const ktype& key
         ) {
             (void)code; (void)key;
+            bucket<ktype, vtype>* found = locate(code, key);
+            if (!found) return;
+            --count;
+            int64 tspot = found->index;
+            int64 sspot = table[tspot].index;
+            // swap/move the last store item to sspot
+            store[sspot].index = store[count].index;
+            store[sspot].code = store[count].code;
+            xm::swap(found->key, store[count].key);
+            xm::swap(found->val, store[count].val);
+            table[store[sspot].index].index = sspot;
+
+            // destruct the items we moved to the end
+            store[count].key.~ktype();
+            store[count].val.~vtype();
+
+            backshift(tspot);
+        }
+
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        void dictimpl<ktype, vtype, ttype, bsize>::backshift(int64 tspot) {
+            for (int64 ii = 0; ii<bsize; ii++) {
+                ttype next = (tspot + 1)%bsize;
+                if (table[next].index == sentinel) {
+                    table[tspot].index = sentinel;
+                    return;
+                }
+                int64 cost = (next - table[next].trunc)%bsize;
+                if (cost == 0) {
+                    table[tspot].index = sentinel;
+                    return;
+                }
+                table[tspot].index = table[next].index;
+                table[tspot].trunc = table[next].trunc;
+                store[table[tspot].index].index = tspot;
+
+                tspot = next;
+            }
+            check(false, "should never get here");
         }
 
         template<class ktype, class vtype, class ttype, uint64_t bsize>
         void dictimpl<ktype, vtype, ttype, bsize>::debug() const {
-            const ttype sentinel = (ttype)-1ULL;
             for (int64 row = 0; row<bsize/4; row++) {
                 for (int64 col = 0; col<4; col++) {
                     int64 ii = row + col*bsize/4;
@@ -289,6 +331,38 @@ namespace xm {
             printf("\n===========================\n");
         }
 
+        template<class ktype, class vtype, class ttype, uint64_t bsize>
+        void dictimpl<ktype, vtype, ttype, bsize>::test() const {
+            for (int64 ii = 0; ii<count; ii++) {
+                check(
+                    table[store[ii].index].index == ii,
+                    "table matches store"
+                );
+            }
+            int64 used = 0;
+            for (int64 ii = 0; ii<bsize; ii++) {
+                if (table[ii].index != sentinel) used++;
+            }
+            check(used == count, "table count equals store count");
+            for (int64 ii = 0; ii<bsize; ii++) {
+                if (table[ii].index != sentinel) {
+                    check(
+                        store[table[ii].index].index == ii,
+                        "store matches table"
+                    );
+                }
+            }
+            for (int64 ii = 0; ii<bsize; ii++) {
+                ttype curr = ((ttype)ii + 0)%bsize;
+                ttype next = ((ttype)ii + 1)%bsize;
+                int64 currcost = (curr - table[curr].trunc)%bsize;
+                int64 nextcost = (next - table[next].trunc)%bsize;
+                if (table[curr].index == sentinel) currcost = 0;
+                if (table[next].index == sentinel) nextcost = 0;
+                check(nextcost <= currcost + 1, "costs correct");
+            }
+        }
+        //}}}
         //{{{ makedict
         template<class ktype, class vtype>
         dictbase<ktype, vtype>* makedict(uint64_t size) {
@@ -361,6 +435,7 @@ namespace xm {
 
     }
 
+    //{{{ newdict
     template<class ktype, class vtype>
     struct newdict {
         ~newdict();
@@ -379,7 +454,6 @@ namespace xm {
             const newdict<kk, vv>& other
         );
 
-        const vtype& operator [](const ktype& key) const;
         vtype& operator [](const ktype& key);
 
         void insert(const ktype& key, const vtype& val);
@@ -400,6 +474,7 @@ namespace xm {
         list<vtype> vals() const;
 
         void debug() const { if (storage) storage->debug(); }
+        void test() const { if (storage) storage->test(); }
         private:
             // updates or inserts key:val and returns
             // reference to val (this may resize and rehash)
@@ -447,36 +522,24 @@ namespace xm {
         const newdict<kk, vv>& other
     ) { assign(other.storage); }
 
-    /* XXX: Rethink these ones.  Should a const dict be
-            modified when the key is not found?
-            Return option?  Throw exception?
-
-    template<class ktype, class vtype>
-    const vtype& newdict<ktype, vtype>::operator [](
-        const ktype& key
-    ) const {
-        using namespace internal;
-        uint64_t code = hash(key);
-        if (!storage) {
-            storage = makedict<ktype, vtype>(4);
-            return storage->inswap(code, ktype(key), vtype());
-        }
-        vtype* result = storage->locate(code, key);
-        if (!result) {
-            return inject(code, key, vtype());
-        }
-        return result;
-    }
-
     template<class ktype, class vtype>
     vtype& newdict<ktype, vtype>::operator [](
         const ktype& key
     ) {
-        // dispatch to the const version
-        // then cast-away the constness
-        return (vtype&)operator [](key);
+        using namespace internal;
+        uint64_t code = hash(key);
+        if (!storage) {
+            storage = makedict<ktype, vtype>(4);
+            ktype kk = key;
+            vtype vv;
+            return storage->inswap(code, kk, vv);
+        }
+        const bucket<ktype, vtype>* result = storage->locate(code, key);
+        if (!result) {
+            return inject(code, key, vtype());
+        }
+        return (vtype&)result->getval();
     }
-    */
 
     template<class ktype, class vtype>
     void newdict<ktype, vtype>::insert(
@@ -565,7 +628,7 @@ namespace xm {
         list<ktype> result;
         int64 len = size();
         if (!len) return result;
-        bucket<ktype, vtype>* buckets = storage->buckets();
+        const bucket<ktype, vtype>* buckets = storage->buckets();
         result.reserve(len);
         for (int64 ii = 0; ii<len; ii++) {
             result.append(buckets[ii].key);
@@ -579,7 +642,7 @@ namespace xm {
         list<vtype> result;
         int64 len = size();
         if (!len) return result;
-        bucket<ktype, vtype>* buckets = storage->buckets();
+        const bucket<ktype, vtype>* buckets = storage->buckets();
         result.reserve(len);
         for (int64 ii = 0; ii<len; ii++) {
             result.append(buckets[ii].getval());
@@ -639,21 +702,50 @@ namespace xm {
             bucket<kk, vv>* buckets = other->buckets();
             for (int64 ii = 0; ii<len; ii++) {
                 ktype key = ktype(buckets[ii].key);
-                storage.inswap(hash(key), key, vtype(buckets[ii].val));
+                vtype val = vtyle(buckets[ii].val);
+                storage.inswap(hash(key), key, val);
             }
         }
     }
+    //}}}
 
 
 }
 
 int main() {
     using namespace xm;
-    newdict<int32_t, int32_t> dd;
-    for (int ii = 0; ii<1000; ii++) {
+    newdict<int32_t, int64_t> dd;
+    //dd.reserve(180);
+    dd.debug();
+    dd.test();
+    getchar();
+    printf("inserting\n");
+    for (int ii = 0; ii<180; ii++) {
         dd.insert(ii*ii, (ii + 1)*1001);
         dd.debug();
+        dd.test();
         getchar();
+        for (int jj = 0; jj<=ii; jj++) {
+            check(dd[jj*jj] == (jj + 1)*1001, "matches %d %d", jj*jj, (jj + 1)*1001);
+        }
+    }
+    list<int32_t> keys = dd.keys();
+    list<int32_t> vals = dd.vals();
+    for (int ii = 0; ii<180; ii++) {
+        check(keys[ii] == ii*ii, "keys correct");
+        check(vals[ii] == (ii + 1)*1001, "vals correct");
+    }
+
+    printf("removing\n");
+    for (int ii = 0; ii<180; ii++) {
+        dd.remove(ii*ii);
+        dd.shrink();
+        dd.debug();
+        dd.test();
+        getchar();
+        for (int jj = ii+1; jj<180; jj++) {
+            check(dd[jj*jj] == (jj + 1)*1001, "matches %d %d", jj*jj, (jj + 1)*1001);
+        }
     }
 
     return 0;
