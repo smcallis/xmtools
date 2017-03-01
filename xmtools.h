@@ -1164,8 +1164,8 @@ namespace xm {
 
         template<class ktype, class vtype>
         void newandswap(bucket<ktype, vtype>& bucket, ktype& key, vtype& val) {
-            new(&bucket.key) ktype;
-            new(&bucket.val) vtype;
+            new(&bucket.key) ktype();
+            new(&bucket.val) vtype();
             // argument dependent lookup
             using namespace xm;
             swap(bucket.key, key);
@@ -1174,7 +1174,7 @@ namespace xm {
 
         template<class ktype>
         void newandswap(bucket<ktype, none>& bucket, ktype& key, none&) {
-            new(&bucket.key) ktype;
+            new(&bucket.key) ktype();
             // argument dependent lookup
             using namespace xm;
             swap(bucket.key, key);
@@ -1277,9 +1277,8 @@ namespace xm {
             }
             table[store[sspot].index].index = sspot;
 
-            // destruct the items we moved to the end
-            store[count].key.~ktype();
-            store[count].getval().~vtype();
+            // destruct the item we moved to the end
+            destruct(store + count, 1);
 
             backshift(tspot);
         }
