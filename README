@@ -2,6 +2,8 @@ A collection of utilities for working with X-Midas files.
 
 To Do List:
 
+    xm::list   - add inswap() and apswap() ?
+                 should work for non-copyables
     xmbase.cc  - real to complex at half rate
     xmhalf.cc  - complex to complex at half rate
     xmtfd.cc   - tune, filter, decimate (Borgerding)
