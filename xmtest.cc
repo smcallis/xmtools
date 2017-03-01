@@ -157,12 +157,14 @@ static void test0005() {
     test0005_t0<       long double>("       long double");
 }
 
-static void test0006() {
+static void test0006_helper(bool reserve) {
+    const int64 maxsize = 1000;
     using namespace xm;
     dict<int32_t, int64_t> dd;
-    //dd.reserve(180);
     dd.test();
-    for (int ii = 0; ii<180; ii++) {
+    if (reserve) dd.reserve(maxsize);
+    dd.test();
+    for (int64 ii = 0; ii<maxsize; ii++) {
         dd.insert(ii*ii, (ii + 1)*1001);
         dd.test();
         for (int jj = 0; jj<=ii; jj++) {
@@ -171,23 +173,117 @@ static void test0006() {
     }
     list<int32_t> keys = dd.keys();
     list<int32_t> vals = dd.vals();
-    for (int ii = 0; ii<180; ii++) {
+    for (int64 ii = 0; ii<maxsize; ii++) {
         check(keys[ii] == ii*ii, "keys correct");
         check(vals[ii] == (ii + 1)*1001, "vals correct");
     }
 
-    for (int ii = 0; ii<180; ii++) {
+    for (int64 ii = 0; ii<maxsize; ii++) {
         dd.remove(ii*ii);
-        dd.shrink();
+        if (!reserve) dd.shrink();
         dd.test();
-        for (int jj = ii+1; jj<180; jj++) {
+        for (int jj = ii+1; jj<maxsize; jj++) {
             check(dd[jj*jj] == (jj + 1)*1001, "matches %d %d", jj*jj, (jj + 1)*1001);
         }
+    }
+    dd.test();
+}
+
+static void test0006() {
+    test0006_helper(true);
+    test0006_helper(false);
+}
+
+static void test0007() {
+    using namespace xm;
+
+    dict<int64> one;
+    for (int64 ii = 0; ii<5000000; ii++) {
+        one.insert(ii);
+    }
+    one.test();
+
+    // this used to exhibit quadratic runtime
+    dict<int64> two;
+    for (int64 ii = 0; ii<one.size(); ii++) {
+        two.insert(one.key(ii));
+    }
+    two.test();
+}
+
+namespace test0008_internal {
+    static int64 keyrefs;
+    struct countedkey {
+        int64 val;
+        countedkey() : val(0) {
+            ++keyrefs;
+        }
+        countedkey(int64 val) : val(val) {
+            ++keyrefs;
+        }
+        ~countedkey() {
+            --keyrefs;
+        }
+        private:
+            countedkey(const countedkey&); // = delete
+            void operator =(const countedkey&); // = delete
+    };
+    static inline bool operator ==(
+        const countedkey& aa, const countedkey& bb
+    ) {
+        return aa.val == bb.val;
+    }
+
+    static inline uint64_t hash(const countedkey& key) {
+        return xm::hash(key.val);
+    }
+
+    static inline void swap(countedkey& aa, countedkey& bb) {
+        xm::swap(aa.val, bb.val);
+    }
+
+    static int64 valrefs;
+    struct countedval {
+        int64 val;
+        countedval() : val(0) {
+            ++valrefs;
+        }
+        countedval(int64 val) : val(val) {
+            ++valrefs;
+        }
+        ~countedval() {
+            --valrefs;
+        }
+        private:
+            countedval(const countedval&); // = delete
+            void operator =(const countedval&); // = delete
+    };
+
+    static inline void swap(countedval& aa, countedval& bb) {
+        xm::swap(aa.val, bb.val);
     }
 
 }
 
+static void test0008() {
+    using namespace xm;
+    using namespace test0008_internal;
 
+    check(keyrefs == 0, "keyrefs 0 before");
+    check(valrefs == 0, "valrefs 0 before");
+    {
+        dict<countedkey, countedval> dd;
+
+        for (int64 ii = 0; ii<10000; ii++) {
+            countedkey key(ii);
+            countedval val(ii*ii);
+            dd.inswap(key, val);
+        }
+    }
+
+    check(keyrefs == 0, "keyrefs 0 after");
+    check(valrefs == 0, "valrefs 0 after");
+}
 
 int main() {
     test0000();
@@ -197,6 +293,8 @@ int main() {
     test0004();
     test0005();
     test0006();
+    test0007();
+    test0008();
 
     return 0;
 }

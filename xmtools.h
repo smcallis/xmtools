@@ -1142,7 +1142,9 @@ namespace xm {
                     bucket<ktype, vtype>& occupant = store[table[tspot].index];
                     if (occupant.code == code && occupant.key == key) {
                         // matching key, replace val
-                        xm::swap(occupant.getval(), val);
+                        // argument dependent lookup
+                        using namespace xm;
+                        swap(occupant.getval(), val);
                         return occupant.getval();
                     }
                 }
@@ -1164,14 +1166,18 @@ namespace xm {
         void newandswap(bucket<ktype, vtype>& bucket, ktype& key, vtype& val) {
             new(&bucket.key) ktype;
             new(&bucket.val) vtype;
-            xm::swap(bucket.key, key);
-            xm::swap(bucket.val, val);
+            // argument dependent lookup
+            using namespace xm;
+            swap(bucket.key, key);
+            swap(bucket.val, val);
         }
 
         template<class ktype>
         void newandswap(bucket<ktype, none>& bucket, ktype& key, none&) {
             new(&bucket.key) ktype;
-            xm::swap(bucket.key, key);
+            // argument dependent lookup
+            using namespace xm;
+            swap(bucket.key, key);
         }
 
         template<class ktype, class vtype, class ttype, uint64_t tsize>
@@ -1207,9 +1213,11 @@ namespace xm {
                 uint64_t newcost = (tspot - newtrunc)%tsize;
                 if (oldcost >= newcost) {
                     store[oldindex].index = tspot;
-                    xm::swap(oldtrunc, newtrunc);
-                    xm::swap(oldindex, newindex);
-                    xm::swap(oldcost, newcost);
+                    // argument dependent lookup
+                    using namespace xm;
+                    swap(oldtrunc, newtrunc);
+                    swap(oldindex, newindex);
+                    swap(oldcost, newcost);
                 }
             }
             check(false, "should never get here");
@@ -1261,8 +1269,12 @@ namespace xm {
             // swap/move the last store item to sspot
             store[sspot].index = store[count].index;
             store[sspot].code = store[count].code;
-            xm::swap(found->key, store[count].key);
-            xm::swap(found->getval(), store[count].getval());
+            {
+                // argument dependent lookup
+                using namespace xm;
+                swap(found->key, store[count].key);
+                swap(found->getval(), store[count].getval());
+            }
             table[store[sspot].index].index = sspot;
 
             // destruct the items we moved to the end
@@ -1467,6 +1479,10 @@ namespace xm {
 
         void insert(const ktype& key, const vtype& val);
         void insert(const ktype& key); // val is default
+        // These two swap (steal) the key and value and
+        // do not make a copy.  Use for non-copyable types.
+        void inswap(ktype& key, vtype& val);
+        void inswap(ktype& key); // val is default
         void remove(const ktype& key);
         bool haskey(const ktype& key) const;
         const vtype* lookup(const ktype& key) const;
@@ -1489,7 +1505,7 @@ namespace xm {
         private:
             // updates or inserts key:val and returns
             // reference to val (this may resize and rehash)
-            vtype& inject(uint64_t code, ktype key, vtype val);
+            vtype& inswap(uint64_t code, ktype& key, vtype& val);
 
             // makes a new storage of the requested size
             // and moves all elements to the new storage
@@ -1548,12 +1564,13 @@ namespace xm {
         if (!storage) {
             storage = makedict<ktype, vtype>(4);
             ktype kk = key;
-            vtype vv;
+            vtype vv = vtype();
             return storage->inswap(code, kk, vv);
         }
         const bucket<ktype, vtype>* result = storage->locate(code, key);
         if (!result) {
-            return inject(code, key, vtype());
+            ktype kk = key; vtype vv = vtype();
+            return inswap(code, kk, vv);
         }
         return (vtype&)result->getval();
     }
@@ -1561,12 +1578,47 @@ namespace xm {
     template<class ktype, class vtype>
     void dict<ktype, vtype>::insert(
         const ktype& key, const vtype& val
-    ) { inject(hash(key), key, val); }
+    ) { 
+        ktype kk = key; vtype vv = val;
+        inswap(hash(key), kk, vv);
+    }
 
     template<class ktype, class vtype>
     void dict<ktype, vtype>::insert(
         const ktype& key
-    ) { inject(hash(key), key, vtype()); }
+    ) {
+        ktype kk = key; vtype vv = vtype();
+        inswap(hash(key), kk, vv);
+    }
+
+    template<class ktype, class vtype>
+    void dict<ktype, vtype>::inswap(
+        ktype& key, vtype& val
+    ) { 
+        inswap(hash(key), key, val);
+    }
+
+    template<class ktype, class vtype>
+    void dict<ktype, vtype>::inswap(
+        ktype& key
+    ) { 
+        vtype vv = vtype();
+        inswap(hash(key), key, vv);
+    }
+
+    template<class ktype, class vtype>
+    vtype& dict<ktype, vtype>::inswap(
+        uint64_t code, ktype& key, vtype& val
+    ) {
+        int64 next_size = size() + 1; // assume key not there
+        int64 curr_bins = storage ? storage->bins() : 0;
+        int64 next_bins = max(curr_bins, 4);
+        while (3*next_bins/4 < next_size) {
+            next_bins *= 2;
+        }
+        if (next_bins != curr_bins) rehash(next_bins);
+        return storage->inswap(code, key, val);
+    }
 
     template<class ktype, class vtype>
     void dict<ktype, vtype>::remove(
@@ -1684,20 +1736,6 @@ namespace xm {
             result.append(buckets[ii].getval());
         }
         return result;
-    }
-
-    template<class ktype, class vtype>
-    vtype& dict<ktype, vtype>::inject(
-        uint64_t code, ktype key, vtype val
-    ) {
-        int64 next_size = size() + 1; // assume key not there
-        int64 curr_bins = storage ? storage->bins() : 0;
-        int64 next_bins = max(curr_bins, 4);
-        while (3*next_bins/4 < next_size) {
-            next_bins *= 2;
-        }
-        if (next_bins != curr_bins) rehash(next_bins);
-        return storage->inswap(code, key, val);
     }
 
     template<class ktype, class vtype>
