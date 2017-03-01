@@ -1067,19 +1067,19 @@ namespace xm {
                 // shuffles the table to occupy a recently removed hole
                 void backshift(int64 tspot);
             
-                int64 count;
+                uint64_t count;
                 static const ttype sentinel = (ttype)-1ULL;
                 struct { ttype index, trunc; } table[tsize];
                 // Flexible Length Arrays are a gcc extension to C++.
                 // C++ 11 and later allows abusing union like this:
                 //    union { bucket<ktype, vtype> store[3*tsize/4]; };
                 // However, we want to be compatible with C++ 98 compilers.
-                bucket<ktype, vtype> store[];
+                bucket<ktype, vtype> store[0];
         };
 
         template<class ktype, class vtype, class ttype, uint64_t tsize>
         dictimpl<ktype, vtype, ttype, tsize>::dictimpl() : count(0) {
-            for (int64 ii = 0; ii<tsize; ii++) {
+            for (uint64_t ii = 0; ii<tsize; ii++) {
                 table[ii].index = sentinel;
             }
         }
@@ -1131,7 +1131,7 @@ namespace xm {
         ) {
             ttype truncode = code%tsize;
             int64 tspot = code%tsize;
-            for (int64 newcost = 0; newcost<tsize; newcost++) {
+            for (uint64_t newcost = 0; newcost<tsize; newcost++) {
                 if (table[tspot].index == sentinel) {
                     // found an empty spot
                     return insert(tspot, code, key, val);
@@ -1147,7 +1147,7 @@ namespace xm {
                     }
                 }
 
-                int64 oldcost = (tspot - table[tspot].trunc)%tsize;
+                uint64_t oldcost = (tspot - table[tspot].trunc)%tsize;
                 if (newcost >= oldcost) {
                     // we've searched far enough that we will not
                     // find our key, and we can steal this spot
@@ -1191,9 +1191,9 @@ namespace xm {
         void dictimpl<ktype, vtype, ttype, tsize>::robinhood(int64 tspot) {
             ttype oldtrunc = table[tspot].trunc;
             ttype oldindex = table[tspot].index;
-            int64 oldcost = (tspot - oldtrunc)%tsize;
+            uint64_t oldcost = (tspot - oldtrunc)%tsize;
 
-            for (int64 ii = 0; ii<tsize; ii++) {
+            for (uint64_t ii = 0; ii<tsize; ii++) {
                 tspot = (tspot + 1)%tsize;
                 ttype& newtrunc = table[tspot].trunc;
                 ttype& newindex = table[tspot].index;
@@ -1204,7 +1204,7 @@ namespace xm {
                     return;
                 }
                 ++oldcost;
-                int64 newcost = (tspot - newtrunc)%tsize;
+                uint64_t newcost = (tspot - newtrunc)%tsize;
                 if (oldcost >= newcost) {
                     store[oldindex].index = tspot;
                     xm::swap(oldtrunc, newtrunc);
@@ -1221,7 +1221,7 @@ namespace xm {
         ) {
             ttype truncode = code%tsize;
             int64 tspot = code%tsize;
-            for (int64 newcost = 0; newcost<tsize; newcost++) {
+            for (uint64_t newcost = 0; newcost<tsize; newcost++) {
                 if (table[tspot].index == sentinel) {
                     // it is not in the table
                     return 0;
@@ -1236,7 +1236,7 @@ namespace xm {
                     }
                 }
 
-                int64 oldcost = (tspot - table[tspot].trunc)%tsize;
+                uint64_t oldcost = (tspot - table[tspot].trunc)%tsize;
                 if (newcost > oldcost) {
                     // we won't find it after this point
                     return 0;
@@ -1274,7 +1274,7 @@ namespace xm {
 
         template<class ktype, class vtype, class ttype, uint64_t tsize>
         void dictimpl<ktype, vtype, ttype, tsize>::backshift(int64 tspot) {
-            for (int64 ii = 0; ii<tsize; ii++) {
+            for (uint64_t ii = 0; ii<tsize; ii++) {
                 ttype next = (tspot + 1)%tsize;
                 if (table[next].index == sentinel) {
                     table[tspot].index = sentinel;
@@ -1296,7 +1296,7 @@ namespace xm {
 
         template<class ktype, class vtype, class ttype, uint64_t tsize>
         void dictimpl<ktype, vtype, ttype, tsize>::debug() const {
-            for (int64 row = 0; row<tsize/4; row++) {
+            for (uint64_t row = 0; row<tsize/4; row++) {
                 for (int64 col = 0; col<4; col++) {
                     int64 ii = row + col*tsize/4;
                     int64 cost = (ii - table[ii].trunc)%tsize;
@@ -1326,18 +1326,18 @@ namespace xm {
 
         template<class ktype, class vtype, class ttype, uint64_t tsize>
         void dictimpl<ktype, vtype, ttype, tsize>::test() const {
-            for (int64 ii = 0; ii<count; ii++) {
+            for (uint64_t ii = 0; ii<count; ii++) {
                 check(
                     table[store[ii].index].index == ii,
                     "table matches store"
                 );
             }
-            int64 used = 0;
-            for (int64 ii = 0; ii<tsize; ii++) {
+            uint64_t used = 0;
+            for (uint64_t ii = 0; ii<tsize; ii++) {
                 if (table[ii].index != sentinel) used++;
             }
             check(used == count, "table count equals store count");
-            for (int64 ii = 0; ii<tsize; ii++) {
+            for (uint64_t ii = 0; ii<tsize; ii++) {
                 if (table[ii].index != sentinel) {
                     check(
                         store[table[ii].index].index == ii,
@@ -1345,7 +1345,7 @@ namespace xm {
                     );
                 }
             }
-            for (int64 ii = 0; ii<tsize; ii++) {
+            for (uint64_t ii = 0; ii<tsize; ii++) {
                 ttype curr = ((ttype)ii + 0)%tsize;
                 ttype next = ((ttype)ii + 1)%tsize;
                 int64 currcost = (curr - table[curr].trunc)%tsize;
@@ -1733,13 +1733,13 @@ namespace xm {
             storage = 0;
         }
         if (other) {
-            storage = makedict<ktype, vtype>(other.bins());
-            int64 len = other.size();
+            storage = makedict<ktype, vtype>(other->bins());
+            int64 len = other->size();
             bucket<kk, vv>* buckets = other->buckets();
             for (int64 ii = 0; ii<len; ii++) {
                 ktype key = ktype(buckets[ii].key);
                 vtype val = vtyle(buckets[ii].val);
-                storage.inswap(hash(key), key, val);
+                storage->inswap(hash(key), key, val);
             }
         }
     }

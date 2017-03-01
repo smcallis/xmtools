@@ -157,6 +157,36 @@ static void test0005() {
     test0005_t0<       long double>("       long double");
 }
 
+static void test0006() {
+    using namespace xm;
+    dict<int32_t, int64_t> dd;
+    //dd.reserve(180);
+    dd.test();
+    for (int ii = 0; ii<180; ii++) {
+        dd.insert(ii*ii, (ii + 1)*1001);
+        dd.test();
+        for (int jj = 0; jj<=ii; jj++) {
+            check(dd[jj*jj] == (jj + 1)*1001, "matches %d %d", jj*jj, (jj + 1)*1001);
+        }
+    }
+    list<int32_t> keys = dd.keys();
+    list<int32_t> vals = dd.vals();
+    for (int ii = 0; ii<180; ii++) {
+        check(keys[ii] == ii*ii, "keys correct");
+        check(vals[ii] == (ii + 1)*1001, "vals correct");
+    }
+
+    for (int ii = 0; ii<180; ii++) {
+        dd.remove(ii*ii);
+        dd.shrink();
+        dd.test();
+        for (int jj = ii+1; jj<180; jj++) {
+            check(dd[jj*jj] == (jj + 1)*1001, "matches %d %d", jj*jj, (jj + 1)*1001);
+        }
+    }
+
+}
+
 
 
 int main() {
@@ -166,6 +196,7 @@ int main() {
     test0003();
     test0004();
     test0005();
+    test0006();
 
     return 0;
 }
