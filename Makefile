@@ -26,8 +26,6 @@ PROGRAMS = \
     xmtone \
     covar \
     eigen \
-    hashit \
-    newdict \
 
 all: $(PROGRAMS)
 
