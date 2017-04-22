@@ -285,6 +285,14 @@ static void test0008() {
     check(valrefs == 0, "valrefs 0 after");
 }
 
+static void test0009() {
+    using namespace xm;
+    static cdouble A[10][10];
+    static cdouble b[10];
+    gensolve((cdouble*)A, 10, 10, b, 1);
+    
+}
+
 int main() {
     test0000();
     test0001();
@@ -295,6 +303,7 @@ int main() {
     test0006();
     test0007();
     test0008();
+    test0009();
 
     return 0;
 }

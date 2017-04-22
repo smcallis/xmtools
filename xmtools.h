@@ -5779,7 +5779,7 @@ namespace xm {
 
         // apply our householder rows to X
         for (int64 ij = rank - 1; ij>=0; ij--) {
-            inverse_row_col(A, rank, cols, B, cols, size, ij, ij);
+            gensolve_row_col(A, rank, cols, B, cols, size, ij, ij);
         }
 
         // apply our permutations to X
