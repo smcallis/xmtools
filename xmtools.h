@@ -1037,9 +1037,9 @@ namespace xm {
         };
         //}}}
         //{{{ dictimpl
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
+        template<class ktype, class vtype, class htype>
         struct dictimpl : dictbase<ktype, vtype> {
-            dictimpl();
+            dictimpl(uint64_t tsize);
             ~dictimpl();
             
             int64 bins() const;
@@ -1055,8 +1055,9 @@ namespace xm {
             void debug() const;
             void test() const;
             private:
-                dictimpl(const dictimpl<ktype, vtype, ttype, tsize>&); // = delete
-                void operator =(const dictimpl<ktype, vtype, ttype, tsize>&); // = delete
+                dictimpl(); // = delete
+                dictimpl(const dictimpl<ktype, vtype, htype>&); // = delete
+                void operator =(const dictimpl<ktype, vtype, htype>&); // = delete
 
                 // appends key:val to the store, then updates table and count
                 vtype& insert(int64 tspot, uint64_t code, ktype& key, vtype& val);
@@ -1067,18 +1068,22 @@ namespace xm {
                 // shuffles the table to occupy a recently removed hole
                 void backshift(int64 tspot);
             
-                uint64_t count;
-                static const ttype sentinel = (ttype)-1ULL;
-                struct { ttype index, trunc; } table[tsize];
-                // Flexible Length Arrays are a gcc extension to C++.
-                // C++ 11 and later allows abusing union like this:
-                //    union { bucket<ktype, vtype> store[3*tsize/4]; };
-                // However, we want to be compatible with C++ 98 compilers.
-                bucket<ktype, vtype> store[0];
+                uint64_t count, tsize;
+                static const htype sentinel = (htype)-1ULL;
+                struct ttype { htype index, trunc; };
+                // We're using placement new to allocated extra storage
+                // after the end of this struct.  The following fields
+                // would be here:
+                // ttype table[tsize];
+                // bucket<ktype, vtype> store[3*tsize/4];
         };
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        dictimpl<ktype, vtype, ttype, tsize>::dictimpl() : count(0) {
+        template<class ktype, class vtype, class htype>
+        dictimpl<ktype, vtype, htype>::dictimpl(uint64_t tsize) :
+            count(0), tsize(tsize)
+        {
+            ttype* table = (ttype*)(void*)(this + 1);
+
             for (uint64_t ii = 0; ii<tsize; ii++) {
                 table[ii].index = sentinel;
             }
@@ -1099,38 +1104,54 @@ namespace xm {
             }
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        dictimpl<ktype, vtype, ttype, tsize>::~dictimpl() {
+        template<class ktype, class vtype, class htype>
+        dictimpl<ktype, vtype, htype>::~dictimpl() {
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
             destruct(store, count);
         }
         
-        
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        int64 dictimpl<ktype, vtype, ttype, tsize>::bins() const {
+        template<class ktype, class vtype, class htype>
+        int64 dictimpl<ktype, vtype, htype>::bins() const {
             return tsize;
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        int64 dictimpl<ktype, vtype, ttype, tsize>::size() const {
+        template<class ktype, class vtype, class htype>
+        int64 dictimpl<ktype, vtype, htype>::size() const {
             return count;
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        const bucket<ktype, vtype>* dictimpl<ktype, vtype, ttype, tsize>::buckets() const {
+        template<class ktype, class vtype, class htype>
+        const bucket<ktype, vtype>* dictimpl<ktype, vtype, htype>::buckets() const {
+            const ttype* table = (const ttype*)(void*)(this + 1);
+            const bucket<ktype, vtype>* store = (
+                (const bucket<ktype,vtype>*)(const void*)(table + tsize)
+            );
             return store;
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        bucket<ktype, vtype>* dictimpl<ktype, vtype, ttype, tsize>::buckets() {
+        template<class ktype, class vtype, class htype>
+        bucket<ktype, vtype>* dictimpl<ktype, vtype, htype>::buckets() {
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
             return store;
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        vtype& dictimpl<ktype, vtype, ttype, tsize>::inswap(
+        template<class ktype, class vtype, class htype>
+        vtype& dictimpl<ktype, vtype, htype>::inswap(
             uint64_t code, ktype& key, vtype& val
         ) {
-            ttype truncode = code%tsize;
-            int64 tspot = code%tsize;
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
+            const uint64_t tmask = tsize - 1;
+            htype truncode = code&tmask;
+            int64 tspot = code&tmask;
             for (uint64_t newcost = 0; newcost<tsize; newcost++) {
                 if (table[tspot].index == sentinel) {
                     // found an empty spot
@@ -1149,14 +1170,14 @@ namespace xm {
                     }
                 }
 
-                uint64_t oldcost = (tspot - table[tspot].trunc)%tsize;
+                uint64_t oldcost = (tspot - table[tspot].trunc)&tmask;
                 if (newcost >= oldcost) {
                     // we've searched far enough that we will not
                     // find our key, and we can steal this spot
                     robinhood(tspot);
                     return insert(tspot, code, key, val);
                 }
-                tspot = (tspot + 1)%tsize;
+                tspot = (tspot + 1)&tmask;
             }
             check(false, "should never get here");
             return store[0].getval(); // this is invalid
@@ -1180,12 +1201,17 @@ namespace xm {
             swap(bucket.key, key);
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        vtype& dictimpl<ktype, vtype, ttype, tsize>::insert(
+        template<class ktype, class vtype, class htype>
+        vtype& dictimpl<ktype, vtype, htype>::insert(
             int64 tspot, uint64_t code, ktype& key, vtype& val
         ) {
-            ttype truncode = code%tsize;
-            table[tspot].index = (ttype)count;
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
+            const uint64_t tmask = tsize - 1;
+            htype truncode = code&tmask;
+            table[tspot].index = (htype)count;
             table[tspot].trunc = truncode;
             store[count].index = tspot;
             store[count].code = code;
@@ -1193,16 +1219,21 @@ namespace xm {
             return store[count++].getval();
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        void dictimpl<ktype, vtype, ttype, tsize>::robinhood(int64 tspot) {
-            ttype oldtrunc = table[tspot].trunc;
-            ttype oldindex = table[tspot].index;
-            uint64_t oldcost = (tspot - oldtrunc)%tsize;
+        template<class ktype, class vtype, class htype>
+        void dictimpl<ktype, vtype, htype>::robinhood(int64 tspot) {
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
+            const uint64_t tmask = tsize - 1;
+            htype oldtrunc = table[tspot].trunc;
+            htype oldindex = table[tspot].index;
+            uint64_t oldcost = (tspot - oldtrunc)&tmask;
 
             for (uint64_t ii = 0; ii<tsize; ii++) {
-                tspot = (tspot + 1)%tsize;
-                ttype& newtrunc = table[tspot].trunc;
-                ttype& newindex = table[tspot].index;
+                tspot = (tspot + 1)&tmask;
+                htype& newtrunc = table[tspot].trunc;
+                htype& newindex = table[tspot].index;
                 if (newindex == sentinel) {
                     store[oldindex].index = tspot;
                     newtrunc = oldtrunc;
@@ -1210,7 +1241,7 @@ namespace xm {
                     return;
                 }
                 ++oldcost;
-                uint64_t newcost = (tspot - newtrunc)%tsize;
+                uint64_t newcost = (tspot - newtrunc)&tmask;
                 if (oldcost >= newcost) {
                     store[oldindex].index = tspot;
                     // argument dependent lookup
@@ -1223,12 +1254,17 @@ namespace xm {
             check(false, "should never get here");
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        bucket<ktype, vtype>* dictimpl<ktype, vtype, ttype, tsize>::locate(
+        template<class ktype, class vtype, class htype>
+        bucket<ktype, vtype>* dictimpl<ktype, vtype, htype>::locate(
             uint64_t code, const ktype& key
         ) {
-            ttype truncode = code%tsize;
-            int64 tspot = code%tsize;
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
+            const uint64_t tmask = tsize - 1;
+            htype truncode = code&tmask;
+            int64 tspot = code&tmask;
             for (uint64_t newcost = 0; newcost<tsize; newcost++) {
                 if (table[tspot].index == sentinel) {
                     // it is not in the table
@@ -1244,22 +1280,26 @@ namespace xm {
                     }
                 }
 
-                uint64_t oldcost = (tspot - table[tspot].trunc)%tsize;
+                uint64_t oldcost = (tspot - table[tspot].trunc)&tmask;
                 if (newcost > oldcost) {
                     // we won't find it after this point
                     return 0;
                 }
-                tspot = (tspot + 1)%tsize;
+                tspot = (tspot + 1)&tmask;
             }
 
             check(false, "should never get here");
             return 0;
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        void dictimpl<ktype, vtype, ttype, tsize>::reject(
+        template<class ktype, class vtype, class htype>
+        void dictimpl<ktype, vtype, htype>::reject(
             uint64_t code, const ktype& key
         ) {
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
             (void)code; (void)key;
             bucket<ktype, vtype>* found = locate(code, key);
             if (!found) return;
@@ -1283,15 +1323,20 @@ namespace xm {
             backshift(tspot);
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        void dictimpl<ktype, vtype, ttype, tsize>::backshift(int64 tspot) {
+        template<class ktype, class vtype, class htype>
+        void dictimpl<ktype, vtype, htype>::backshift(int64 tspot) {
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
+            const uint64_t tmask = tsize - 1;
             for (uint64_t ii = 0; ii<tsize; ii++) {
-                ttype next = (tspot + 1)%tsize;
+                htype next = (tspot + 1)&tmask;
                 if (table[next].index == sentinel) {
                     table[tspot].index = sentinel;
                     return;
                 }
-                int64 cost = (next - table[next].trunc)%tsize;
+                int64 cost = (next - table[next].trunc)&tmask;
                 if (cost == 0) {
                     table[tspot].index = sentinel;
                     return;
@@ -1305,12 +1350,19 @@ namespace xm {
             check(false, "should never get here");
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        void dictimpl<ktype, vtype, ttype, tsize>::debug() const {
+        template<class ktype, class vtype, class htype>
+        void dictimpl<ktype, vtype, htype>::debug() const {
+            ttype* table = (ttype*)(void*)(this + 1);
+            /*
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
+            */
+            const uint64_t tmask = tsize - 1;
             for (uint64_t row = 0; row<tsize/4; row++) {
                 for (int64 col = 0; col<4; col++) {
                     int64 ii = row + col*tsize/4;
-                    int64 cost = (ii - table[ii].trunc)%tsize;
+                    int64 cost = (ii - table[ii].trunc)&tmask;
                     if (table[ii].index == sentinel) {
                         printf("%-3lld =========================== | ", ii);
                     } else {
@@ -1335,8 +1387,13 @@ namespace xm {
             printf("\n===========================\n");
         }
 
-        template<class ktype, class vtype, class ttype, uint64_t tsize>
-        void dictimpl<ktype, vtype, ttype, tsize>::test() const {
+        template<class ktype, class vtype, class htype>
+        void dictimpl<ktype, vtype, htype>::test() const {
+            ttype* table = (ttype*)(void*)(this + 1);
+            bucket<ktype, vtype>* store = (
+                (bucket<ktype,vtype>*)(void*)(table + tsize)
+            );
+            const uint64_t tmask = tsize - 1;
             for (uint64_t ii = 0; ii<count; ii++) {
                 check(
                     table[store[ii].index].index == ii,
@@ -1357,10 +1414,10 @@ namespace xm {
                 }
             }
             for (uint64_t ii = 0; ii<tsize; ii++) {
-                ttype curr = ((ttype)ii + 0)%tsize;
-                ttype next = ((ttype)ii + 1)%tsize;
-                int64 currcost = (curr - table[curr].trunc)%tsize;
-                int64 nextcost = (next - table[next].trunc)%tsize;
+                htype curr = ((htype)ii + 0)&tmask;
+                htype next = ((htype)ii + 1)&tmask;
+                int64 currcost = (curr - table[curr].trunc)&tmask;
+                int64 nextcost = (next - table[next].trunc)&tmask;
                 if (table[curr].index == sentinel) currcost = 0;
                 if (table[next].index == sentinel) nextcost = 0;
                 check(nextcost <= currcost + 1, "costs correct");
@@ -1368,13 +1425,16 @@ namespace xm {
         }
         //}}}
         //{{{ makedict
-        template<class ktype, class vtype, class ttype, int64 tsize>
-        dictimpl<ktype, vtype, ttype, tsize>* newdict() {
-            int64 extra = 3*tsize/4*sizeof(bucket<ktype, vtype>);
-            dictimpl<ktype, vtype, ttype, tsize>* result = (
-                alloc<dictimpl<ktype, vtype, ttype, tsize> >(extra)
+        template<class ktype, class vtype, class htype>
+        dictimpl<ktype, vtype, htype>* newdict(int64 tsize) {
+            int64 extra = (
+                2*tsize*sizeof(htype) +
+                3*tsize/4*sizeof(bucket<ktype, vtype>)
             );
-            new(result) dictimpl<ktype, vtype, ttype, tsize>;
+            dictimpl<ktype, vtype, htype>* result = (
+                alloc<dictimpl<ktype, vtype, htype> >(extra)
+            );
+            new(result) dictimpl<ktype, vtype, htype>(tsize);
             return result;
         }
 
@@ -1386,70 +1446,10 @@ namespace xm {
 
         template<class ktype, class vtype>
         dictbase<ktype, vtype>* makedict(uint64_t size) {
-            switch (size) {
-                case 1ULL<< 2: return newdict<ktype, vtype,  uint8_t, 1ULL<< 2>();
-                case 1ULL<< 3: return newdict<ktype, vtype,  uint8_t, 1ULL<< 3>();
-                case 1ULL<< 4: return newdict<ktype, vtype,  uint8_t, 1ULL<< 4>();
-                case 1ULL<< 5: return newdict<ktype, vtype,  uint8_t, 1ULL<< 5>();
-                case 1ULL<< 6: return newdict<ktype, vtype,  uint8_t, 1ULL<< 6>();
-                case 1ULL<< 7: return newdict<ktype, vtype,  uint8_t, 1ULL<< 7>();
-                case 1ULL<< 8: return newdict<ktype, vtype,  uint8_t, 1ULL<< 8>();
-                case 1ULL<< 9: return newdict<ktype, vtype, uint16_t, 1ULL<< 9>();
-                case 1ULL<<10: return newdict<ktype, vtype, uint16_t, 1ULL<<10>();
-                case 1ULL<<11: return newdict<ktype, vtype, uint16_t, 1ULL<<11>();
-                case 1ULL<<12: return newdict<ktype, vtype, uint16_t, 1ULL<<12>();
-                case 1ULL<<13: return newdict<ktype, vtype, uint16_t, 1ULL<<13>();
-                case 1ULL<<14: return newdict<ktype, vtype, uint16_t, 1ULL<<14>();
-                case 1ULL<<15: return newdict<ktype, vtype, uint16_t, 1ULL<<15>();
-                case 1ULL<<16: return newdict<ktype, vtype, uint16_t, 1ULL<<16>();
-                case 1ULL<<17: return newdict<ktype, vtype, uint32_t, 1ULL<<17>();
-                case 1ULL<<18: return newdict<ktype, vtype, uint32_t, 1ULL<<18>();
-                case 1ULL<<19: return newdict<ktype, vtype, uint32_t, 1ULL<<19>();
-                case 1ULL<<20: return newdict<ktype, vtype, uint32_t, 1ULL<<20>();
-                case 1ULL<<21: return newdict<ktype, vtype, uint32_t, 1ULL<<21>();
-                case 1ULL<<22: return newdict<ktype, vtype, uint32_t, 1ULL<<22>();
-                case 1ULL<<23: return newdict<ktype, vtype, uint32_t, 1ULL<<23>();
-                case 1ULL<<24: return newdict<ktype, vtype, uint32_t, 1ULL<<24>();
-                case 1ULL<<25: return newdict<ktype, vtype, uint32_t, 1ULL<<25>();
-                case 1ULL<<26: return newdict<ktype, vtype, uint32_t, 1ULL<<26>();
-                case 1ULL<<27: return newdict<ktype, vtype, uint32_t, 1ULL<<27>();
-                case 1ULL<<28: return newdict<ktype, vtype, uint32_t, 1ULL<<28>();
-                case 1ULL<<29: return newdict<ktype, vtype, uint32_t, 1ULL<<29>();
-                case 1ULL<<30: return newdict<ktype, vtype, uint32_t, 1ULL<<30>();
-                case 1ULL<<31: return newdict<ktype, vtype, uint32_t, 1ULL<<31>();
-                case 1ULL<<32: return newdict<ktype, vtype, uint32_t, 1ULL<<32>();
-                case 1ULL<<33: return newdict<ktype, vtype, uint64_t, 1ULL<<33>();
-                case 1ULL<<34: return newdict<ktype, vtype, uint64_t, 1ULL<<34>();
-                case 1ULL<<35: return newdict<ktype, vtype, uint64_t, 1ULL<<35>();
-                case 1ULL<<36: return newdict<ktype, vtype, uint64_t, 1ULL<<36>();
-                case 1ULL<<37: return newdict<ktype, vtype, uint64_t, 1ULL<<37>();
-                case 1ULL<<38: return newdict<ktype, vtype, uint64_t, 1ULL<<38>();
-                case 1ULL<<39: return newdict<ktype, vtype, uint64_t, 1ULL<<39>();
-                case 1ULL<<40: return newdict<ktype, vtype, uint64_t, 1ULL<<40>();
-                case 1ULL<<41: return newdict<ktype, vtype, uint64_t, 1ULL<<41>();
-                case 1ULL<<42: return newdict<ktype, vtype, uint64_t, 1ULL<<42>();
-                case 1ULL<<43: return newdict<ktype, vtype, uint64_t, 1ULL<<43>();
-                case 1ULL<<44: return newdict<ktype, vtype, uint64_t, 1ULL<<44>();
-                case 1ULL<<45: return newdict<ktype, vtype, uint64_t, 1ULL<<45>();
-                case 1ULL<<46: return newdict<ktype, vtype, uint64_t, 1ULL<<46>();
-                case 1ULL<<47: return newdict<ktype, vtype, uint64_t, 1ULL<<47>();
-                case 1ULL<<48: return newdict<ktype, vtype, uint64_t, 1ULL<<48>();
-                case 1ULL<<49: return newdict<ktype, vtype, uint64_t, 1ULL<<49>();
-                case 1ULL<<50: return newdict<ktype, vtype, uint64_t, 1ULL<<50>();
-                case 1ULL<<51: return newdict<ktype, vtype, uint64_t, 1ULL<<51>();
-                case 1ULL<<52: return newdict<ktype, vtype, uint64_t, 1ULL<<52>();
-                case 1ULL<<53: return newdict<ktype, vtype, uint64_t, 1ULL<<53>();
-                case 1ULL<<54: return newdict<ktype, vtype, uint64_t, 1ULL<<54>();
-                case 1ULL<<55: return newdict<ktype, vtype, uint64_t, 1ULL<<55>();
-                case 1ULL<<56: return newdict<ktype, vtype, uint64_t, 1ULL<<56>();
-                case 1ULL<<57: return newdict<ktype, vtype, uint64_t, 1ULL<<57>();
-                case 1ULL<<58: return newdict<ktype, vtype, uint64_t, 1ULL<<58>();
-                case 1ULL<<59: return newdict<ktype, vtype, uint64_t, 1ULL<<59>();
-                case 1ULL<<60: return newdict<ktype, vtype, uint64_t, 1ULL<<60>();
-                default: break;
-            }
-            check(false, "internal error bins: %lld\n", (int64)size);
-            return 0;
+            if (size <= 1ULL<<8)  return newdict<ktype, vtype,  uint8_t>(size);
+            if (size <= 1ULL<<16) return newdict<ktype, vtype, uint16_t>(size);
+            if (size <= 1ULL<<32) return newdict<ktype, vtype, uint32_t>(size);
+            return newdict<ktype, vtype, uint64_t>(size);
         }
         //}}}
 
