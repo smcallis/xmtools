@@ -540,16 +540,16 @@ namespace xm {
 
         const uint8_t *bytes = (const uint8_t*)words;
         switch (len & 7) {
-            case 7: code ^= (uint64_t)bytes[6] << 48;
-            case 6: code ^= (uint64_t)bytes[5] << 40;
-            case 5: code ^= (uint64_t)bytes[4] << 32;
-            case 4: code ^= (uint64_t)bytes[3] << 24;
-            case 3: code ^= (uint64_t)bytes[2] << 16;
-            case 2: code ^= (uint64_t)bytes[1] <<  8;
-            case 1: code ^= (uint64_t)bytes[0];
+            case 7: code ^= (uint64_t)bytes[6] << 48; // falls through
+            case 6: code ^= (uint64_t)bytes[5] << 40; // falls through
+            case 5: code ^= (uint64_t)bytes[4] << 32; // falls through
+            case 4: code ^= (uint64_t)bytes[3] << 24; // falls through
+            case 3: code ^= (uint64_t)bytes[2] << 16; // falls through
+            case 2: code ^= (uint64_t)bytes[1] <<  8; // falls through
+            case 1: code ^= (uint64_t)bytes[0];       // falls through
             code *= mult;
         };
-
+ 
         code ^= code >> 47;
         code *= mult;
         code ^= code >> 47;
