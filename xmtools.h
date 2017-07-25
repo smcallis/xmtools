@@ -1068,7 +1068,8 @@ namespace xm {
                 // shuffles the table to occupy a recently removed hole
                 void backshift(int64 tspot);
             
-                uint64_t count, tsize;
+                uint64_t count;
+                const uint64_t tsize;
                 static const htype sentinel = (htype)-1ULL;
                 struct ttype { htype index, trunc; };
                 // We're using placement new to allocated extra storage
