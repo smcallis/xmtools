@@ -6852,24 +6852,26 @@ namespace xm {
             case 0: // rectangular
                 return 1.0;
             case 1: // Hann window (-43.94dB, -18dB per octave)
-                // taps = 1.674 * input_sample_rate / transition_bandwidth
+                // taps = 1.673904 * input_sample_rate / transition_bandwidth
                 return 0.5 + 0.5*cos(xx);
             case 2: // Nuttall 3-term (-80.41dB, -18dB per octave)
-                // taps = 2.811 * input_sample_rate / transition_bandwidth
+                // taps = 2.810852 * input_sample_rate / transition_bandwidth
                 return 0.41 + 0.5*cos(xx) + 0.09*cos(2*xx);
             case 3: // Nuttall 4-term (-114.38dB, -18dB per octave)
-                // taps = 3.892 * input_sample_rate / transition_bandwidth
+                // taps = 3.891769 * input_sample_rate / transition_bandwidth
                 return (
                     0.353478834 + 0.486608654*cos(xx) +
                     0.146521166*cos(2*xx) + 0.013391346*cos(3*xx)
                 );
             case 4: // Nuttall, Albrecht (-134.96dB, -18dB per octave)
+                // taps = 4.830276 * input_sample_rate / transition_bandwidth
                 return (
                     0.323497331 + 0.471838046*cos(xx) +
                     0.175295953*cos(2*xx) + 0.028161954*cos(3*xx) +
                     0.001206716*cos(4*xx)
                 );
             case 5: // Nuttall, Albrecht (-163.69dB, -18dB per octave)
+                // taps = 5.901855 * input_sample_rate / transition_bandwidth
                 return (
                     0.293169361571 + 0.451670371292*cos(xx) +
                     0.201735249850*cos(2*xx) + 0.048184602083*cos(3*xx) +
