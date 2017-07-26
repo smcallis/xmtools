@@ -6852,10 +6852,13 @@ namespace xm {
             case 0: // rectangular
                 return 1.0;
             case 1: // Hann window (-43.94dB, -18dB per octave)
+                // taps = 1.674 * input_sample_rate / transition_bandwidth
                 return 0.5 + 0.5*cos(xx);
             case 2: // Nuttall 3-term (-80.41dB, -18dB per octave)
+                // taps = 2.811 * input_sample_rate / transition_bandwidth
                 return 0.41 + 0.5*cos(xx) + 0.09*cos(2*xx);
             case 3: // Nuttall 4-term (-114.38dB, -18dB per octave)
+                // taps = 3.892 * input_sample_rate / transition_bandwidth
                 return (
                     0.353478834 + 0.486608654*cos(xx) +
                     0.146521166*cos(2*xx) + 0.013391346*cos(3*xx)
