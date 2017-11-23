@@ -6455,10 +6455,9 @@ namespace xm {
         return state[index] * 1181783497276652981LL; 
     }
 
-    double prng::uniform() {
-        const double scale = pow(2, -63);
-        int64_t value = (int64_t)uint64();
-        return value*scale;
+    double prng::uniform() { // [0, 1]
+        const double scale = pow(2, -64);
+        return scale*uint64();
     }
 
     double prng::uniform(double lo, double hi) {
