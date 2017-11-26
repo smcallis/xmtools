@@ -30,9 +30,9 @@ PROGRAMS = \
 all: $(PROGRAMS)
 
 % : %.cc $(INCLUDES)
-	@/bin/echo Compiling $@
+	@echo Compiling $@
 	@$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
 
 clean:
-	/bin/rm -rf $(PROGRAMS) *.dSYM *.so *.pyc
+	rm -rf $(PROGRAMS) *.dSYM *.so *.pyc
 
