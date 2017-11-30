@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <endian.h>
 #include <stdarg.h>
 #define __STDC_LIMIT_MACROS
 #include <stdint.h>
@@ -10683,10 +10684,10 @@ namespace xm {
         // read one new block to satisfy our request
         int64 cache_ending = pimpl->cache_offset + pimpl->cache_length;
         if (offset + length > cache_ending && cache_ending < pimpl->data_length) {
-            const int64 PAGE_SIZE = 65536;
+            const int64 page_size = 65536;
             int64 needed = (offset + length) - cache_ending;
-            int64 extra = needed % PAGE_SIZE;
-            int64 wanted = needed + (extra ? PAGE_SIZE - extra : 0);
+            int64 extra = needed % page_size;
+            int64 wanted = needed + (extra ? page_size - extra : 0);
             int64 remaining = pimpl->data_length - cache_ending;
             int64 amount = min(wanted, remaining);
             vector<char> block(amount);
