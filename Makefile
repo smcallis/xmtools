@@ -22,6 +22,18 @@ bin/% : src/%.cc $(INCLUDES)
 	@echo Compiling $@
 	@$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
 
+test:
+	@for source in unit/*.cc; do \
+            printf "  Running %-24s : " $$source; \
+            $(CXX) $(CXXFLAGS) $$source -o ./doit $(LDFLAGS); \
+            ./doit; \
+            if test $$? = 0; \
+                then echo Success; \
+                else echo FAILURE; \
+            fi; \
+            rm -f ./doit; \
+        done
+
 clean:
 	rm -rf $(PROGRAMS) *.dSYM *.so *.pyc
 

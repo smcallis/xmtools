@@ -50,6 +50,8 @@ To Do List:
 
     struct autodiff<>
 
+    expj() in complex.h
+
     blueheader, bluekeyword, bluefield
     bluereader, load1000, load2000
     bluewriter, dump1000, dump2000

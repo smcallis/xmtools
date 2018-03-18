@@ -59,7 +59,7 @@ static void test0003() {
     xm::check(gg == 7, "gg");
     xm::check(hh == 8, "hh");
 
-    xm::dict<xm::tuple<int64, int64>, int> xx;
+    xm::dict<xm::tuple<xm::int64, xm::int64>, int> xx;
     xx[xm::multival(10, 20)] = 30;
     xx[xm::multival(30, 40)] = 90;
     xm::check(xx[xm::multival(10, 20)] == 30, "10,20");
@@ -158,13 +158,13 @@ static void test0005() {
 }
 
 static void test0006_helper(bool reserve) {
-    const int64 maxsize = 1000;
+    const xm::int64 maxsize = 1000;
     using namespace xm;
     dict<int32_t, int64_t> dd;
     dd.test();
     if (reserve) dd.reserve(maxsize);
     dd.test();
-    for (int64 ii = 0; ii<maxsize; ii++) {
+    for (xm::int64 ii = 0; ii<maxsize; ii++) {
         dd.insert(ii*ii, (ii + 1)*1001);
         dd.test();
         for (int jj = 0; jj<=ii; jj++) {
@@ -173,12 +173,12 @@ static void test0006_helper(bool reserve) {
     }
     list<int32_t> keys = dd.keys();
     list<int32_t> vals = dd.vals();
-    for (int64 ii = 0; ii<maxsize; ii++) {
+    for (xm::int64 ii = 0; ii<maxsize; ii++) {
         check(keys[ii] == ii*ii, "keys correct");
         check(vals[ii] == (ii + 1)*1001, "vals correct");
     }
 
-    for (int64 ii = 0; ii<maxsize; ii++) {
+    for (xm::int64 ii = 0; ii<maxsize; ii++) {
         dd.remove(ii*ii);
         if (!reserve) dd.shrink();
         dd.test();
@@ -197,28 +197,28 @@ static void test0006() {
 static void test0007() {
     using namespace xm;
 
-    dict<int64> one;
-    for (int64 ii = 0; ii<5000000; ii++) {
+    dict<xm::int64> one;
+    for (xm::int64 ii = 0; ii<5000000; ii++) {
         one.insert(ii);
     }
     one.test();
 
     // this used to exhibit quadratic runtime
-    dict<int64> two;
-    for (int64 ii = 0; ii<one.size(); ii++) {
+    dict<xm::int64> two;
+    for (xm::int64 ii = 0; ii<one.size(); ii++) {
         two.insert(one.key(ii));
     }
     two.test();
 }
 
 namespace test0008_internal {
-    static int64 keyrefs;
+    static xm::int64 keyrefs;
     struct countedkey {
-        int64 val;
+        xm::int64 val;
         countedkey() : val(0) {
             ++keyrefs;
         }
-        countedkey(int64 val) : val(val) {
+        countedkey(xm::int64 val) : val(val) {
             ++keyrefs;
         }
         ~countedkey() {
@@ -242,13 +242,13 @@ namespace test0008_internal {
         xm::swap(aa.val, bb.val);
     }
 
-    static int64 valrefs;
+    static xm::int64 valrefs;
     struct countedval {
-        int64 val;
+        xm::int64 val;
         countedval() : val(0) {
             ++valrefs;
         }
-        countedval(int64 val) : val(val) {
+        countedval(xm::int64 val) : val(val) {
             ++valrefs;
         }
         ~countedval() {
@@ -274,7 +274,7 @@ static void test0008() {
     {
         dict<countedkey, countedval> dd;
 
-        for (int64 ii = 0; ii<10000; ii++) {
+        for (xm::int64 ii = 0; ii<10000; ii++) {
             countedkey key(ii);
             countedval val(ii*ii);
             dd.inswap(key, val);
