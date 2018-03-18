@@ -1,35 +1,24 @@
 
-CXXFLAGS = -std=c++98 -fwrapv -pthread -g -O3 -Wall -Wextra
-#LDFLAGS = -lX11 -lm -lrt
+CXXFLAGS = -std=c++98 -fwrapv -pthread -g -O3 -Wall -Wextra -Iinc
 LDFLAGS = -lm -lrt
 
 INCLUDES = \
-    xmtools.h \
-    kissfft.h \
-    xmkwds.h \
+    inc/xmtools.h \
+    inc/xm/* \
 
 PROGRAMS = \
-    xmbase \
-    xmcat \
-    xmcut \
-    xmfirpm \
-    xmgps \
-    xmhalf \
-    xmkwds \
-    xmkwds \
-    xmlfsr \
-    xmnoise \
-    xmrate \
-    xmspec \
-    xmstat \
-    xmtest \
-    xmtone \
-    covar \
-    eigen \
+    bin/xmcat \
+    bin/xmcut \
+    bin/xmgps \
+    bin/xmkwds \
+    bin/xmnoise \
+    bin/xmrate \
+    bin/xmstat \
+    bin/xmtone \
 
 all: $(PROGRAMS)
 
-% : %.cc $(INCLUDES)
+bin/% : src/%.cc $(INCLUDES)
 	@echo Compiling $@
 	@$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
 

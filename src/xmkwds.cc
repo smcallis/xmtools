@@ -1,5 +1,5 @@
 #include "xmtools.h"
-#include "xmkwds.h"
+#include "xm/printkwd.h"
 using namespace xm;
 
 int main(int argc, char* argv[]) {
