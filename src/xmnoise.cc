@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     check(rate > 0, "must have sample rate");
     int64 samples = llrint(tspan*rate);
 
-    prng random(seed);
+    longprng random(seed);
 
     bluewriter output(outpath);
     output->time = tstart;
