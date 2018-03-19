@@ -588,13 +588,13 @@ namespace xm {
     template<class ktype, class vtype>
     dict<ktype, vtype>& dict<ktype, vtype>::operator =(
         const dict<ktype, vtype>& other
-    ) { assign(other.storage); }
+    ) { assign(other.storage); return *this; }
 
     template<class ktype, class vtype>
     template<class kk, class vv>
     dict<ktype, vtype>& dict<ktype, vtype>::operator =(
         const dict<kk, vv>& other
-    ) { assign(other.storage); }
+    ) { assign(other.storage); return *this; }
 
     template<class ktype, class vtype>
     vtype& dict<ktype, vtype>::operator [](
