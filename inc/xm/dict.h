@@ -817,7 +817,7 @@ namespace xm {
             bucket<kk, vv>* buckets = other->buckets();
             for (int64 ii = 0; ii<len; ii++) {
                 ktype key = ktype(buckets[ii].key);
-                vtype val = vtyle(buckets[ii].val);
+                vtype val = vtype(buckets[ii].val);
                 storage->inswap(hash(key), key, val);
             }
         }
