@@ -1,6 +1,10 @@
 #ifndef XM_BESSEL_H_
 #define XM_BESSEL_H_ 1
 
+#include <math.h>
+
+#include "basics.h"
+
 namespace xm {
 
     //{{{ internal

@@ -24,8 +24,9 @@ bin/% : src/%.cc $(INCLUDES)
 
 test:
 	@for source in unit/*.cc; do \
-            printf "  Running %-24s : " $$source; \
+            printf "  Compiling %-32s " $$source; \
             $(CXX) $(CXXFLAGS) $$source -o ./doit $(LDFLAGS); \
+            printf "Running  "; \
             ./doit; \
             if test $$? = 0; \
                 then echo Success; \

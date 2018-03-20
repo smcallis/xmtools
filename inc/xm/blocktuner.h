@@ -1,6 +1,12 @@
 #ifndef XM_BLOCKTUNER_H_
 #define XM_BLOCKTUNER_H_ 1
 
+#include <math.h>
+#include <stdint.h>
+
+#include "basics.h"
+#include "complex.h"
+
 namespace xm {
 
     // blocktuner uses a 64 bit integer to track phase.  This has more
