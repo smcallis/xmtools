@@ -588,13 +588,13 @@ namespace xm {
     template<class ktype, class vtype>
     dict<ktype, vtype>& dict<ktype, vtype>::operator =(
         const dict<ktype, vtype>& other
-    ) { assign(other.storage); }
+    ) { assign(other.storage); return *this; }
 
     template<class ktype, class vtype>
     template<class kk, class vv>
     dict<ktype, vtype>& dict<ktype, vtype>::operator =(
         const dict<kk, vv>& other
-    ) { assign(other.storage); }
+    ) { assign(other.storage); return *this; }
 
     template<class ktype, class vtype>
     vtype& dict<ktype, vtype>::operator [](
@@ -817,7 +817,7 @@ namespace xm {
             bucket<kk, vv>* buckets = other->buckets();
             for (int64 ii = 0; ii<len; ii++) {
                 ktype key = ktype(buckets[ii].key);
-                vtype val = vtyle(buckets[ii].val);
+                vtype val = vtype(buckets[ii].val);
                 storage->inswap(hash(key), key, val);
             }
         }
