@@ -68,12 +68,12 @@ namespace xm {
 
             template<class cleanup>
             struct specific : counted {
-                specific(type data, cleanup done) :
-                    counted(data), done(done) {}
+                specific(type data, cleanup finish) :
+                    counted(data), finish(finish) {}
                 virtual ~specific() {
-                    done(this->data);
+                    finish(this->data);
                 }
-                cleanup done;
+                cleanup finish;
             };
 
             static void deleter(type& val) {
