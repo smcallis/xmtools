@@ -1010,7 +1010,7 @@ namespace xm {
                 bool is_swapped;
                 bool kwds_ready;
             };
-            shared<implementation> pimpl;
+            shared<implementation*> pimpl;
     };
 
     bluereader::bluereader(const string& path) {
@@ -1082,56 +1082,56 @@ namespace xm {
             }
         }
 
-        shared<implementation> tmp(new implementation());
+        shared<implementation*> tmp(new implementation());
         swap(pimpl, tmp);
-        swap(pimpl->file, file);
-        pimpl->meta.type     = hdr.type;
-        pimpl->meta.time     = xmgettime(&hdr);
-        pimpl->meta.format   = terminated(hdr.format, 2);
-        pimpl->meta.kwds     = keywords;
-        pimpl->data_offset   = data_offset;
-        pimpl->data_length   = data_length;
-        pimpl->error_offset  = INT64_MIN;
-        pimpl->cache_offset  = 0;
-        pimpl->cache_length  = 0;
-        pimpl->is_swapped    = memcmp(hdr.data_rep, xmnative, 4) != 0;
-        pimpl->kwds_ready    = kwds_ready;
+        swap(pimpl.value()->file, file);
+        pimpl.value()->meta.type     = hdr.type;
+        pimpl.value()->meta.time     = xmgettime(&hdr);
+        pimpl.value()->meta.format   = terminated(hdr.format, 2);
+        pimpl.value()->meta.kwds     = keywords;
+        pimpl.value()->data_offset   = data_offset;
+        pimpl.value()->data_length   = data_length;
+        pimpl.value()->error_offset  = INT64_MIN;
+        pimpl.value()->cache_offset  = 0;
+        pimpl.value()->cache_length  = 0;
+        pimpl.value()->is_swapped    = memcmp(hdr.data_rep, xmnative, 4) != 0;
+        pimpl.value()->kwds_ready    = kwds_ready;
 
         switch (hdr.type/1000) {
             case 1:
-                pimpl->meta.itemsize = xmbytesize(hdr.format);
-                check(pimpl->meta.itemsize != 0, "recognized sample type");
-                pimpl->meta.xcount   = xmxcount(&hdr);
-                pimpl->meta.xstart   = hdr.xstart;
-                pimpl->meta.xdelta   = hdr.xdelta;
-                pimpl->meta.xunits   = hdr.xunits;
-                pimpl->meta.ycount   = 1;
+                pimpl.value()->meta.itemsize = xmbytesize(hdr.format);
+                check(pimpl.value()->meta.itemsize != 0, "recognized sample type");
+                pimpl.value()->meta.xcount   = xmxcount(&hdr);
+                pimpl.value()->meta.xstart   = hdr.xstart;
+                pimpl.value()->meta.xdelta   = hdr.xdelta;
+                pimpl.value()->meta.xunits   = hdr.xunits;
+                pimpl.value()->meta.ycount   = 1;
                 break;
 
             case 2:
-                pimpl->meta.itemsize = xmbytesize(hdr.format);
-                check(pimpl->meta.itemsize != 0, "recognized sample type");
-                pimpl->meta.xcount   = xmxcount(&hdr);
-                pimpl->meta.xstart   = hdr.xstart;
-                pimpl->meta.xdelta   = hdr.xdelta;
-                pimpl->meta.xunits   = hdr.xunits;
-                pimpl->meta.ycount   = xmycount(&hdr);
-                pimpl->meta.ystart   = hdr.ystart;
-                pimpl->meta.ydelta   = hdr.ydelta;
-                pimpl->meta.yunits   = hdr.yunits;
+                pimpl.value()->meta.itemsize = xmbytesize(hdr.format);
+                check(pimpl.value()->meta.itemsize != 0, "recognized sample type");
+                pimpl.value()->meta.xcount   = xmxcount(&hdr);
+                pimpl.value()->meta.xstart   = hdr.xstart;
+                pimpl.value()->meta.xdelta   = hdr.xdelta;
+                pimpl.value()->meta.xunits   = hdr.xunits;
+                pimpl.value()->meta.ycount   = xmycount(&hdr);
+                pimpl.value()->meta.ystart   = hdr.ystart;
+                pimpl.value()->meta.ydelta   = hdr.ydelta;
+                pimpl.value()->meta.yunits   = hdr.yunits;
                 break;
 
             case 3:
-                pimpl->meta.itemsize = hdr.recsize;
-                check(pimpl->meta.itemsize > 0, "positive record size");
-                pimpl->meta.xcount   = llrint(hdr.data_size)/hdr.recsize;
-                pimpl->meta.xstart   = hdr.xstart;
-                pimpl->meta.xdelta   = hdr.xdelta;
-                pimpl->meta.xunits   = hdr.xunits;
-                pimpl->meta.ycount   = 1;
+                pimpl.value()->meta.itemsize = hdr.recsize;
+                check(pimpl.value()->meta.itemsize > 0, "positive record size");
+                pimpl.value()->meta.xcount   = llrint(hdr.data_size)/hdr.recsize;
+                pimpl.value()->meta.xstart   = hdr.xstart;
+                pimpl.value()->meta.xdelta   = hdr.xdelta;
+                pimpl.value()->meta.xunits   = hdr.xunits;
+                pimpl.value()->meta.ycount   = 1;
 
                 for (int64 ii = 0; ii<hdr.subsize; ii++) {
-                    pimpl->meta.fields.append(
+                    pimpl.value()->meta.fields.append(
                         (bluefield){
                             fortranstr(hdr.u.std.fields[ii].name, 4),
                             terminated(hdr.u.std.fields[ii].format, 2),
@@ -1142,13 +1142,13 @@ namespace xm {
                 break;
 
             case 5:
-                pimpl->meta.itemsize = hdr.recsize;
-                check(pimpl->meta.itemsize > 0, "positive record size");
-                pimpl->meta.xcount   = llrint(hdr.data_size)/hdr.recsize;
-                pimpl->meta.xstart   = hdr.xstart;
-                pimpl->meta.xdelta   = hdr.xdelta;
-                pimpl->meta.xunits   = hdr.xunits;
-                pimpl->meta.ycount   = 1;
+                pimpl.value()->meta.itemsize = hdr.recsize;
+                check(pimpl.value()->meta.itemsize > 0, "positive record size");
+                pimpl.value()->meta.xcount   = llrint(hdr.data_size)/hdr.recsize;
+                pimpl.value()->meta.xstart   = hdr.xstart;
+                pimpl.value()->meta.xdelta   = hdr.xdelta;
+                pimpl.value()->meta.xunits   = hdr.xunits;
+                pimpl.value()->meta.ycount   = 1;
                 // This doesn't really belong here, but we assume that all Type
                 // 5000 files are ephemeris in the ECR (ECF) coordinate system.
                 // It'll be good to catch errors if we ever find one that isn't.
@@ -1172,7 +1172,7 @@ namespace xm {
                 for (int64 offset = 0, ii = 0; ii<hdr.subsize; ii++) {
                     string format = terminated(hdr.u.eph.fields[ii].format, 2);
                     int64 bytes = xmbytesize(format);
-                    pimpl->meta.fields.append(
+                    pimpl.value()->meta.fields.append(
                         (bluefield){
                             fortranstr(hdr.u.eph.fields[ii].name, 4),
                             format, (int16_t)offset
@@ -1189,35 +1189,35 @@ namespace xm {
     }
 
     bool bluereader::kwds_ready() const {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return pimpl->kwds_ready;
+        check(pimpl.valid(), "need an opened file");
+        return pimpl.value()->kwds_ready;
     }
 
     bool bluereader::is_swapped() const {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return pimpl->is_swapped;
+        check(pimpl.valid(), "need an opened file");
+        return pimpl.value()->is_swapped;
     }
 
     const bluemeta* bluereader::operator ->() const {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return &pimpl->meta;
+        check(pimpl.valid(), "need an opened file");
+        return &pimpl.value()->meta;
     }
 
     const bluemeta& bluereader::operator *() const {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return pimpl->meta;
+        check(pimpl.valid(), "need an opened file");
+        return pimpl.value()->meta;
     }
 
     void bluereader::grab(int64 offset, void* buffer, int64 length) {
         char* pointer = (char*)buffer;
-        check(pimpl.borrow() != 0, "need an opened file");
+        check(pimpl.valid(), "need an opened file");
         // first we check that they don't go backwards
         check(
-            offset >= pimpl->error_offset,
+            offset >= pimpl.value()->error_offset,
             "not allowed to read backward in file %lld < %lld",
-            offset, pimpl->error_offset
+            offset, pimpl.value()->error_offset
         );
-        pimpl->error_offset = offset;
+        pimpl.value()->error_offset = offset;
         if (length == 0) return;
 
         // zeros before the start of the file
@@ -1231,50 +1231,50 @@ namespace xm {
         }
 
         // discard blocks before our request
-        while (pimpl->cache.size() != 0) {
-            vector<char>& block = pimpl->cache[0];
-            if (offset < pimpl->cache_offset + (int64)block.size()) break;
-            pimpl->cache_offset += block.size();
-            pimpl->cache_length -= block.size();
-            pimpl->cache.remove(0);
+        while (pimpl.value()->cache.size() != 0) {
+            vector<char>& block = pimpl.value()->cache[0];
+            if (offset < pimpl.value()->cache_offset + (int64)block.size()) break;
+            pimpl.value()->cache_offset += block.size();
+            pimpl.value()->cache_length -= block.size();
+            pimpl.value()->cache.remove(0);
         }
 
         // skip to the start if it's after our cache
-        if (offset > pimpl->cache_offset + pimpl->cache_length) {
-            check(pimpl->cache.size() == 0, "sanity");
-            check(pimpl->cache_length == 0, "sanity");
-            check(pimpl->cache_offset <= pimpl->data_length, "sanity");
+        if (offset > pimpl.value()->cache_offset + pimpl.value()->cache_length) {
+            check(pimpl.value()->cache.size() == 0, "sanity");
+            check(pimpl.value()->cache_length == 0, "sanity");
+            check(pimpl.value()->cache_offset <= pimpl.value()->data_length, "sanity");
             int64 amount = min(
-                offset - pimpl->cache_offset,
-                pimpl->data_length - pimpl->cache_offset
+                offset - pimpl.value()->cache_offset,
+                pimpl.value()->data_length - pimpl.value()->cache_offset
             );
-            check(pimpl->file.skip(amount), "skip %lld", amount);
-            pimpl->cache_offset += amount;
+            check(pimpl.value()->file.skip(amount), "skip %lld", amount);
+            pimpl.value()->cache_offset += amount;
         }
 
         // read one new block to satisfy our request
-        int64 cache_ending = pimpl->cache_offset + pimpl->cache_length;
-        if (offset + length > cache_ending && cache_ending < pimpl->data_length) {
+        int64 cache_ending = pimpl.value()->cache_offset + pimpl.value()->cache_length;
+        if (offset + length > cache_ending && cache_ending < pimpl.value()->data_length) {
             const int64 page_size = 65536;
             int64 needed = (offset + length) - cache_ending;
             int64 extra = needed % page_size;
             int64 wanted = needed + (extra ? page_size - extra : 0);
-            int64 remaining = pimpl->data_length - cache_ending;
+            int64 remaining = pimpl.value()->data_length - cache_ending;
             int64 amount = min(wanted, remaining);
             vector<char> block(amount);
-            check(pimpl->file.read(block.data(), amount), "read %lld", amount);
-            pimpl->cache.append(vector<char>());
-            swap(pimpl->cache[pimpl->cache.size() - 1], block);
-            pimpl->cache_length += amount;
+            check(pimpl.value()->file.read(block.data(), amount), "read %lld", amount);
+            pimpl.value()->cache.append(vector<char>());
+            swap(pimpl.value()->cache[pimpl.value()->cache.size() - 1], block);
+            pimpl.value()->cache_length += amount;
             // XXX: Here is where we could check to see if we should read
             // keywords that come at the end of a pipe, but it isn't really
             // needed in practice.
         }
 
         // copy from the cache to the output
-        int64_t block_offset = pimpl->cache_offset;
-        for (int64 ii = 0; ii<pimpl->cache.size(); ii++) {
-            vector<char>& block = pimpl->cache[ii];
+        int64_t block_offset = pimpl.value()->cache_offset;
+        for (int64 ii = 0; ii<pimpl.value()->cache.size(); ii++) {
+            vector<char>& block = pimpl.value()->cache[ii];
             int64 start = offset - block_offset;
             int64 amount = min(length, (int64)block.size() - start);
             memcpy(pointer, block.data() + start, amount);
@@ -1291,14 +1291,14 @@ namespace xm {
 
     void bluereader::grabcf(int64 offset, cfloat* samples, int64 length) {
         using namespace internal;
-        check(pimpl.borrow() != 0, "need an opened file");
-        const int64 sample_size = pimpl->meta.itemsize;
+        check(pimpl.valid(), "need an opened file");
+        const int64 sample_size = pimpl.value()->meta.itemsize;
 
         // this one reads directly into the samples vector
-        if (pimpl->meta.format == "CF") {
+        if (pimpl.value()->meta.format == "CF") {
             grab(offset*sample_size, (char*)samples, length*sample_size);
 
-            if (pimpl->is_swapped) {
+            if (pimpl.value()->is_swapped) {
                 float* elems = (float*)samples;
                 for (int64 ii = 0; ii<2*length; ii++) {
                     byteswap4(elems + ii);
@@ -1308,18 +1308,18 @@ namespace xm {
         }
 
         // the rest perform type conversions and use the scratch buffer
-        pimpl->scratch.resize(length * sample_size);
-        grab(offset*sample_size, (char*)pimpl->scratch.data(), length*sample_size);
+        pimpl.value()->scratch.resize(length * sample_size);
+        grab(offset*sample_size, (char*)pimpl.value()->scratch.data(), length*sample_size);
 
-        if (pimpl->meta.format == "SB") {
-            int8_t* ptr = (int8_t*)pimpl->scratch.data();
+        if (pimpl.value()->meta.format == "SB") {
+            int8_t* ptr = (int8_t*)pimpl.value()->scratch.data();
             for (int64 ii = 0; ii<length; ii++) {
                 samples[ii] = cfloat(ptr[ii], 0);
             }
 
-        } else if (pimpl->meta.format == "SI") {
-            int16_t* ptr = (int16_t*)pimpl->scratch.data();
-            if (pimpl->is_swapped) {
+        } else if (pimpl.value()->meta.format == "SI") {
+            int16_t* ptr = (int16_t*)pimpl.value()->scratch.data();
+            if (pimpl.value()->is_swapped) {
                 for (int64 ii = 0; ii<length; ii++) {
                     byteswap2(ptr + ii);
                 }
@@ -1328,9 +1328,9 @@ namespace xm {
                 samples[ii] = cfloat(ptr[ii], 0);
             }
 
-        } else if (pimpl->meta.format == "SL") {
-            int32_t* ptr = (int32_t*)pimpl->scratch.data();
-            if (pimpl->is_swapped) {
+        } else if (pimpl.value()->meta.format == "SL") {
+            int32_t* ptr = (int32_t*)pimpl.value()->scratch.data();
+            if (pimpl.value()->is_swapped) {
                 for (int64 ii = 0; ii<length; ii++) {
                     byteswap4(ptr + ii);
                 }
@@ -1339,9 +1339,9 @@ namespace xm {
                 samples[ii] = cfloat(ptr[ii], 0);
             }
 
-        } else if (pimpl->meta.format == "SF") {
-            float* ptr = (float*)pimpl->scratch.data();
-            if (pimpl->is_swapped) {
+        } else if (pimpl.value()->meta.format == "SF") {
+            float* ptr = (float*)pimpl.value()->scratch.data();
+            if (pimpl.value()->is_swapped) {
                 for (int64 ii = 0; ii<length; ii++) {
                     byteswap4(ptr + ii);
                 }
@@ -1350,9 +1350,9 @@ namespace xm {
                 samples[ii] = cfloat(ptr[ii], 0);
             }
 
-        } else if (pimpl->meta.format == "SD") {
-            double* ptr = (double*)pimpl->scratch.data();
-            if (pimpl->is_swapped) {
+        } else if (pimpl.value()->meta.format == "SD") {
+            double* ptr = (double*)pimpl.value()->scratch.data();
+            if (pimpl.value()->is_swapped) {
                 for (int64 ii = 0; ii<length; ii++) {
                     byteswap8(ptr + ii);
                 }
@@ -1361,15 +1361,15 @@ namespace xm {
                 samples[ii] = cfloat(ptr[ii], 0);
             }
 
-        } else if (pimpl->meta.format == "CB") {
-            int8_t* ptr = (int8_t*)pimpl->scratch.data();
+        } else if (pimpl.value()->meta.format == "CB") {
+            int8_t* ptr = (int8_t*)pimpl.value()->scratch.data();
             for (int64 ii = 0; ii<length; ii++) {
                 samples[ii] = cfloat(ptr[2*ii + 0], ptr[2*ii + 1]);
             }
 
-        } else if (pimpl->meta.format == "CI") {
-            int16_t* ptr = (int16_t*)pimpl->scratch.data();
-            if (pimpl->is_swapped) {
+        } else if (pimpl.value()->meta.format == "CI") {
+            int16_t* ptr = (int16_t*)pimpl.value()->scratch.data();
+            if (pimpl.value()->is_swapped) {
                 for (int64 ii = 0; ii<2*length; ii++) {
                     byteswap2(ptr + ii);
                 }
@@ -1378,9 +1378,9 @@ namespace xm {
                 samples[ii] = cfloat(ptr[2*ii + 0], ptr[2*ii + 1]);
             }
 
-        } else if (pimpl->meta.format == "CL") {
-            int32_t* ptr = (int32_t*)pimpl->scratch.data();
-            if (pimpl->is_swapped) {
+        } else if (pimpl.value()->meta.format == "CL") {
+            int32_t* ptr = (int32_t*)pimpl.value()->scratch.data();
+            if (pimpl.value()->is_swapped) {
                 for (int64 ii = 0; ii<2*length; ii++) {
                     byteswap4(ptr + ii);
                 }
@@ -1389,9 +1389,9 @@ namespace xm {
                 samples[ii] = cfloat(ptr[2*ii + 0], ptr[2*ii + 1]);
             }
 
-        } else if (pimpl->meta.format == "CD") {
-            double* ptr = (double*)pimpl->scratch.data();
-            if (pimpl->is_swapped) {
+        } else if (pimpl.value()->meta.format == "CD") {
+            double* ptr = (double*)pimpl.value()->scratch.data();
+            if (pimpl.value()->is_swapped) {
                 for (int64 ii = 0; ii<2*length; ii++) {
                     byteswap8(ptr + ii);
                 }
@@ -1401,18 +1401,18 @@ namespace xm {
             }
 
         } else {
-            check(false, "unsuported conversion '%s' to 'CF'", pimpl->meta.format.data());
+            check(false, "unsuported conversion '%s' to 'CF'", pimpl.value()->meta.format.data());
         }
     }
 
     const void* bluereader::mmap() {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return pimpl->data_offset + (char*)pimpl->file.mmap();
+        check(pimpl.valid(), "need an opened file");
+        return pimpl.value()->data_offset + (char*)pimpl.value()->file.mmap();
     }
 
     inline int64 bluereader::byte_offset(int64 sample) {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return pimpl->data_offset + sample*pimpl->meta.itemsize;
+        check(pimpl.valid(), "need an opened file");
+        return pimpl.value()->data_offset + sample*pimpl.value()->meta.itemsize;
     }
 
     //}}}
@@ -1441,14 +1441,14 @@ namespace xm {
                 int64 bytes_written;
                 int64 total_length;
             };
-            shared<implementation> pimpl;
+            shared<implementation*> pimpl;
     };
 
     bluewriter::~bluewriter() {
-        if (pimpl.borrow() != 0) check(
-            pimpl->bytes_written == pimpl->total_length,
+        if (pimpl.valid()) check(
+            pimpl.value()->bytes_written == pimpl.value()->total_length,
             "need to write the total number of bytes (%lld/%lld)",
-            pimpl->bytes_written, pimpl->total_length
+            pimpl.value()->bytes_written, pimpl.value()->total_length
         );
     }
 
@@ -1461,73 +1461,73 @@ namespace xm {
         check(fd >= 0, "opening '%s' for writing", path.data());
         rawfile file(fd);
 
-        shared<implementation> tmp(new implementation());
+        shared<implementation*> tmp(new implementation());
         swap(pimpl, tmp);
-        swap(pimpl->file, file);
-        pimpl->meta.type     = 1000;
-        pimpl->meta.format   = "CF";
-        pimpl->meta.xcount   = 0;
-        pimpl->meta.ycount   = 1;
-        pimpl->meta.xstart   = 0.0;
-        pimpl->meta.ystart   = 0.0;
-        pimpl->meta.xdelta   = 1.0;
-        pimpl->meta.ydelta   = 1.0;
-        pimpl->meta.xunits   = 0;
-        pimpl->meta.yunits   = 0;
+        swap(pimpl.value()->file, file);
+        pimpl.value()->meta.type     = 1000;
+        pimpl.value()->meta.format   = "CF";
+        pimpl.value()->meta.xcount   = 0;
+        pimpl.value()->meta.ycount   = 1;
+        pimpl.value()->meta.xstart   = 0.0;
+        pimpl.value()->meta.ystart   = 0.0;
+        pimpl.value()->meta.xdelta   = 1.0;
+        pimpl.value()->meta.ydelta   = 1.0;
+        pimpl.value()->meta.xunits   = 0;
+        pimpl.value()->meta.yunits   = 0;
         // sentinel to indicate that we need
         // to write the header and keywords
-        pimpl->bytes_written = -1;
+        pimpl.value()->bytes_written = -1;
     }
 
     bluemeta* bluewriter::operator ->() {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return &pimpl->meta;
+        check(pimpl.valid(), "need an opened file");
+        return &pimpl.value()->meta;
     }
 
     const bluemeta* bluewriter::operator ->() const {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return &pimpl->meta;
+        check(pimpl.valid(), "need an opened file");
+        return &pimpl.value()->meta;
     }
 
     bluemeta& bluewriter::operator *() {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return pimpl->meta;
+        check(pimpl.valid(), "need an opened file");
+        return pimpl.value()->meta;
     }
 
     const bluemeta& bluewriter::operator *() const {
-        check(pimpl.borrow() != 0, "need an opened file");
-        return pimpl->meta;
+        check(pimpl.valid(), "need an opened file");
+        return pimpl.value()->meta;
     }
 
     void bluewriter::setup() {
         using namespace internal;
-        xmheader hdr = init_header(pimpl->meta);
+        xmheader hdr = init_header(pimpl.value()->meta);
 
-        check(pimpl->file.write(&hdr, sizeof(xmheader)), "writing header");
-        write_kwds(&pimpl->file, pimpl->meta.kwds);
+        check(pimpl.value()->file.write(&hdr, sizeof(xmheader)), "writing header");
+        write_kwds(&pimpl.value()->file, pimpl.value()->meta.kwds);
         /*
         if (padding_bytes) {
             static char scratch[512];
-            check(pimpl->file.write(scratch, padding_bytes), "writing padding");
+            check(pimpl.value()->file.write(scratch, padding_bytes), "writing padding");
         }
         */
 
-        pimpl->bytes_written = 0;
-        pimpl->total_length = (uint64_t)hdr.data_size;
+        pimpl.value()->bytes_written = 0;
+        pimpl.value()->total_length = (uint64_t)hdr.data_size;
     }
 
     void bluewriter::write(const void* ptr, int64 len) {
-        check(pimpl.borrow() != 0, "need an opened file");
+        check(pimpl.valid(), "need an opened file");
 
-        if (pimpl->bytes_written == -1) setup();
+        if (pimpl.value()->bytes_written == -1) setup();
 
         check(
-            pimpl->bytes_written + len <= pimpl->total_length,
+            pimpl.value()->bytes_written + len <= pimpl.value()->total_length,
             "can't write %lld bytes of data %lld/%lld", len,
-            pimpl->bytes_written, pimpl->total_length
+            pimpl.value()->bytes_written, pimpl.value()->total_length
         );
-        check(pimpl->file.write(ptr, len), "writing data");
-        pimpl->bytes_written += len;
+        check(pimpl.value()->file.write(ptr, len), "writing data");
+        pimpl.value()->bytes_written += len;
     }
 
     //}}}

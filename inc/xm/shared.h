@@ -5,38 +5,86 @@
 
 namespace xm {
 
+    //
+    // This class holds on to a value using reference counting.
+    // It is similar in spirit to std::shared_ptr<> in C++11,
+    // but this works in C++98, and it's not just for use with
+    // pointers.  It can hold values of any kind.
+    // 
+    // Some common examples:
+    //
+    // This stores a file descriptor.  It will be closed when
+    // the last shared<int> is destructed:
+    //     shared<int> fd(::open("/path/file.txt", O_RDONLY), ::close);
+    // 
+    // This stores an FFTW plan.  It will be destroyed when done:
+    //     shared<fftwf_plan> plan(
+    //         ::fftwf_plan_dft_1d(n, in, out, sign, flags),
+    //         ::fftwf_destroy_plan
+    //     );
+    // 
+    // This shares a pointer to an instance.  Since a cleanup
+    // function isn't specified, the default cleanup function
+    // will call operator delete on the pointer:
+    //     struct foo { int bar; };
+    //     shared<foo> ptr(new foo);
+    //
+
     template<class type>
     struct shared {
+
         ~shared();
+        shared(const shared<type>& that);
+        shared<type>& operator=(const shared<type>& that);
+
+        // Constructs an empty shared value holder.
         shared();
-        shared(type* pp);
-        shared(const shared<type>& other);
-        shared<type>& operator =(const shared<type>& other);
 
-        type& operator *();
-        const type& operator *() const;
+        // Build a shared value with default cleanup function
+        // Use this constructor when type is a pointer, and you
+        // want it to be deleted when it's time to cleanup.
+        shared(const type& val);
 
-        type* operator ->();
-        const type* operator ->() const;
+        // Build a shared value with a specific cleanup function.
+        template<class cleanup>
+        shared(const type& val, cleanup func);
 
-        type* borrow();
-        const type* borrow() const;
+        // Access the shared value.  This will throw an
+        // exception if there is no current value.
+        type& value();
+        const type& value() const;
+
+        // Asks if there is a current value
+        bool valid() const;
 
         private:
-
-            template<class tt> friend void swap(
-                shared<tt>& flip, shared<tt>& flop
-            );
-
             struct counted {
-                type* pointer;
-                ssize_t refcount;
+                virtual ~counted(){}
+                counted(type data) :
+                    refs(1), data(data) {}
+                mutable int64 refs;
+                type data;
             };
 
-            void decref();
-            counted* incref();
+            template<class cleanup>
+            struct specific : counted {
+                specific(type data, cleanup done) :
+                    counted(data), done(done) {}
+                virtual ~specific() {
+                    done(this->data);
+                }
+                cleanup done;
+            };
 
-            counted* storage;
+            static void deleter(type& val) {
+                delete val;
+            }
+
+            void decref() const;
+            counted* incref() const;
+
+            mutable counted* ptr;
+
     };
 
     template<class type>
@@ -45,80 +93,61 @@ namespace xm {
     }
 
     template<class type>
-    shared<type>::shared() : storage(0) {}
+    shared<type>::shared() : ptr(0) {}
 
     template<class type>
-    shared<type>::shared(type* pp) : storage(new counted) {
-        storage->refcount = 1;
-        storage->pointer = pp;
-    }
+    shared<type>::shared(const shared<type>& that) :
+        ptr(that.incref()) {}
 
     template<class type>
-    shared<type>::shared(const shared<type>& other) : storage(other.incref()) {}
-
-    template<class type>
-    shared<type>& shared<type>::operator =(const shared<type>& other) {
-        if (this == &other) return *this;
-        if (storage == other.storage) return *this;
+    shared<type>& shared<type>::operator=(const shared<type>& that) {
+        counted* copy = that.incref();
         decref();
-        // XXX: incref() needs a mutable refcount...
-        storage = other.incref();
+        ptr = copy;
         return *this;
     }
 
     template<class type>
-    type& shared<type>::operator *() {
-        check(storage != 0, "can't dereference a null ptr");
-        return *storage->pointer;
+    shared<type>::shared(const type& val) :
+        ptr(new specific<void (*)(type&)>(val, deleter)) {}
+
+    template<class type>
+    template<class cleanup>
+    shared<type>::shared(const type& val, cleanup func) :
+        ptr(new specific<cleanup>(val, func)) {}
+
+    template<class type>
+    type& shared<type>::value() {
+        check(ptr != 0, "can't access empty shared value");
+        return ptr->data;
     }
 
     template<class type>
-    const type& shared<type>::operator *() const {
-        check(storage != 0, "can't dereference a null ptr");
-        return *storage->pointer;
+    const type& shared<type>::value() const {
+        check(ptr != 0, "can't access empty shared value");
+        return ptr->data;
     }
 
     template<class type>
-    type* shared<type>::operator ->() {
-        check(storage != 0, "can't dereference a null ptr");
-        return storage->pointer;
+    bool shared<type>::valid() const {
+        return ptr != 0;
     }
 
     template<class type>
-    const type* shared<type>::operator ->() const {
-        check(storage != 0, "can't dereference a null ptr");
-        return storage->pointer;
-    }
-
-    template<class type>
-    type* shared<type>::borrow() {
-        return storage ? storage->pointer : 0;
-    }
-
-    template<class type>
-    const type* shared<type>::borrow() const {
-        return storage ? storage->pointer : 0;
-    }
-
-    template<class type>
-    void shared<type>::decref() {
-        if (storage) {
-            if (--storage->refcount == 0) {
-                delete storage->pointer;
-                delete storage;
-            }
+    void shared<type>::decref() const {
+        if (ptr && --ptr->refs == 0) {
+            delete ptr;
+            ptr = 0;
         }
     }
 
     template<class type>
-    typename shared<type>::counted* shared<type>::incref() {
-        if (storage) ++storage->refcount;
-        return storage;
-    }
-
-    template<class type> 
-    void swap(shared<type>& flip, shared<type>& flop) {
-        swap(flip.storage, flop.storage);
+    typename shared<type>::counted* shared<type>::incref() const {
+        if (ptr) {
+            ++ptr->refs;
+            return ptr;
+        }
+        return 0;
     }
 
 }
