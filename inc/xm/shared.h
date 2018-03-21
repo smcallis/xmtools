@@ -27,7 +27,7 @@ namespace xm {
     // function isn't specified, the default cleanup function
     // will call operator delete on the pointer:
     //     struct foo { int bar; };
-    //     shared<foo> ptr(new foo);
+    //     shared<foo*> ptr(new foo);
     //
 
     template<class type>
